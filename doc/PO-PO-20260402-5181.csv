@@ -1,0 +1,7 @@
+﻿PO Number,PO Date,Expected Date,Supplier Name,Ship To Name,Ship To Address1,Ship To Address2,Ship To City,Ship To Province,Ship To Zip,Ship To Country,Notes
+PO-20260402-5181,4/1/2026,,Brandon Supplier,New Jersey Warehouse,2 Federal Square,,Newark,New Jersey,"07102",United States,
+Line No,SKU,Supplier SKU,Supplier Barcode,Title,Order Qty Units,Unit Cost,Extended Cost
+1,bch-flops-bl-l,,,"Beach Flip Flops — Blue / L",500,2.99,1495.00
+2,bch-flops-bl-m,,,"Beach Flip Flops — Blue / M",250,2.99,747.50
+3,bch-flops-bl-s,,,"Beach Flip Flops — Blue / S",100,2.99,299.00
+4,bch-flops-gr-l,,,"Beach Flip Flops — Green / L",200,2.99,598.00

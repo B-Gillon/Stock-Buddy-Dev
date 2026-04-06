@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------
+   GLOBAL BASE
+--------------------------------------------- */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #f3f4f6; /* light gray */
+  font-family: system-ui, sans-serif;
+  color: #111827;
+}
+
+/* ---------------------------------------------
+   TABLE — OLD UI DENSITY (SOFTER VERSION)
+--------------------------------------------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px; /* text-sm */
+}
+
+thead th {
+  background: #f9fafb; /* lighter gray */
+  border-bottom: 1px solid #e5e7eb;
+  padding: 4px 8px; /* px-2 py-1 */
+  font-weight: 600;
+  text-align: left;
+}
+
+tbody td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f0f0f0; /* softer border */
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+/* Row height */
+tbody tr {
+  height: 44px;
+}
+
+/* Hover */
+tbody tr:hover {
+  background: #f9fafb;
+}
+
+/* ---------------------------------------------
+   IMAGE WRAPPERS — SOFTER GRAY
+--------------------------------------------- */
+
+td .image-wrapper,
+td div.w-10 {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f3f4f6; /* softer */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+td img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+}
+
+/* ---------------------------------------------
+   BUTTONS — LIGHTER, LESS BULKY
+--------------------------------------------- */
+
+button {
+  font-size: 14px;
+  padding: 4px 10px; /* smaller */
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------
+   INPUTS & SELECTS — MATCH OLD UI
+--------------------------------------------- */
+
+input,
+select {
+  font-size: 14px;
+  padding: 4px 6px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------
+   CARD WRAPPER — CENTERED
+--------------------------------------------- */
+
+.page-card {
+  max-width: 1200px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------
+   CONTENT AREA — LIGHTER TOUCH
+--------------------------------------------- */
+
+.content-area {
+  padding: 12px; /* slightly more breathing room */
+}
+
+html {
+  overflow-y: scroll;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}

@@ -1,0 +1,165 @@
+******************************************************************
+**********CREATE A PAGE*******************************************
+This simply creates the new blank page structure
+******************************************************************
+
+TASK: Create a new page in the Stock Buddy app.
+
+Before generating ANY code:
+1. Read Engineering_Specs.txt.
+2. Read Schema_Reference.md.
+3. Confirm the exact route and file location for the new page.
+4. Tell me whether this page requires new database fields, tables, or schema changes.
+5. Wait for my approval before generating any code.
+
+Once I approve:
+- Generate the server page in /src/app/<route>/page.jsx.
+- Generate the corresponding client page in /src/components/<ClientPageName>.jsx.
+- Follow all server/client component rules.
+- Follow all naming conventions.
+- Follow all UI patterns (header, modals, tables, filters).
+- Do not invent new patterns, folders, or fields.
+- Do not fetch data inside client components.
+- Do not perform joins inside client components.
+- Place all files in the correct folders.
+- Output the full code for each file.
+
+PAGE REQUEST: Create the Locations page.
+
+******************************************************************
+**********CREATE A MODAL******************************************
+******************************************************************
+
+TASK: Create a new modal component in the Stock Buddy app.
+
+Before generating ANY code:
+1. Read Engineering_Specs.txt.
+2. Read Schema_Reference.md.
+3. Confirm the exact purpose of the modal (detail modal, filter modal, search modal, etc.).
+4. Confirm the expected props and data shape.
+5. Tell me whether this modal requires new database fields, tables, or schema changes.
+6. Wait for my approval before generating any code.
+
+Once I approve:
+- Generate a client component in /src/components/<ModalName>.jsx.
+- Include "use client" at the top.
+- Follow all modal patterns defined in Engineering_Specs.txt.
+- Follow all naming conventions.
+- Follow all UI conventions (header, close button, layout, spacing).
+- Do not invent new patterns, folders, or fields.
+- Do not fetch data inside the modal.
+- Do not perform joins inside the modal.
+- Accept all required data via props.
+- Output the full code for the modal component.
+
+TASK: Create a new modal component in the Stock Buddy app.
+[...prompt continues...]
+
+MODAL REQUEST: Create a ProductDetailModal that shows all product fields and a table of variants.
+
+******************************************************************
+**********CREATE A TABLE******************************************
+******************************************************************
+
+TASK: Create a new table component in the Stock Buddy app.
+
+Before generating ANY code:
+1. Read Engineering_Specs.txt.
+2. Read Schema_Reference.md.
+3. Confirm the exact purpose of the table (listing products, variants, inventory items, locations, etc.).
+4. Confirm the expected columns, data shape, and row actions.
+5. Tell me whether this table requires new database fields, tables, or schema changes.
+6. Wait for my approval before generating any code.
+
+Once I approve:
+- Generate a server component in /src/app/<route>/page.jsx that fetches and joins all required data.
+- Generate a client component in /src/components/<TableName>.jsx that renders the table UI.
+- Follow all table patterns defined in Engineering_Specs.txt.
+- Follow all naming conventions.
+- Follow all UI conventions (header row, sortable columns, row click behavior, empty state).
+- Do not invent new patterns, folders, or fields.
+- Do not fetch data inside the client component.
+- Do not perform joins inside the client component.
+- Accept all required data via props.
+- Output the full code for each file.
+
+******************************************************************
+**********CREATE A FILTER MODAL***********************************
+******************************************************************
+
+TASK: Create a new filter modal component in the Stock Buddy app.
+
+Before generating ANY code:
+1. Read Engineering_Specs.txt.
+2. Read Schema_Reference.md.
+3. Confirm the exact purpose of the filter modal and the page it belongs to.
+4. Confirm the expected filter categories, filter fields, and data shape.
+5. Confirm how selected filters should be returned to the parent component.
+6. Tell me whether this filter modal requires new database fields, tables, or schema changes.
+7. Wait for my approval before generating any code.
+
+Once I approve:
+- Generate a client component in /src/components/<FilterModalName>.jsx.
+- Include "use client" at the top.
+- Follow all filter modal patterns defined in Engineering_Specs.txt.
+- Follow all naming conventions.
+- Follow all UI conventions (header, close button, pill UI, multi-select checkboxes, apply/clear buttons).
+- Do not invent new patterns, folders, or fields.
+- Do not fetch data inside the modal.
+- Do not perform joins inside the modal.
+- Accept all filter options and current filter state via props.
+- Return updated filter state through the onApply callback.
+- Output the full code for the filter modal component.
+
+******************************************************************
+**********CREATE A SERVER ACTION**********************************
+******************************************************************
+
+TASK: Create a new server action in the Stock Buddy app.
+
+Before generating ANY code:
+1. Read Engineering_Specs.txt.
+2. Read Schema_Reference.md.
+3. Confirm the exact purpose of the server action (create, update, delete, bulk update, sync trigger, etc.).
+4. Confirm the expected input parameters and validation requirements.
+5. Confirm the expected return shape.
+6. Tell me whether this server action requires new database fields, tables, or schema changes.
+7. Wait for my approval before generating any code.
+
+Once I approve:
+- Generate a server action in /src/app/actions/<ActionName>.js.
+- Follow all server action patterns defined in Engineering_Specs.txt.
+- Follow all naming conventions.
+- Validate all inputs using the patterns defined in the Engineering Spec.
+- Use Supabase queries exactly as described in the Engineering Spec.
+- Do not invent new patterns, folders, or fields.
+- Do not perform UI logic inside the server action.
+- Return only structured data or success/error objects.
+- Output the full code for the server action file.
+
+******************************************************************
+**********CREATE A SYNC PIPELINE STEP*****************************
+******************************************************************
+
+TASK: Create or update a sync pipeline step in the Stock Buddy app.
+
+Before generating ANY code:
+1. Read Engineering_Specs.txt.
+2. Read Schema_Reference.md.
+3. Confirm the exact purpose of this sync step (fetch, process, transform, insert, update, or orchestrate).
+4. Confirm which Shopify objects are involved and which Supabase tables they map to.
+5. Confirm the expected input and output shapes for this step.
+6. Tell me whether this sync step requires new database fields, tables, or schema changes.
+7. Wait for my approval before generating any code.
+
+Once I approve:
+- Generate the sync step inside /src/lib/sync/<StepName>.js.
+- Follow all sync pipeline patterns defined in Engineering_Specs.txt.
+- Follow all naming conventions.
+- Use the existing fetch/process/insert structure.
+- Use the Shopify Admin GraphQL API exactly as described in the Engineering Spec.
+- Use Supabase queries exactly as described in the Engineering Spec.
+- Do not invent new patterns, folders, or fields.
+- Do not perform UI logic inside sync code.
+- Return only structured data or success/error objects.
+- Output the full code for the sync step file.

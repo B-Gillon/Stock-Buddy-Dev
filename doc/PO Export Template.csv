@@ -1,0 +1,7 @@
+PO Number,PO Date,Expected Date,Supplier Name,Ship To Name,Ship To Address1,Ship To Address2,Ship To City,Ship To Province,Ship To Zip,Ship To Country,Notes
+{{po_number}},{{po_date}},{{expected_date}},{{supplier_name}},{{ship_to_name}},{{ship_to_address1}},{{ship_to_address2}},{{ship_to_city}},{{ship_to_province}},{{ship_to_zip}},{{ship_to_country}},{{notes}}
+Line No,SKU,Supplier SKU,Supplier Barcode,Title,Order Qty Units,Unit Cost,Extended Cost,,,,
+{{line_no}},{{sku}},{{supplier_sku}},{{supplier_barcode}},{{title}},{{order_qty_units}},{{unit_cost}},{{extended_cost}},,,,
+{{line_no}},{{sku}},{{supplier_sku}},{{supplier_barcode}},{{title}},{{order_qty_units}},{{unit_cost}},{{extended_cost}},,,,
+{{line_no}},{{sku}},{{supplier_sku}},{{supplier_barcode}},{{title}},{{order_qty_units}},{{unit_cost}},{{extended_cost}},,,,
+{{line_no}},{{sku}},{{supplier_sku}},{{supplier_barcode}},{{title}},{{order_qty_units}},{{unit_cost}},{{extended_cost}},,,,

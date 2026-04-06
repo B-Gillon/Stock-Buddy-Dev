@@ -1,0 +1,53 @@
+// /src/app/locations/page.jsx
+
+import { supabase } from "@/lib/supabaseClient";
+import ClientLocationsPage from "@/app/locations/components/ClientLocationsPage";
+
+function toSlug(name) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
+export default async function LocationsPage() {
+  const { data: locations } = await supabase
+    .from("locations")
+    .select("id, name, active, address1, city, province, zip, country")
+    .order("name", { ascending: true });
+
+  // Fetch primary contacts for all locations
+  const { data: primaryContacts } = await supabase
+    .from("location_contacts")
+    .select("location_id, name, phone, email")
+    .eq("is_primary", true);
+
+  const primaryByLocation = new Map(
+    (primaryContacts ?? []).map((c) => [c.location_id, c])
+  );
+
+  const { data: syncStatus } = await supabase
+    .from("sync_status")
+    .select("last_synced_at")
+    .eq("sync_type", "locations")
+    .single();
+
+  const enrichedLocations = (locations ?? []).map((location) => {
+    const primary = primaryByLocation.get(location.id);
+    return {
+      ...location,
+      slug:          toSlug(location.name),
+      primary_name:  primary?.name  ?? null,
+      primary_phone: primary?.phone ?? null,
+      primary_email: primary?.email ?? null,
+    };
+  });
+
+  return (
+    <ClientLocationsPage
+      locations={enrichedLocations}
+      lastSyncedAt={syncStatus?.last_synced_at ?? null}
+    />
+  );
+}
