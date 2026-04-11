@@ -1,8 +1,15 @@
+// /src/app/purchase-orders/create/page.jsx
+import { headers } from 'next/headers';
 import { supabase } from '@/lib/supabaseClient';
+import { getTenantIdFromHeaders } from '@/lib/tenants';
 import PurchaseOrderCreatePage from '@/app/purchase-orders/create/components/PurchaseOrderCreatePage';
 
 export default async function Page() {
+  const headersList = await headers();
+  const tenantId = await getTenantIdFromHeaders(headersList);
+
   const [
+    { data: settingsRows },
     { data: suppliers },
     { data: locations },
     { data: variants },
@@ -10,12 +17,19 @@ export default async function Page() {
     { data: inventoryLevels },
   ] = await Promise.all([
     supabase
+      .from('settings')
+      .select('key, value')
+      .eq('tenant_id', tenantId)
+      .eq('key', 'po_next_number'),
+    supabase
       .from('suppliers')
       .select('id, supplier_name, supplier_number')
+      .eq('tenant_id', tenantId)
       .order('supplier_name'),
     supabase
       .from('locations')
       .select('id, name')
+      .eq('tenant_id', tenantId)
       .eq('active', true)
       .order('name'),
     supabase
@@ -33,10 +47,12 @@ export default async function Page() {
           title
         )
       `)
+      .eq('tenant_id', tenantId)
       .order('display_title'),
     supabase
       .from('supplier_variants')
-      .select('id, supplier_id, variant_id, supplier_sku, cost, case_pack, inner_pack, order_increment, moq, lead_days'),
+      .select('id, supplier_id, variant_id, supplier_sku, cost, case_pack, inner_pack, order_increment, moq, lead_days')
+      .eq('tenant_id', tenantId),
     supabase
       .from('inventory_levels')
       .select(`
@@ -44,7 +60,8 @@ export default async function Page() {
         incoming,
         location_id,
         inventory_items ( variant_id )
-      `),
+      `)
+      .eq('tenant_id', tenantId),
   ]);
 
   const flatVariants = (variants ?? []).map((v) => ({
@@ -59,7 +76,6 @@ export default async function Page() {
     product_id:         v.products?.id ?? null,
   }));
 
-  // Flatten inventory levels: [{ variant_id, location_id, available, incoming }]
   const flatInventoryLevels = (inventoryLevels ?? [])
     .filter((il) => il.inventory_items?.variant_id)
     .map((il) => ({
@@ -69,6 +85,8 @@ export default async function Page() {
       incoming:    il.incoming ?? 0,
     }));
 
+  const poNextNumber = (settingsRows ?? []).find((r) => r.key === 'po_next_number')?.value ?? null;
+
   return (
     <PurchaseOrderCreatePage
       suppliers={suppliers ?? []}
@@ -76,6 +94,7 @@ export default async function Page() {
       variants={flatVariants}
       supplierVariants={supplierVariants ?? []}
       inventoryLevels={flatInventoryLevels}
+      poNextNumber={poNextNumber}
     />
   );
 }

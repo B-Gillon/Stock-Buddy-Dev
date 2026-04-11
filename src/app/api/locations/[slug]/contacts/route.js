@@ -1,5 +1,5 @@
 // /src/app/api/locations/[slug]/contacts/route.js
-import { supabase, setTenantContext } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
 import { NextResponse } from "next/server";
 
@@ -11,26 +11,26 @@ function toSlug(name) {
     .replace(/\s+/g, "-");
 }
 
-async function getLocationId(slug) {
+async function getLocationId(slug, tenantId) {
   const { data: locations } = await supabase
     .from("locations")
-    .select("id, name");
+    .select("id, name")
+    .eq("tenant_id", tenantId);
   const location = (locations ?? []).find((l) => toSlug(l.name) === slug);
   return location?.id ?? null;
 }
 
 export async function GET(request, { params }) {
   const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
-
   const { slug } = await params;
-  const locationId = await getLocationId(slug);
+  const locationId = await getLocationId(slug, tenantId);
   if (!locationId) return NextResponse.json({ error: "Location not found" }, { status: 404 });
 
   const { data, error } = await supabase
     .from("location_contacts")
     .select("*")
     .eq("location_id", locationId)
+    .eq("tenant_id", tenantId)
     .order("is_primary", { ascending: false })
     .order("name", { ascending: true });
 
@@ -40,10 +40,8 @@ export async function GET(request, { params }) {
 
 export async function POST(request, { params }) {
   const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
-
   const { slug } = await params;
-  const locationId = await getLocationId(slug);
+  const locationId = await getLocationId(slug, tenantId);
   if (!locationId) return NextResponse.json({ error: "Location not found" }, { status: 404 });
 
   let body;
@@ -57,12 +55,14 @@ export async function POST(request, { params }) {
     await supabase
       .from("location_contacts")
       .update({ is_primary: false })
-      .eq("location_id", locationId);
+      .eq("location_id", locationId)
+      .eq("tenant_id", tenantId);
   }
 
   const { data, error } = await supabase
     .from("location_contacts")
     .insert({
+      tenant_id:   tenantId,
       location_id: locationId,
       name:        name.trim(),
       phone:       phone?.trim() || null,
@@ -79,10 +79,8 @@ export async function POST(request, { params }) {
 
 export async function PATCH(request, { params }) {
   const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
-
   const { slug } = await params;
-  const locationId = await getLocationId(slug);
+  const locationId = await getLocationId(slug, tenantId);
   if (!locationId) return NextResponse.json({ error: "Location not found" }, { status: 404 });
 
   let body;
@@ -98,6 +96,7 @@ export async function PATCH(request, { params }) {
       .from("location_contacts")
       .update({ is_primary: false })
       .eq("location_id", locationId)
+      .eq("tenant_id", tenantId)
       .neq("id", id);
   }
 
@@ -113,6 +112,7 @@ export async function PATCH(request, { params }) {
     })
     .eq("id", id)
     .eq("location_id", locationId)
+    .eq("tenant_id", tenantId)
     .select()
     .single();
 
@@ -122,10 +122,8 @@ export async function PATCH(request, { params }) {
 
 export async function DELETE(request, { params }) {
   const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
-
   const { slug } = await params;
-  const locationId = await getLocationId(slug);
+  const locationId = await getLocationId(slug, tenantId);
   if (!locationId) return NextResponse.json({ error: "Location not found" }, { status: 404 });
 
   let body;
@@ -139,7 +137,8 @@ export async function DELETE(request, { params }) {
     .from("location_contacts")
     .delete()
     .eq("id", id)
-    .eq("location_id", locationId);
+    .eq("location_id", locationId)
+    .eq("tenant_id", tenantId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

@@ -134,7 +134,7 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
     setSyncing(true);
     setBanner(null);
     try {
-      const res  = await fetch("/api/sync_Vendors", { method: "POST" });
+      const res  = await fetch("/api/sync/vendors", { method: "POST" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Sync failed. Please try again.");
       setLastSynced(new Date().toISOString());

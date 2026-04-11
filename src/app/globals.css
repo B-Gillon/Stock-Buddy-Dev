@@ -30,7 +30,8 @@ thead th {
   text-align: left;
 }
 
-tbody td {
+tbody td,
+tfoot td {
   padding: 4px 8px;
   border-bottom: 1px solid #f0f0f0; /* softer border */
   vertical-align: middle;

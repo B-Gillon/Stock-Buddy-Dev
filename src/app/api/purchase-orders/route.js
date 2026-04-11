@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { supabase, setTenantContext } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
+import { logPOActivity } from '@/lib/logPOActivity';
 
 export async function POST(request) {
   try {
@@ -21,9 +22,27 @@ export async function POST(request) {
       return NextResponse.json({ error: 'At least one line item is required' }, { status: 400 });
     }
 
+    // Enforce po_next_number is configured before allowing PO creation
+    const { data: settingsRows } = await supabase
+      .from('settings')
+      .select('key, value')
+      .in('key', ['po_next_number', 'po_format']);
+
+    const settings = Object.fromEntries((settingsRows ?? []).map((r) => [r.key, r.value]));
+    const poNextNumber = settings.po_next_number ? parseInt(settings.po_next_number, 10) : null;
+
+    if (!poNextNumber) {
+      return NextResponse.json(
+        { error: 'PO numbering has not been configured. Please set the Next PO Number in Settings before creating a PO.' },
+        { status: 400 }
+      );
+    }
+
+    const poFormat = settings.po_format || 'PO-{DATE}-{NUM}';
     const datePart = new Date(header.po_date).toISOString().slice(0, 10).replace(/-/g, '');
-    const rand = Math.floor(1000 + Math.random() * 9000);
-    const po_number = `PO-${datePart}-${rand}`;
+    const po_number = poFormat
+      .replace('{DATE}', datePart)
+      .replace('{NUM}', String(poNextNumber).padStart(4, '0'));
 
     const { data: po, error: poError } = await supabase
       .from('purchase_orders')
@@ -68,6 +87,14 @@ export async function POST(request) {
       await supabase.from('purchase_orders').delete().eq('id', po.id);
       throw new Error(`Failed to save line items: ${linesError.message}`);
     }
+
+    await logPOActivity({ poId: po.id, tenantId, action: 'created' });
+
+    // Increment po_next_number for the next PO
+    await supabase.from('settings').upsert(
+      { tenant_id: tenantId, key: 'po_next_number', value: String(poNextNumber + 1), updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
 
     return NextResponse.json({ id: po.id, slug: po.po_number }, { status: 201 });
   } catch (err) {

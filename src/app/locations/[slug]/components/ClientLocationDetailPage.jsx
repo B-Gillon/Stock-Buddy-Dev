@@ -137,15 +137,32 @@ function ContactModal({ contact, onSave, onClose, saving, error }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientLocationDetailPage({ location, initialContacts, slug }) {
+export default function ClientLocationDetailPage({ location, initialContacts, lastSyncedAt, slug }) {
   const router   = useRouter();
   const [contacts,     setContacts]     = useState(initialContacts);
-  const [modalContact, setModalContact] = useState(null); // null = closed, {} = new, {...} = editing
+  const [modalContact, setModalContact] = useState(null);
   const [saving,       setSaving]       = useState(false);
   const [modalError,   setModalError]   = useState(null);
+  const [syncing,      setSyncing]      = useState(false);
+  const [syncedAt,     setSyncedAt]     = useState(lastSyncedAt);
   const { toast, showToast: _showToast } = useToast();
 
   function showToast(msg) { _showToast(msg); }
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/sync/locations", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
+      setSyncedAt(data.last_synced_at ?? new Date().toISOString());
+      showToast("Locations synced.");
+    } catch (err) {
+      showToast(`Sync error: ${err.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function handleSaveContact(draft) {
     setSaving(true);
@@ -161,7 +178,6 @@ export default function ClientLocationDetailPage({ location, initialContacts, sl
       if (!res.ok) throw new Error(data.error ?? "Save failed.");
 
       if (isNew) {
-        // If new contact is primary, unset others locally
         setContacts((prev) => {
           const updated = draft.is_primary
             ? prev.map((c) => ({ ...c, is_primary: false }))
@@ -205,7 +221,16 @@ export default function ClientLocationDetailPage({ location, initialContacts, sl
   }
 
   return (
-    <AppLayout title={location.name} showActionBar={false}>
+    <AppLayout
+      title={location.name}
+      showActionBar={false}
+      actions={{
+        syncLabel:    "Sync Locations",
+        onSync:       handleSync,
+        syncing:      syncing,
+        lastSyncedAt: syncedAt,
+      }}
+    >
 
       {/* ── Back + Title ── */}
       <div className="mb-3 flex items-center gap-3">

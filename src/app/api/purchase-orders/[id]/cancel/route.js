@@ -2,6 +2,7 @@
 import { supabase, setTenantContext } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
 import { NextResponse } from 'next/server';
+import { logPOActivity } from '@/lib/logPOActivity';
 
 export async function POST(request, { params }) {
   const tenantId = await getTenantId(request);
@@ -25,16 +26,15 @@ export async function POST(request, { params }) {
 
   const { error: updateError } = await supabase
     .from('purchase_orders')
-    .update({
-      status:       'cancelled',
-      cancelled_at: new Date().toISOString(),
-    })
+    .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
     .eq('id', id);
 
   if (updateError) {
     console.error('Cancel PO error:', updateError);
     return NextResponse.json({ error: 'Failed to cancel PO' }, { status: 500 });
   }
+
+  await logPOActivity({ poId: id, tenantId, action: 'cancelled' });
 
   return NextResponse.json({ success: true });
 }

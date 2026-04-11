@@ -4,7 +4,6 @@ import processVariants from "./processVariants";
 import { supabase, insertRows, updateSyncStatus } from "./supabaseHelpers";
 
 export default async function syncProducts() {
-  console.log("syncProducts() is RUNNING");
 
   // 1. FETCH PRODUCTS FROM SHOPIFY
   const gqlProducts = await fetchProducts();
@@ -25,7 +24,6 @@ export default async function syncProducts() {
   });
 
   await insertRows("products", flattenedProducts);
-  console.log(`Inserted ${flattenedProducts.length} products.`);
 
   await updateSyncStatus("products");
 
@@ -84,9 +82,7 @@ const variantsToInsert = flattenedVariants.map(({
 }) => rest);
 
 await insertRows("variants", variantsToInsert);
-  console.log(`Inserted ${flattenedVariants.length} variants.`);
 
   await updateSyncStatus("variants");
 
-  console.log("syncProducts: Done.");
 }

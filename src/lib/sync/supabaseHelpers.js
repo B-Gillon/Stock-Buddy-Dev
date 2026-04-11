@@ -38,7 +38,6 @@ export async function insertRows(table, rows) {
 
 // Update sync_status for a given sync type
 export async function updateSyncStatus(syncType) {
-  console.log("updateSyncStatus CALLED with:", syncType);
 
   const { error } = await supabase
     .from("sync_status")
@@ -54,6 +53,5 @@ export async function updateSyncStatus(syncType) {
     console.error("Error updating sync_status:", error);
     throw new Error(`Failed to update sync_status for ${syncType}: ${error.message}`);
   } else {
-    console.log("updateSyncStatus SUCCESS for:", syncType);
   }
 }

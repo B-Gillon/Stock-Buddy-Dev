@@ -1,14 +1,21 @@
+// /src/app/purchase-orders/[slug]/edit/page.jsx
+import { headers } from 'next/headers';
 import { supabase } from '@/lib/supabaseClient';
+import { getTenantIdFromHeaders } from '@/lib/tenants';
 import PurchaseOrderCreatePage from '../../create/components/PurchaseOrderCreatePage';
 
 export default async function Page({ params }) {
   const { slug } = await params;
   const poNumber = decodeURIComponent(slug);
 
+  const headersList = await headers();
+  const tenantId = await getTenantIdFromHeaders(headersList);
+
   // Load the existing PO
   const { data: po } = await supabase
     .from('purchase_orders')
     .select(`*, suppliers ( supplier_name, supplier_number ), locations ( name )`)
+    .eq('tenant_id', tenantId)
     .eq('po_number', poNumber)
     .single();
 
@@ -20,10 +27,11 @@ export default async function Page({ params }) {
   const { data: existingLines } = await supabase
     .from('purchase_order_lines')
     .select('*')
+    .eq('tenant_id', tenantId)
     .eq('purchase_order_id', po.id)
     .order('created_at');
 
-  // Load supporting data (same as create page)
+  // Load supporting data
   const [
     { data: suppliers },
     { data: locations },
@@ -31,26 +39,26 @@ export default async function Page({ params }) {
     { data: supplierVariants },
     { data: inventoryLevels },
   ] = await Promise.all([
-    supabase.from('suppliers').select('id, supplier_name, supplier_number').order('supplier_name'),
-    supabase.from('locations').select('id, name').eq('active', true).order('name'),
+    supabase.from('suppliers').select('id, supplier_name, supplier_number').eq('tenant_id', tenantId).order('supplier_name'),
+    supabase.from('locations').select('id, name').eq('tenant_id', tenantId).eq('active', true).order('name'),
     supabase.from('variants').select(`
       id, sku, barcode, display_title, image_src, inventory_quantity, cost,
       products ( id, title )
-    `).order('display_title'),
-    supabase.from('supplier_variants').select('id, supplier_id, variant_id, supplier_sku, cost, case_pack, inner_pack, order_increment, moq, lead_days'),
-    supabase.from('inventory_levels').select(`available, incoming, location_id, inventory_items ( variant_id )`),
+    `).eq('tenant_id', tenantId).order('display_title'),
+    supabase.from('supplier_variants').select('id, supplier_id, variant_id, supplier_sku, cost, case_pack, inner_pack, order_increment, moq, lead_days').eq('tenant_id', tenantId),
+    supabase.from('inventory_levels').select(`available, incoming, location_id, inventory_items ( variant_id )`).eq('tenant_id', tenantId),
   ]);
 
   const flatVariants = (variants ?? []).map((v) => ({
-    id:               v.id,
-    sku:              v.sku,
-    barcode:          v.barcode,
-    display_title:    v.display_title,
-    image_src:        v.image_src,
+    id:                 v.id,
+    sku:                v.sku,
+    barcode:            v.barcode,
+    display_title:      v.display_title,
+    image_src:          v.image_src,
     inventory_quantity: v.inventory_quantity,
-    cost:             v.cost ?? null,
-    product_title:    v.products?.title ?? null,
-    product_id:       v.products?.id ?? null,
+    cost:               v.cost ?? null,
+    product_title:      v.products?.title ?? null,
+    product_id:         v.products?.id ?? null,
   }));
 
   const flatInventoryLevels = (inventoryLevels ?? [])
@@ -64,17 +72,16 @@ export default async function Page({ params }) {
 
   // Build initialHeader from existing PO
   const initialHeader = {
-    supplier_id:        po.supplier_id,
+    supplier_id:         po.supplier_id,
     ship_to_location_id: po.ship_to_location_id ?? '',
-    po_date:            po.po_date ? po.po_date.split('T')[0] : '',
-    po_release_date:    po.po_release_date ? po.po_release_date.split('T')[0] : '',
-    expected_date:      po.expected_date ?? '',
-    notes_internal:     po.notes_internal ?? '',
-    notes_supplier:     po.notes_supplier ?? '',
-    status:             po.status,
+    po_date:             po.po_date ? po.po_date.split('T')[0] : '',
+    expected_date:       po.expected_date ?? '',
+    notes_internal:      po.notes_internal ?? '',
+    notes_supplier:      po.notes_supplier ?? '',
+    status:              po.status,
   };
 
-  // Build initialRows from existing line items — look up barcode from variants
+  // Build initialRows from existing line items
   const initialRows = (existingLines ?? []).map((line) => {
     const variant = flatVariants.find((v) => v.id === line.variant_id);
     const sv      = (supplierVariants ?? []).find((sv) => sv.variant_id === line.variant_id && sv.supplier_id === po.supplier_id);

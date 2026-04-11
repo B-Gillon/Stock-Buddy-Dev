@@ -9,10 +9,11 @@ import POTable from './POTable';
 
 function exportCSV(purchaseOrders) {
   if (!purchaseOrders.length) { alert('No purchase orders to export.'); return; }
-  const headers = ['PO Number', 'Supplier', 'Status', 'PO Date', 'Expected Date', 'Total Cost'];
+  const headers = ['PO Number', 'Supplier', 'Location', 'Status', 'PO Date', 'Expected Date', 'Total Cost'];
   const rows = purchaseOrders.map((po) => [
     po.po_number,
     po.supplier_name ?? '',
+    po.location_name ?? '',
     po.status,
     po.po_date ?? '',
     po.expected_date ?? '',
@@ -32,6 +33,7 @@ function exportCSV(purchaseOrders) {
 export default function PurchaseOrdersLandingPage({
   purchaseOrders,
   suppliers,
+  locations,
   currentFilters,
 }) {
   const router = useRouter();
@@ -49,7 +51,7 @@ export default function PurchaseOrdersLandingPage({
 
         {/* Filters + Export + Create PO */}
         <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
-          <POFiltersRow suppliers={suppliers} currentFilters={currentFilters} />
+          <POFiltersRow suppliers={suppliers} locations={locations} currentFilters={currentFilters} />
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button variant="secondary" onClick={() => exportCSV(purchaseOrders)}>Export</Button>
             <Button onClick={() => router.push('/purchase-orders/create')}>Create PO</Button>

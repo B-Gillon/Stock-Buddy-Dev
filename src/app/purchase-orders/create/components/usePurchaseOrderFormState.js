@@ -58,7 +58,6 @@ export function usePurchaseOrderFormState(initialHeader = null, initialRows = nu
     supplier_id: '',
     ship_to_location_id: '',
     po_date: today,
-    po_release_date: '',
     expected_date: '',
     notes_internal: '',
     notes_supplier: '',

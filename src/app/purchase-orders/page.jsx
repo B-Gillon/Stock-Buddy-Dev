@@ -5,6 +5,7 @@ export default async function Page({ searchParams }) {
   const params = await searchParams;
   const status      = params.status      ?? '';
   const supplierId  = params.supplier_id ?? '';
+  const locationId  = params.location_id ?? '';
   const dateFrom    = params.date_from   ?? '';
   const dateTo      = params.date_to     ?? '';
   const search      = params.search      ?? '';
@@ -16,20 +17,34 @@ export default async function Page({ searchParams }) {
       id,
       po_number,
       supplier_id,
+      ship_to_location_id,
       status,
       po_date,
       expected_date,
-      suppliers ( supplier_name )
+      suppliers ( supplier_name ),
+      locations ( name )
     `)
     .order('po_date', { ascending: false });
 
-  if (status)     query = query.eq('status', status);
+  if (status === 'overdue') {
+    // Overdue tab — past expected date, not draft/cancelled/received
+    const today = new Date().toISOString().split('T')[0];
+    query = query
+      .lt('expected_date', today)
+      .not('status', 'in', '("draft","cancelled","received")');
+  } else if (status) {
+    // Specific status tab
+    query = query.eq('status', status);
+  } else {
+    // "All Open" tab — exclude closed statuses
+    query = query.not('status', 'in', '("cancelled","received")');
+  }
+
   if (supplierId) query = query.eq('supplier_id', supplierId);
+  if (locationId) query = query.eq('ship_to_location_id', locationId);
   if (dateFrom)   query = query.gte('po_date', dateFrom);
   if (dateTo)     query = query.lte('po_date', dateTo);
-  if (search) {
-    query = query.or(`po_number.ilike.%${search}%,suppliers.supplier_name.ilike.%${search}%`);
-  }
+  if (search)     query = query.or(`po_number.ilike.%${search}%`);
 
   const { data: posRaw } = await query;
 
@@ -49,13 +64,15 @@ export default async function Page({ searchParams }) {
 
   // Flatten
   const purchaseOrders = (posRaw ?? []).map((po) => ({
-    id:            po.id,
-    po_number:     po.po_number,
-    supplier_name: po.suppliers?.supplier_name ?? '—',
-    status:        po.status,
-    po_date:       po.po_date,
-    expected_date: po.expected_date,
-    total_cost:    totalsMap[po.id] ?? null,
+    id:                  po.id,
+    po_number:           po.po_number,
+    supplier_name:       po.suppliers?.supplier_name ?? '—',
+    location_name:       po.locations?.name ?? '—',
+    ship_to_location_id: po.ship_to_location_id,
+    status:              po.status,
+    po_date:             po.po_date,
+    expected_date:       po.expected_date,
+    total_cost:          totalsMap[po.id] ?? null,
   }));
 
   // Suppliers for filter dropdown
@@ -64,12 +81,27 @@ export default async function Page({ searchParams }) {
     .select('id, supplier_name')
     .order('supplier_name');
 
-  const currentFilters = { status, supplier_id: supplierId, date_from: dateFrom, date_to: dateTo, search };
+  // Locations for filter dropdown
+  const { data: locations } = await supabase
+    .from('locations')
+    .select('id, name')
+    .eq('active', true)
+    .order('name');
+
+  const currentFilters = {
+    status,
+    supplier_id: supplierId,
+    location_id: locationId,
+    date_from:   dateFrom,
+    date_to:     dateTo,
+    search,
+  };
 
   return (
     <PurchaseOrdersLandingPage
       purchaseOrders={purchaseOrders}
       suppliers={suppliers ?? []}
+      locations={locations ?? []}
       currentFilters={currentFilters}
     />
   );

@@ -2,18 +2,15 @@
 
 // /src/app/products/components/ClientProductsPage.jsx
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import SortIcon from "@/shared/components/icons/SortIcon";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 import SearchModal from "@/shared/components/modals/SearchModal";
 import ProductFilterModal from "@/app/products/components/ProductFilterModal";
-import usePagination from "@/shared/utils/usePagination";
 import { formatCategory } from "@/shared/utils/formatters";
-
-const SHOPIFY_DOMAIN = "https://brandongtest.myshopify.com";
 
 const ALL_COLUMNS = [
   { key: "image",         label: "Image",      hideable: false, defaultVisible: true  },
@@ -54,22 +51,6 @@ function StatusPill({ status }) {
     </span>
   );
 }
-
-
-function sortRows(rows, key, direction) {
-  if (!key || !direction) return rows;
-  return [...rows].sort((a, b) => {
-    const aVal = a[key] ?? "";
-    const bVal = b[key] ?? "";
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return direction === "asc" ? aVal - bVal : bVal - aVal;
-    }
-    return direction === "asc"
-      ? String(aVal).localeCompare(String(bVal))
-      : String(bVal).localeCompare(String(aVal));
-  });
-}
-
 
 function ColumnToggleMenu({ columns, visibility, onChange }) {
   const [open, setOpen] = useState(false);
@@ -121,12 +102,20 @@ function ColumnToggleMenu({ columns, visibility, onChange }) {
 }
 
 export default function ClientProductsPage({
-  initialProducts,
-  initialLastSyncedAt,
+  products = [],
+  totalCount = 0,
+  totalPages = 1,
+  currentPage = 1,
+  pageSize = 20,
+  currentFilters = {},
+  filterOptions = {},
+  lastSyncedAt: initialLastSyncedAt,
   storeName = "My Store",
+  shopDomain = "",
 }) {
-  const products = initialProducts ?? [];
-  const router   = useRouter();
+  const router       = useRouter();
+  const pathname     = usePathname();
+  const searchParams = useSearchParams();
 
   const [syncing,      setSyncing]      = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState(initialLastSyncedAt);
@@ -134,21 +123,14 @@ export default function ClientProductsPage({
   const { toast, showToast: _showToast } = useToast();
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(currentFilters.search ?? "");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filters,    setFilters]    = useState({
-    vendors: [], categories: [], collections: [], tags: [], status: [],
-  });
 
-  const [hoveredRow, setHoveredRow] = useState(null);
-  const [sortKey,    setSortKey]    = useState("title");
-  const [sortDir,    setSortDir]    = useState("asc");
-
-  const defaultVisibility = useMemo(() => {
+  const defaultVisibility = (() => {
     const def = {};
     ALL_COLUMNS.forEach((c) => { def[c.key] = c.defaultVisible !== false; });
     return def;
-  }, []);
+  })();
 
   const [visibility, setVisibility] = useState(defaultVisibility);
 
@@ -159,7 +141,7 @@ export default function ClientProductsPage({
 
   function toggleColumn(key) {
     setVisibility((prev) => {
-      const next = { ...prev, [key]: prev[key] === false ? true : false };
+      const next = { ...prev, [key]: !prev[key] };
       saveVisibility(next);
       return next;
     });
@@ -173,56 +155,85 @@ export default function ClientProductsPage({
     showToast("Copied");
   }
 
-  function handleSort(key) {
-    if (!SORT_COLUMNS.includes(key)) return;
-    if (sortKey !== key) {
-      setSortKey(key);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else {
-      setSortDir("asc");
-    }
+  // ── URL navigation helpers ────────────────────────────────────────────────
+
+  function buildParams(overrides = {}) {
+    const params  = new URLSearchParams(searchParams.toString());
+    const merged  = { ...currentFilters, ...overrides };
+
+    // String params
+    ["search", "sort", "dir", "page"].forEach((k) => {
+      if (merged[k]) params.set(k, merged[k]);
+      else params.delete(k);
+    });
+
+    // Array params — comma-separated
+    ["vendors", "categories", "collections", "status", "tags"].forEach((k) => {
+      const val = merged[k];
+      if (Array.isArray(val) && val.length > 0) params.set(k, val.join(","));
+      else params.delete(k);
+    });
+
+    return params.toString();
   }
 
-  const filteredProducts = useMemo(() => {
-    let result = [...products];
-    const term = searchTerm.trim().toLowerCase();
-    if (term) {
-      result = result.filter((p) =>
-        p.title?.toLowerCase().includes(term) ||
-        p.vendor?.toLowerCase().includes(term) ||
-        p.collection?.toLowerCase().includes(term) ||
-        p.category?.toLowerCase().includes(term)
-      );
-    }
-    if (filters.vendors.length > 0)
-      result = result.filter((p) => filters.vendors.includes(p.vendor));
-    if (filters.categories.length > 0)
-      result = result.filter((p) => filters.categories.includes(p.category));
-    if (filters.collections.length > 0)
-      result = result.filter((p) => filters.collections.includes(p.collection));
-    if (filters.tags.length > 0)
-      result = result.filter((p) =>
-        filters.tags.some((t) => (p.tags ?? []).includes(t))
-      );
-    if (filters.status.length > 0)
-      result = result.filter((p) => filters.status.includes(p.status));
-    return result;
-  }, [products, searchTerm, filters]);
+  function navigate(overrides) {
+    router.push(`${pathname}?${buildParams(overrides)}`);
+  }
 
-  const sortedProducts = useMemo(
-    () => sortRows(filteredProducts, sortKey, sortDir),
-    [filteredProducts, sortKey, sortDir]
-  );
+  function handleSort(key) {
+    if (!SORT_COLUMNS.includes(key)) return;
+    const newDir = currentFilters.sort === key && currentFilters.dir === "asc" ? "desc" : "asc";
+    navigate({ sort: key, dir: newDir, page: "1" });
+  }
 
-  const pagination = usePagination(sortedProducts, 20);
+  function handleSearch() {
+    navigate({ search: searchTerm, page: "1" });
+    setSearchOpen(false);
+  }
+
+  function handleClearSearch() {
+    setSearchTerm("");
+    navigate({ search: "", page: "1" });
+  }
+
+  function handleApplyFilters(filters) {
+    navigate({
+      vendors:     filters.vendors,
+      categories:  filters.categories,
+      collections: filters.collections,
+      status:      filters.status,
+      tags:        filters.tags,
+      page:        "1",
+    });
+    setFilterOpen(false);
+  }
+
+  function handleClearFilters() {
+    navigate({ vendors: [], categories: [], collections: [], status: [], tags: [], page: "1" });
+    setFilterOpen(false);
+  }
+
+  function goToPage(p) {
+    navigate({ page: String(p) });
+  }
+
+  // Active filters for the modal (arrays)
+  const activeFilters = {
+    vendors:     currentFilters.vendors     ?? [],
+    categories:  currentFilters.categories  ?? [],
+    collections: currentFilters.collections ?? [],
+    status:      currentFilters.status      ?? [],
+    tags:        currentFilters.tags        ?? [],
+  };
+
+  // ── Sync ──────────────────────────────────────────────────────────────────
 
   async function handleSync() {
     setSyncing(true);
     setBanner(null);
     try {
-      const res  = await fetch("/api/sync_Products", { method: "POST" });
+      const res  = await fetch("/api/sync/products", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Sync failed.");
       setLastSyncedAt(data.last_synced_at ?? new Date().toISOString());
@@ -234,19 +245,21 @@ export default function ClientProductsPage({
     }
   }
 
+  // ── Export (current filtered page) ───────────────────────────────────────
+
   function exportCSV() {
-    const rows = sortedProducts;
-    if (!rows.length) { alert("No products to export."); return; }
-    const header  = Object.keys(rows[0]).join(",");
-    const csvRows = rows.map((row) =>
-      Object.values(row).map((value) => {
-        if (value == null) return "";
-        if (Array.isArray(value)) return `"${value.join(";")}"`;
-        if (typeof value === "string") return `"${value.replace(/"/g, '""')}"`;
-        return value;
+    if (!products.length) { alert("No products to export."); return; }
+    const cols    = ["title", "vendor", "category", "collection", "status", "handle", "variant_count"];
+    const csvRows = products.map((p) =>
+      cols.map((key) => {
+        const val = p[key];
+        if (val == null) return "";
+        if (Array.isArray(val)) return `"${val.join(";")}"`;
+        if (typeof val === "string") return `"${val.replace(/"/g, '""')}"`;
+        return val;
       }).join(",")
     );
-    const csv  = [header, ...csvRows].join("\n");
+    const csv  = [cols.join(","), ...csvRows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url  = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -257,12 +270,21 @@ export default function ClientProductsPage({
     document.body.removeChild(link);
   }
 
-  const filterOptions = useMemo(() => ({
-    vendors:     [...new Set(products.map((p) => p.vendor).filter(Boolean))],
-    categories:  [...new Set(products.map((p) => p.category).filter(Boolean))],
-    collections: [...new Set(products.map((p) => p.collection).filter(Boolean))],
-    tags:        [...new Set(products.flatMap((p) => p.tags || []))],
-  }), [products]);
+  // ── Pagination controls ───────────────────────────────────────────────────
+
+  const start     = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end       = Math.min(currentPage * pageSize, totalCount);
+  const pageLabel = totalCount === 0 ? "No results" : `${start}–${end} of ${totalCount.toLocaleString()}`;
+
+  const paginationControls = {
+    pageData:    products,
+    pageLabel,
+    currentPage,
+    totalPages,
+    prevPage:    () => goToPage(currentPage - 1),
+    nextPage:    () => goToPage(currentPage + 1),
+    goToPage,
+  };
 
   const visibleColumns = ALL_COLUMNS.filter((c) => visibility[c.key] !== false);
   const colSpan        = visibleColumns.length;
@@ -270,7 +292,7 @@ export default function ClientProductsPage({
   return (
     <AppLayout
       title="Products"
-      paginationControls={pagination}
+      paginationControls={paginationControls}
       actions={{
         onSearch:     () => setSearchOpen(true),
         onFilter:     () => setFilterOpen(true),
@@ -313,7 +335,7 @@ export default function ClientProductsPage({
               >
                 {col.label}
                 {SORT_COLUMNS.includes(col.key) && (
-                  <SortIcon direction={sortKey === col.key ? sortDir : null} />
+                  <SortIcon direction={currentFilters.sort === col.key ? currentFilters.dir : null} />
                 )}
               </th>
             ))}
@@ -321,20 +343,18 @@ export default function ClientProductsPage({
           </tr>
         </thead>
         <tbody>
-          {pagination.pageData.length === 0 ? (
+          {products.length === 0 ? (
             <tr>
               <td colSpan={colSpan + 1} className="px-2 py-8 text-center text-gray-400">
                 No products found.
               </td>
             </tr>
           ) : (
-            pagination.pageData.map((p) => (
+            products.map((p) => (
               <tr
                 key={p.id}
                 className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer"
                 style={{ height: "48px" }}
-                onMouseEnter={() => setHoveredRow(p.id)}
-                onMouseLeave={() => setHoveredRow(null)}
                 onClick={() => router.push(`/product/${p.shopify_product_id}`)}
               >
                 {visibleColumns.map((col) => {
@@ -383,7 +403,7 @@ export default function ClientProductsPage({
                 })}
                 <td className="px-2 py-1 w-8 text-center">
                   <a
-                    href={`${SHOPIFY_DOMAIN}/admin/products/${p.shopify_product_id}`}
+                    href={`${shopDomain}/admin/products/${p.shopify_product_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
@@ -406,22 +426,18 @@ export default function ClientProductsPage({
         title="Search Products"
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
-        onSearch={() => setSearchOpen(false)}
-        onClear={() => setSearchTerm("")}
+        onSearch={handleSearch}
+        onClear={handleClearSearch}
         onClose={() => setSearchOpen(false)}
       />
 
       <ProductFilterModal
         isOpen={filterOpen}
         onClose={() => setFilterOpen(false)}
-        filters={filters}
-        setFilters={setFilters}
+        filters={activeFilters}
         options={filterOptions}
-        onApply={() => setFilterOpen(false)}
-        onClear={() => {
-          setFilters({ vendors: [], categories: [], collections: [], tags: [], status: [] });
-          setFilterOpen(false);
-        }}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
       />
 
     </AppLayout>

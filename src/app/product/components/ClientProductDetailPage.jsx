@@ -7,7 +7,7 @@ import AppLayout from "@/shared/components/layout/AppLayout";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 import { stripHtml, formatCategory } from "@/shared/utils/formatters";
 
-const SHOPIFY_DOMAIN = "https://brandongtest.myshopify.com";
+
 
 // ─── Variant column definitions ──────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ function ColumnToggleMenu({ columns, visibility, onChange }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function ClientProductDetailPage({ product, variants }) {
+export default function ClientProductDetailPage({ product, variants, shopDomain = "" }) {
   const router = useRouter();
   const { toast, showToast: _showToast } = useToast();
 
@@ -194,7 +194,7 @@ export default function ClientProductDetailPage({ product, variants }) {
     + 1; // action col
 
   return (
-    <AppLayout title={product.display_title || product.title}>
+    <AppLayout title={product.display_title || product.title} showActionBar={false}>
 
       {/* BACK + TITLE + STATUS */}
       <div className="mb-3 flex items-center gap-3">
@@ -355,7 +355,7 @@ export default function ClientProductDetailPage({ product, variants }) {
                   })}
                   <td className="px-2 py-1 w-8 text-center">
                     <a
-                      href={`${SHOPIFY_DOMAIN}/admin/products/${product.shopify_product_id}/variants/${v.shopify_variant_id}`}
+                      href={`${shopDomain}/admin/products/${product.shopify_product_id}/variants/${v.shopify_variant_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}

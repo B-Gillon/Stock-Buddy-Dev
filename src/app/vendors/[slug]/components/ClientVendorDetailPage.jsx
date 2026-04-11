@@ -10,7 +10,7 @@ import { Toast, useToast } from "@/shared/components/ui/Toast";
 import SortIcon from "@/shared/components/icons/SortIcon";
 import { formatCategory } from "@/shared/utils/formatters";
 
-const SHOPIFY_DOMAIN = "https://brandongtest.myshopify.com";
+const SHOPIFY_DOMAIN_UNUSED = "";
 
 const ALL_COLUMNS = [
   { key: "image",         label: "Image",      hideable: false, defaultVisible: true  },
@@ -111,6 +111,7 @@ export default function ClientVendorDetailPage({
   initialProducts,
   initialLastSyncedAt,
   storeName = "My Store",
+  shopDomain = "",
 }) {
   const products = initialProducts ?? [];
   const router   = useRouter();
@@ -162,7 +163,7 @@ export default function ClientVendorDetailPage({
     setSyncing(true);
     setBanner(null);
     try {
-      const res  = await fetch("/api/sync_Products", { method: "POST" });
+      const res  = await fetch("/api/sync/vendors", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Sync failed.");
       setLastSyncedAt(data.last_synced_at ?? new Date().toISOString());
@@ -309,7 +310,7 @@ export default function ClientVendorDetailPage({
                 })}
                 <td className="px-2 py-1 w-8 text-center">
                   <a
-                    href={`${SHOPIFY_DOMAIN}/admin/products/${p.shopify_product_id}`}
+                    href={`${shopDomain}/admin/products/${p.shopify_product_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}

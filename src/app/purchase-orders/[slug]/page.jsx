@@ -5,11 +5,12 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantIdFromHeaders } from "@/lib/tenants";
+import { formatCurrency } from "@/shared/utils/formatCurrency";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import Badge from "@/shared/components/ui/Badge";
 import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
-import PODetailActions from "./PODetailActions";
+import PODetailActions from "./components/PODetailActions";
 
 export default async function PurchaseOrderDetailPage({ params }) {
   const { slug } = await params;
@@ -25,7 +26,8 @@ export default async function PurchaseOrderDetailPage({ params }) {
       supplier:suppliers!supplier_id (
         id,
         supplier_name,
-        supplier_number
+        supplier_number,
+        currency
       ),
       location:locations!ship_to_location_id (
         id,
@@ -64,6 +66,9 @@ export default async function PurchaseOrderDetailPage({ params }) {
 
   if (linesError) throw new Error(linesError.message);
 
+  // currency_code on the PO is the source of truth; fall back to supplier currency
+  const currencyCode = po.currency_code ?? po.supplier?.currency ?? 'USD';
+
   const flatLines = (lines ?? []).map((l) => ({
     id:               l.id,
     line_no:          l.line_no,
@@ -74,12 +79,13 @@ export default async function PurchaseOrderDetailPage({ params }) {
     barcode:          l.variant?.barcode ?? null,
     supplier_sku:     l.supplier_variant?.supplier_sku ?? null,
     supplier_barcode: l.supplier_variant?.supplier_barcode ?? null,
-    variant_id:       l.variant_id,
-    order_qty_units:  l.order_qty_units,
-    order_qty_cases:  l.order_qty_cases,
-    case_pack_qty:    l.case_pack_qty,
-    unit_cost:        l.unit_cost,
-    extended_cost:    l.extended_cost,
+    variant_id:         l.variant_id,
+    order_qty_units:    l.order_qty_units,
+    received_qty_units: l.received_qty_units ?? 0,
+    order_qty_cases:    l.order_qty_cases,
+    case_pack_qty:      l.case_pack_qty,
+    unit_cost:          l.unit_cost,
+    extended_cost:      l.extended_cost,
   }));
 
   const flatPO = {
@@ -90,7 +96,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
     expected_date:      po.expected_date,
     notes_internal:     po.notes_internal,
     notes_supplier:     po.notes_supplier,
-    currency_code:      po.currency_code,
+    currency_code:      currencyCode,
     released_at:        po.released_at,
     cancelled_at:       po.cancelled_at,
     supplier_id:        po.supplier_id,
@@ -138,7 +144,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Currency</span>
-                <span className="font-medium text-gray-800">{flatPO.currency_code || "USD"}</span>
+                <span className="font-medium text-gray-800">{currencyCode}</span>
               </div>
               {flatPO.released_at && (
                 <div className="flex justify-between">
@@ -186,9 +192,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Total Cost</span>
-                <span className="font-medium text-gray-800">
-                  ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
+                <span className="font-medium text-gray-800">{formatCurrency(totalCost, currencyCode)}</span>
               </div>
             </div>
           </Card>
@@ -230,29 +234,32 @@ export default async function PurchaseOrderDetailPage({ params }) {
             </div>
           </div>
 
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-spacing-0">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
-                <th className="text-left px-3 py-2 font-medium w-10">#</th>
-                <th className="text-left px-3 py-2 font-medium w-10"></th>
+                <th className="text-left px-3 py-2 font-medium">#</th>
+                <th className="text-left px-3 py-2 font-medium"></th>
                 <th className="text-left px-3 py-2 font-medium">SKU</th>
                 <th className="text-left px-3 py-2 font-medium">Description</th>
-                <th className="text-left px-3 py-2 font-medium">Supplier SKU</th>
-                <th className="text-left px-3 py-2 font-medium">Qty</th>
+                <th className="text-left px-3 py-2 font-medium">Ordered</th>
+                <th className="text-left px-3 py-2 font-medium">Received</th>
+                <th className="text-left px-3 py-2 font-medium">Open</th>
                 <th className="text-left px-3 py-2 font-medium">Unit Cost</th>
-                <th className="text-left px-3 py-2 font-medium">Extended</th>
+                <th className="text-left px-3 py-2 font-medium">Extended Cost</th>
               </tr>
             </thead>
             <tbody>
               {flatLines.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-gray-400">
+                  <td colSpan={9} className="px-3 py-8 text-center text-gray-400">
                     No line items on this purchase order.
                   </td>
                 </tr>
-              ) : flatLines.map((line) => (
+              ) : flatLines.map((line) => {
+                const open = (line.order_qty_units ?? 0) - (line.received_qty_units ?? 0);
+                return (
                 <tr key={line.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400">{line.line_no}</td>
+                  <td className="px-3 py-2 text-left  text-gray-400">{line.line_no}</td>
                   <td className="px-3 py-2">
                     <div className="w-8 h-8 bg-gray-100 rounded border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
                       {line.image_src
@@ -263,28 +270,29 @@ export default async function PurchaseOrderDetailPage({ params }) {
                       }
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{line.sku || "—"}</td>
-                  <td className="px-3 py-2 text-gray-800 font-medium">{line.display_title || line.title || "—"}</td>
-                  <td className="px-3 py-2 text-gray-500">{line.supplier_sku || "—"}</td>
-                  <td className="px-3 py-2 text-gray-800">{line.order_qty_units?.toLocaleString() ?? "—"}</td>
-                  <td className="px-3 py-2 text-gray-800">
-                    {line.unit_cost != null ? `$${parseFloat(line.unit_cost).toFixed(2)}` : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-gray-800">
-                    {line.extended_cost != null ? `$${parseFloat(line.extended_cost).toFixed(2)}` : "—"}
-                  </td>
+                  <td className="px-3 py-2 text-left  text-gray-600">{line.sku || "—"}</td>
+                  <td className="px-3 py-2 text-left  text-gray-800 font-medium">{line.display_title || line.title || "—"}</td>
+                  <td className="px-3 py-2 text-left text-gray-800">{line.order_qty_units?.toLocaleString() ?? "—"}</td>
+                  <td className="px-3 py-2 text-left text-gray-800">{(line.received_qty_units ?? 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-left text-gray-800">{open > 0 ? open.toLocaleString() : "—"}</td>
+                  <td className="px-3 py-2 text-left text-gray-800">{formatCurrency(line.unit_cost, currencyCode)}</td>
+                  <td className="px-3 py-2 text-left text-gray-800">{formatCurrency(line.extended_cost, currencyCode)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
             {flatLines.length > 0 && (
-              <tfoot>
-                <tr className="border-t border-gray-200 bg-gray-50 text-sm font-semibold text-gray-800">
-                  <td colSpan={5} className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
-                  <td className="px-3 py-2">{totalUnits.toLocaleString()}</td>
-                  <td className="px-3 py-2" />
-                  <td className="px-3 py-2">
-                    ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
+              <tfoot style={{borderSpacing: 0}}>
+                <tr className="border-t border-gray-200 bg-gray-50 text-sm text-gray-800 border-spacing-0">
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2 text-left text-xs text-gray-500 font-medium">Totals</td>
+                  <td className="px-3 py-2 text-left font-semibold">{totalUnits.toLocaleString()}</td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2"></td>
+                  <td className="px-3 py-2 text-left font-semibold">{formatCurrency(totalCost, currencyCode)}</td>
                 </tr>
               </tfoot>
             )}

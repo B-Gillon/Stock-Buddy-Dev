@@ -21,15 +21,18 @@ export default async function VendorsPage() {
   const { data: vendors } = await supabase
     .from("vendors")
     .select("id, name")
-    .order("name", { ascending: true });
+    .order("name", { ascending: true })
+    .limit(500);
 
   const { data: products } = await supabase
     .from("products")
-    .select("id, vendor_id, product_type, status, updated_at");
+    .select("id, vendor_id, product_type, status, updated_at")
+    .limit(500);
 
   const { data: variants } = await supabase
     .from("variants")
-    .select("id, product_id");
+    .select("id, product_id")
+    .limit(2000);
 
   const productsByVendor = new Map();
   for (const product of products ?? []) {

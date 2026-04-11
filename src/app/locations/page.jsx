@@ -17,10 +17,9 @@ export default async function LocationsPage() {
     .select("id, name, active, address1, city, province, zip, country")
     .order("name", { ascending: true });
 
-  // Fetch primary contacts for all locations
   const { data: primaryContacts } = await supabase
     .from("location_contacts")
-    .select("location_id, name, phone, email")
+    .select("location_id, name, phone, email, role")
     .eq("is_primary", true);
 
   const primaryByLocation = new Map(
@@ -39,6 +38,7 @@ export default async function LocationsPage() {
       ...location,
       slug:          toSlug(location.name),
       primary_name:  primary?.name  ?? null,
+      primary_role:  primary?.role  ?? null,
       primary_phone: primary?.phone ?? null,
       primary_email: primary?.email ?? null,
     };

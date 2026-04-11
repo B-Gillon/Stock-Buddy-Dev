@@ -209,7 +209,7 @@ export default function ClientImportPage({ suppliers, lastSyncedAt }) {
     setSyncing(true);
     setBanner(null);
     try {
-      const res  = await fetch("/api/sync_Products", { method: "POST" });
+      const res  = await fetch("/api/sync/products", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Sync failed.");
       setLastSynced(data.last_synced_at ?? new Date().toISOString());

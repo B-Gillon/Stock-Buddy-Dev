@@ -2,33 +2,13 @@
 
 // /src/app/inventory/components/ClientInventoryPage.jsx
 
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import SearchModal from "@/shared/components/modals/SearchModal";
 import InventoryFilterModal from "@/app/inventory/components/InventoryFilterModal";
 import SortIcon from "@/shared/components/icons/SortIcon";
-import usePagination from "@/shared/utils/usePagination";
 
-const SYNC_STEPS = [
-  { label: "Syncing locations...",        endpoint: "/api/sync_Locations"       },
-  { label: "Syncing inventory items...",  endpoint: "/api/sync_InventoryItems"  },
-  { label: "Syncing inventory levels...", endpoint: "/api/sync_InventoryLevels" },
-];
-
-const initialFilters = {
-  vendors:          [],
-  categories:       [],
-  collections:      [],
-  tags:             [],
-  status:           [],
-  locations:        [],
-  availability:     null,
-  incoming:         null,
-  total_value:      null,
-  inventory_policy: null,
-};
-
-// Columns that can be toggled. "chevron" is always visible and excluded from the menu.
 const ALL_COLUMNS = [
   { key: "display_title",   label: "Variant Title", sortable: true,  hideable: false },
   { key: "vendor_name",     label: "Vendor",        sortable: true,  hideable: true  },
@@ -42,10 +22,7 @@ const ALL_COLUMNS = [
 ];
 
 const STORAGE_KEY = "inventory_column_visibility";
-
-const DEFAULT_VISIBILITY = Object.fromEntries(
-  ALL_COLUMNS.map((c) => [c.key, true])
-);
+const DEFAULT_VISIBILITY = Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, true]));
 
 function loadVisibility() {
   if (typeof window === "undefined") return DEFAULT_VISIBILITY;
@@ -53,18 +30,12 @@ function loadVisibility() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return DEFAULT_VISIBILITY;
     return { ...DEFAULT_VISIBILITY, ...JSON.parse(stored) };
-  } catch {
-    return DEFAULT_VISIBILITY;
-  }
+  } catch { return DEFAULT_VISIBILITY; }
 }
 
 function formatCurrency(value) {
   if (value == null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style:                 "currency",
-    currency:              "USD",
-    minimumFractionDigits: 2,
-  }).format(value);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(value);
 }
 
 function StatusPill({ status }) {
@@ -74,11 +45,7 @@ function StatusPill({ status }) {
     normalized === "draft"    ? "bg-yellow-100 text-yellow-700" :
     normalized === "archived" ? "bg-gray-100 text-gray-500"     :
                                 "bg-gray-100 text-gray-400";
-  return (
-    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${styles}`}>
-      {status ?? "—"}
-    </span>
-  );
+  return <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${styles}`}>{status ?? "—"}</span>;
 }
 
 function Chevron({ expanded }) {
@@ -89,7 +56,6 @@ function Chevron({ expanded }) {
   );
 }
 
-// ── Column Toggle Menu ──────────────────────────────────────────────────────
 function ColumnToggleMenu({ visibility, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -102,8 +68,6 @@ function ColumnToggleMenu({ visibility, onChange }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const hideableColumns = ALL_COLUMNS.filter((c) => c.hideable);
-
   return (
     <div className="relative" ref={ref}>
       <button
@@ -115,17 +79,11 @@ function ColumnToggleMenu({ visibility, onChange }) {
         </svg>
         Columns
       </button>
-
       {open && (
         <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-2">
-          <p className="px-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
-            Show / Hide Columns
-          </p>
-          {hideableColumns.map((col) => (
-            <label
-              key={col.key}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-            >
+          <p className="px-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">Show / Hide Columns</p>
+          {ALL_COLUMNS.filter((c) => c.hideable).map((col) => (
+            <label key={col.key} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
               <input
                 type="checkbox"
                 checked={visibility[col.key] ?? true}
@@ -140,45 +98,31 @@ function ColumnToggleMenu({ visibility, onChange }) {
     </div>
   );
 }
-// ───────────────────────────────────────────────────────────────────────────
 
-function sortRows(rows, key, direction) {
-  if (!key || !direction) return rows;
-  return [...rows].sort((a, b) => {
-    const aVal = a[key] ?? "";
-    const bVal = b[key] ?? "";
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      return direction === "asc" ? aVal - bVal : bVal - aVal;
-    }
-    return direction === "asc"
-      ? String(aVal).localeCompare(String(bVal))
-      : String(bVal).localeCompare(String(aVal));
-  });
-}
+export default function ClientInventoryPage({
+  inventory = [],
+  totalCount = 0,
+  totalPages = 1,
+  currentPage = 1,
+  pageSize = 20,
+  currentFilters = {},
+  filterOptions = {},
+  lastSyncedAt: initialLastSyncedAt,
+}) {
+  const router       = useRouter();
+  const pathname     = usePathname();
+  const searchParams = useSearchParams();
 
-export default function ClientInventoryPage({ inventory, lastSyncedAt, locationNames = [] }) {
-  const rows_raw = inventory ?? [];
+  const [syncing,      setSyncing]      = useState(false);
+  const [lastSynced,   setLastSynced]   = useState(initialLastSyncedAt);
+  const [banner,       setBanner]       = useState(null);
+  const [searchOpen,   setSearchOpen]   = useState(false);
+  const [searchTerm,   setSearchTerm]   = useState(currentFilters.search ?? "");
+  const [filterOpen,   setFilterOpen]   = useState(false);
+  const [expanded,     setExpanded]     = useState(new Set());
+  const [visibility,   setVisibility]   = useState(DEFAULT_VISIBILITY);
 
-  const [syncing,    setSyncing]    = useState(false);
-  const [syncLabel,  setSyncLabel]  = useState("Sync Inventory");
-  const [lastSynced, setLastSynced] = useState(lastSyncedAt);
-  const [banner,     setBanner]     = useState(null);
-
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filters,    setFilters]    = useState(initialFilters);
-
-  const [sortKey, setSortKey] = useState("display_title");
-  const [sortDir, setSortDir] = useState("asc");
-
-  const [expanded, setExpanded] = useState(new Set());
-
-  // Column visibility — default on first render, hydrate from localStorage in effect
-  const [visibility, setVisibility] = useState(DEFAULT_VISIBILITY);
-  useEffect(() => {
-    setVisibility(loadVisibility());
-  }, []);
+  useEffect(() => { setVisibility(loadVisibility()); }, []);
 
   function handleVisibilityChange(key, checked) {
     setVisibility((prev) => {
@@ -196,93 +140,121 @@ export default function ClientInventoryPage({ inventory, lastSyncedAt, locationN
     });
   }
 
-  function handleSort(key) {
-    if (!ALL_COLUMNS.find((c) => c.key === key)?.sortable) return;
-    if (sortKey !== key) { setSortKey(key); setSortDir("asc"); }
-    else if (sortDir === "asc") setSortDir("desc");
-    else setSortDir("asc");
+  // ── URL navigation ────────────────────────────────────────────────────────
+
+  function buildParams(overrides = {}) {
+    const params  = new URLSearchParams(searchParams.toString());
+    const merged  = { ...currentFilters, ...overrides };
+
+    // String params
+    ["search", "sort", "dir", "page", "availability", "incoming", "total_value", "inventory_policy"].forEach((k) => {
+      if (merged[k]) params.set(k, merged[k]);
+      else params.delete(k);
+    });
+
+    // Array params — comma-separated
+    ["vendors", "categories", "collections", "status", "tags", "locations"].forEach((k) => {
+      const val = merged[k];
+      if (Array.isArray(val) && val.length > 0) params.set(k, val.join(","));
+      else params.delete(k);
+    });
+
+    return params.toString();
   }
 
-  // Visible columns (chevron is always first, then filtered list)
-  const visibleColumns = ALL_COLUMNS.filter((c) => !c.hideable || visibility[c.key]);
-  const totalCols = visibleColumns.length + 1; // +1 for chevron
+  function navigate(overrides) {
+    router.push(`${pathname}?${buildParams(overrides)}`);
+  }
 
-  const filteredRows = useMemo(() => {
-    let result = [...rows_raw];
+  function handleSort(key) {
+    if (!ALL_COLUMNS.find((c) => c.key === key)?.sortable) return;
+    const newDir = currentFilters.sort === key && currentFilters.dir === "asc" ? "desc" : "asc";
+    navigate({ sort: key, dir: newDir, page: "1" });
+  }
 
-    const term = searchTerm.trim().toLowerCase();
-    if (term) {
-      result = result.filter((r) =>
-        r.display_title?.toLowerCase().includes(term) ||
-        r.sku?.toLowerCase().includes(term) ||
-        r.barcode?.toLowerCase().includes(term) ||
-        r.vendor_name?.toLowerCase().includes(term) ||
-        r.status?.toLowerCase().includes(term)
-      );
+  function handleSearch() {
+    navigate({ search: searchTerm, page: "1" });
+    setSearchOpen(false);
+  }
+
+  function handleClearSearch() {
+    setSearchTerm("");
+    navigate({ search: "", page: "1" });
+  }
+
+  function handleApplyFilters(filters) {
+    navigate({
+      vendors:          filters.vendors,
+      categories:       filters.categories,
+      collections:      filters.collections,
+      status:           filters.status,
+      tags:             filters.tags,
+      locations:        filters.locations,
+      availability:     filters.availability ?? "",
+      incoming:         filters.incoming ?? "",
+      total_value:      filters.total_value ?? "",
+      inventory_policy: filters.inventory_policy ?? "",
+      page:             "1",
+    });
+    setFilterOpen(false);
+  }
+
+  function handleClearFilters() {
+    navigate({
+      vendors: [], categories: [], collections: [], status: [], tags: [],
+      locations: [], availability: "", incoming: "", total_value: "",
+      inventory_policy: "", page: "1",
+    });
+    setFilterOpen(false);
+  }
+
+  function goToPage(p) { navigate({ page: String(p) }); }
+
+  // Active filters for the modal
+  const activeFilters = {
+    vendors:          currentFilters.vendors     ?? [],
+    categories:       currentFilters.categories  ?? [],
+    collections:      currentFilters.collections ?? [],
+    status:           currentFilters.status      ?? [],
+    tags:             currentFilters.tags        ?? [],
+    locations:        currentFilters.locations   ?? [],
+    availability:     currentFilters.availability     || null,
+    incoming:         currentFilters.incoming         || null,
+    total_value:      currentFilters.total_value      || null,
+    inventory_policy: currentFilters.inventory_policy || null,
+  };
+
+  // ── Sync ──────────────────────────────────────────────────────────────────
+
+  async function handleSync() {
+    setSyncing(true);
+    setBanner(null);
+    try {
+      const res = await fetch("/api/sync/inventory", { method: "POST" });
+      if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error ?? res.statusText); }
+      setLastSynced(new Date().toISOString());
+      setBanner({ type: "success", message: "Inventory sync complete." });
+    } catch (err) {
+      setBanner({ type: "error", message: err.message ?? "Sync failed." });
+    } finally {
+      setSyncing(false);
     }
+  }
 
-    if (filters.vendors.length > 0)
-      result = result.filter((r) => filters.vendors.includes(r.vendor_name));
-    if (filters.categories.length > 0)
-      result = result.filter((r) => filters.categories.includes(r.category));
-    if (filters.collections.length > 0)
-      result = result.filter((r) => filters.collections.includes(r.collection));
-    if (filters.tags.length > 0)
-      result = result.filter((r) => (r.tags || []).some((t) => filters.tags.includes(t)));
-    if (filters.status.length > 0)
-      result = result.filter((r) => filters.status.includes(r.status?.toLowerCase()));
-    if (filters.locations.length > 0)
-      result = result.filter((r) =>
-        r.location_rows?.some((l) => filters.locations.includes(l.location_name))
-      );
-    if (filters.availability === "in_stock")
-      result = result.filter((r) => r.available_total > 0);
-    if (filters.availability === "out_of_stock")
-      result = result.filter((r) => r.available_total <= 0);
-    if (filters.availability === "low_stock")
-      result = result.filter((r) => r.available_total > 0 && r.available_total < 5);
-    if (filters.incoming === "has_incoming")
-      result = result.filter((r) => r.incoming_total > 0);
-    if (filters.incoming === "no_incoming")
-      result = result.filter((r) => r.incoming_total <= 0);
-    if (filters.total_value === "has_value")
-      result = result.filter((r) => r.total_value != null);
-    if (filters.total_value === "no_value")
-      result = result.filter((r) => r.total_value == null);
-    if (filters.inventory_policy)
-      result = result.filter((r) => r.inventory_policy === filters.inventory_policy);
+  // ── Export ────────────────────────────────────────────────────────────────
 
-    return result;
-  }, [rows_raw, searchTerm, filters]);
-
-  const sortedRows = useMemo(
-    () => sortRows(filteredRows, sortKey, sortDir),
-    [filteredRows, sortKey, sortDir]
-  );
-
-  const pagination = usePagination(sortedRows, 20);
-
-  const filterOptions = useMemo(() => ({
-    vendors:     [...new Set(rows_raw.map((r) => r.vendor_name).filter(Boolean))],
-    categories:  [...new Set(rows_raw.map((r) => r.category).filter(Boolean))],
-    collections: [...new Set(rows_raw.map((r) => r.collection).filter(Boolean))],
-    tags:        [...new Set(rows_raw.flatMap((r) => r.tags || []))],
-    locations:   locationNames,
-  }), [rows_raw, locationNames]);
-
-  const exportCSV = useCallback(() => {
-    if (!sortedRows.length) { alert("No inventory to export."); return; }
-    const exportRows = sortedRows.map(({ location_rows, ...rest }) => rest);
-    const header  = Object.keys(exportRows[0]).join(",");
-    const csvRows = exportRows.map((row) =>
-      Object.values(row).map((value) => {
-        if (value == null) return "";
-        if (Array.isArray(value)) return `"${value.join(";")}"`;
-        if (typeof value === "string") return `"${value.replace(/"/g, '""')}"`;
-        return value;
+  function exportCSV() {
+    if (!inventory.length) { alert("No inventory to export."); return; }
+    const cols = ["display_title", "vendor_name", "sku", "barcode", "status", "available_total", "incoming_total", "total_value"];
+    const csvRows = inventory.map((row) =>
+      cols.map((key) => {
+        const val = row[key];
+        if (val == null) return "";
+        if (typeof val === "string") return `"${val.replace(/"/g, '""')}"`;
+        return val;
       }).join(",")
     );
-    const csv  = [header, ...csvRows].join("\n");
+    const csv  = [cols.join(","), ...csvRows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url  = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -292,32 +264,38 @@ export default function ClientInventoryPage({ inventory, lastSyncedAt, locationN
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [sortedRows]);
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      for (const step of SYNC_STEPS) {
-        setSyncLabel(step.label);
-        const res = await fetch(step.endpoint, { method: "POST" });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(`${step.endpoint} failed: ${body.error ?? res.statusText}`);
-        }
-      }
-      setLastSynced(new Date().toISOString());
-      setBanner({ type: "success", message: "Inventory sync complete." });
-    } catch (err) {
-      setBanner({ type: "error", message: err.message ?? "Sync failed." });
-    } finally {
-      setSyncing(false);
-      setSyncLabel("Sync Inventory");
-    }
   }
 
-  // Helper: render a cell value for a given column key
-  function renderCell(col, row, displayAvailable, displayIncoming, displayValue) {
+  // ── Pagination controls ───────────────────────────────────────────────────
+
+  const start     = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end       = Math.min(currentPage * pageSize, totalCount);
+  const pageLabel = totalCount === 0 ? "No results" : `${start}–${end} of ${totalCount.toLocaleString()}`;
+
+  const paginationControls = {
+    pageData: inventory, pageLabel, currentPage, totalPages,
+    prevPage: () => goToPage(currentPage - 1),
+    nextPage: () => goToPage(currentPage + 1),
+    goToPage,
+  };
+
+  const visibleColumns = ALL_COLUMNS.filter((c) => !c.hideable || visibility[c.key]);
+  const totalCols = visibleColumns.length + 1;
+
+  // ── Render helpers ────────────────────────────────────────────────────────
+
+  function renderCell(col, row) {
+    const locationFilter = currentFilters.locations ?? [];
+    const visibleLocations = locationFilter.length > 0
+      ? (row.location_rows ?? []).filter((l) => locationFilter.includes(l.location_name))
+      : (row.location_rows ?? []);
+
+    const displayAvailable = visibleLocations.reduce((s, l) => s + l.available, 0);
+    const displayIncoming  = visibleLocations.reduce((s, l) => s + l.incoming,  0);
+    const displayValue     = visibleLocations.length > 0 && visibleLocations.every((l) => l.total_value != null)
+      ? visibleLocations.reduce((s, l) => s + (l.total_value ?? 0), 0)
+      : row.total_value;
+
     switch (col.key) {
       case "display_title":   return <span className="font-medium text-gray-900">{row.display_title}</span>;
       case "vendor_name":     return <span className="text-gray-600">{row.vendor_name}</span>;
@@ -332,7 +310,6 @@ export default function ClientInventoryPage({ inventory, lastSyncedAt, locationN
     }
   }
 
-  // Helper: render a location sub-row cell for a given column key
   function renderLocationCell(col, loc) {
     switch (col.key) {
       case "location":        return <span className="text-xs text-gray-600 font-medium">{loc.location_name}</span>;
@@ -346,20 +323,17 @@ export default function ClientInventoryPage({ inventory, lastSyncedAt, locationN
   return (
     <AppLayout
       title="Inventory"
-      paginationControls={pagination}
+      paginationControls={paginationControls}
       actions={{
         onSync:       handleSync,
         syncing:      syncing,
-        syncLabel:    syncLabel,
+        syncLabel:    "Sync Inventory",
         lastSyncedAt: lastSynced,
         onSearch:     () => setSearchOpen(true),
         onFilter:     () => setFilterOpen(true),
         onExport:     exportCSV,
         columnsMenu: (
-          <ColumnToggleMenu
-            visibility={visibility}
-            onChange={handleVisibilityChange}
-          />
+          <ColumnToggleMenu visibility={visibility} onChange={handleVisibilityChange} />
         ),
       }}
     >
@@ -376,73 +350,51 @@ export default function ClientInventoryPage({ inventory, lastSyncedAt, locationN
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-gray-200 border-b border-gray-300">
-            {/* Chevron — always visible */}
             <th className="px-2 py-2 w-6" />
             {visibleColumns.map((col) => (
               <th
                 key={col.key}
                 onClick={() => handleSort(col.key)}
                 className={`text-left px-2 py-2 font-medium whitespace-nowrap ${
-                  col.sortable
-                    ? "cursor-pointer select-none hover:bg-gray-300 transition-colors"
-                    : ""
+                  col.sortable ? "cursor-pointer select-none hover:bg-gray-300 transition-colors" : ""
                 }`}
               >
                 {col.label}
                 {col.sortable && (
-                  <SortIcon direction={sortKey === col.key ? sortDir : null} />
+                  <SortIcon direction={currentFilters.sort === col.key ? currentFilters.dir : null} />
                 )}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {pagination.pageData.length === 0 ? (
+          {inventory.length === 0 ? (
             <tr>
-              <td colSpan={totalCols} className="px-2 py-8 text-center text-gray-400">
-                No inventory found.
-              </td>
+              <td colSpan={totalCols} className="px-2 py-8 text-center text-gray-400">No inventory found.</td>
             </tr>
           ) : (
-            pagination.pageData.map((row) => {
+            inventory.map((row) => {
               const isExpanded = expanded.has(row.id);
-              const visibleLocations = (row.location_rows ?? []).filter(
-                (loc) => filters.locations.length === 0 || filters.locations.includes(loc.location_name)
-              );
-              const displayAvailable = visibleLocations.reduce((s, l) => s + l.available, 0);
-              const displayIncoming  = visibleLocations.reduce((s, l) => s + l.incoming,  0);
-              const displayValue     = visibleLocations.length > 0 && visibleLocations.every((l) => l.total_value != null)
-                ? visibleLocations.reduce((s, l) => s + (l.total_value ?? 0), 0)
-                : row.total_value;
+              const locationFilter = currentFilters.locations ?? [];
+              const visibleLocations = locationFilter.length > 0
+                ? (row.location_rows ?? []).filter((l) => locationFilter.includes(l.location_name))
+                : (row.location_rows ?? []);
 
               return (
                 <React.Fragment key={row.id}>
-                  {/* ── Main variant row ── */}
                   <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td
-                      className="px-2 py-3 w-6 cursor-pointer"
-                      onClick={() => toggleExpanded(row.id)}
-                    >
+                    <td className="px-2 py-3 w-6 cursor-pointer" onClick={() => toggleExpanded(row.id)}>
                       <Chevron expanded={isExpanded} />
                     </td>
                     {visibleColumns.map((col) => (
-                      <td key={col.key} className="px-2 py-3">
-                        {renderCell(col, row, displayAvailable, displayIncoming, displayValue)}
-                      </td>
+                      <td key={col.key} className="px-2 py-3">{renderCell(col, row)}</td>
                     ))}
                   </tr>
-
-                  {/* ── Expanded location rows ── */}
                   {isExpanded && visibleLocations.map((loc) => (
-                    <tr
-                      key={`${row.id}-${loc.location_id}`}
-                      className="bg-gray-50 border-b border-gray-100"
-                    >
+                    <tr key={`${row.id}-${loc.location_id}`} className="bg-gray-50 border-b border-gray-100">
                       <td className="px-2 py-2" />
                       {visibleColumns.map((col) => (
-                        <td key={col.key} className="px-2 py-2">
-                          {renderLocationCell(col, loc)}
-                        </td>
+                        <td key={col.key} className="px-2 py-2">{renderLocationCell(col, loc)}</td>
                       ))}
                     </tr>
                   ))}
@@ -458,19 +410,19 @@ export default function ClientInventoryPage({ inventory, lastSyncedAt, locationN
         title="Search Inventory"
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
-        onSearch={() => setSearchOpen(false)}
-        onClear={() => setSearchTerm("")}
+        onSearch={handleSearch}
+        onClear={handleClearSearch}
         onClose={() => setSearchOpen(false)}
       />
 
       <InventoryFilterModal
         isOpen={filterOpen}
         onClose={() => setFilterOpen(false)}
-        filters={filters}
-        setFilters={setFilters}
+        filters={activeFilters}
+        setFilters={() => {}}
         options={filterOptions}
-        onApply={() => setFilterOpen(false)}
-        onClear={() => setFilterOpen(false)}
+        onApply={handleApplyFilters}
+        onClear={handleClearFilters}
       />
     </AppLayout>
   );

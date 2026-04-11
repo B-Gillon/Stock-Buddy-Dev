@@ -1,188 +1,165 @@
 /**
  * receivePO.js
- * Orchestrates partial or full receiving against a released PO:
- *   1. Validate PO is receivable
- *   2. Update line received quantities
- *   3. Recalculate PO status (partially_received / received)
- *   4. Adjust Shopify: decrease incoming, increase available
- *   5. Mark po_shopify_incoming rows as reversed
+ *
+ * Records receiving in Stock Buddy and adjusts Shopify available inventory.
+ *
+ * Rules:
+ * - Only push to Shopify if receiving_source === 'stock_buddy'
+ * - FAIL-SAFE: Block if incoming_remaining < qty_to_receive
+ * - Reduces incoming_remaining by qty_to_receive
+ * - Increases Shopify available by qty_to_receive
+ * - Marks po_shopify_incoming rows as reversed (partial or full)
+ * - Recalculates PO status: partially_received or received
+ * - Does NOT roll back DB on Shopify failure (received qty is ground truth)
  */
 
+import { supabase } from "@/lib/supabaseClient";
 import {
-  buildAdjustPayload,
-  callShopifyAdjust,
-  getExistingIncoming,
-  markIncomingReversed,
-  resolveTenantCredentials,
-} from "./poSyncHelpers.js";
-
-const RECEIVABLE_STATUSES = ["released", "partially_received"];
+  resolveShopifyCredentials,
+  fetchPOWithLines,
+  getShopifyLocationId,
+  adjustShopifyAvailable,
+  logShopifyIncoming,
+} from "./poSyncHelpers";
 
 /**
- * @param {object} opts
- * @param {object} opts.supabase    - server supabase client
- * @param {string} opts.poId        - purchase_orders.id
- * @param {string} opts.tenantId
- * @param {Array}  opts.receipts    - [{ lineId: uuid, receivedQty: number }]
- *                                    Only lines being received now; omit untouched lines.
+ * Record receiving for a single PO line.
+ *
+ * @param {string} poId        - UUID of the purchase order
+ * @param {string} lineId      - UUID of the purchase_order_line
+ * @param {number} qtyToReceive - Number of units being received
+ * @param {string} tenantId    - UUID of the tenant
+ * @returns {Promise<{ success: boolean, newPOStatus?: string, error?: string }>}
  */
-export async function receivePO({ supabase, poId, tenantId, receipts }) {
-  if (!receipts || receipts.length === 0) throw new Error("No receipt quantities provided.");
-
-  // ── 1. Fetch PO ───────────────────────────────────────────────────────────
-  const { data: po, error: poError } = await supabase
-    .from("purchase_orders")
-    .select("*")
-    .eq("id", poId)
-    .eq("tenant_id", tenantId)
-    .single();
-
-  if (poError || !po) throw new Error(`PO not found: ${poError?.message}`);
-  if (!RECEIVABLE_STATUSES.includes(po.status)) {
-    throw new Error(`PO cannot be received from status: ${po.status}`);
+export async function receiveInStockBuddy(poId, lineId, qtyToReceive, tenantId) {
+  if (!Number.isInteger(qtyToReceive) || qtyToReceive <= 0) {
+    return { success: false, error: "qty_to_receive must be a positive integer" };
   }
 
-  // ── 2. Fetch all lines ────────────────────────────────────────────────────
-  const { data: lines, error: linesError } = await supabase
-    .from("purchase_order_lines")
-    .select(`
-      *,
-      inventory_item:inventory_items!inner (
-        shopify_inventory_item_id
-      )
-    `)
-    .eq("purchase_order_id", poId)
-    .eq("tenant_id", tenantId);
+  try {
+    const { po, lines } = await fetchPOWithLines(poId, tenantId);
 
-  if (linesError) throw new Error(`Failed to fetch PO lines: ${linesError.message}`);
+    // Guard: must be in a receivable status
+    if (!["released", "partially_received"].includes(po.status)) {
+      return {
+        success: false,
+        error: `PO status '${po.status}' is not receivable`,
+      };
+    }
 
-  const lineMap = Object.fromEntries(lines.map((l) => [l.id, l]));
+    // Find the specific line
+    const line = lines.find((l) => l.id === lineId);
+    if (!line) return { success: false, error: `PO line not found: ${lineId}` };
 
-  // ── 3. Update each received line ──────────────────────────────────────────
-  const now = new Date().toISOString();
+    // ── FAIL-SAFE ─────────────────────────────────────────────────────────────
+    if (line.incoming_remaining < qtyToReceive) {
+      return {
+        success: false,
+        error: `Cannot receive ${qtyToReceive} units — only ${line.incoming_remaining} remaining. Operation blocked.`,
+        failSafe: true,
+      };
+    }
 
-  for (const { lineId, receivedQty } of receipts) {
-    const line = lineMap[lineId];
-    if (!line) throw new Error(`Line ${lineId} not found on this PO.`);
+    // Guard: if receiving_source is external, block Shopify push
+    const willPushToShopify = po.receiving_source === "stock_buddy";
 
-    const newTotal = (line.received_qty_units ?? 0) + receivedQty;
+    const inventoryItem = line.variants?.inventory_items?.[0];
+    if (willPushToShopify && !inventoryItem?.shopify_inventory_item_id) {
+      return { success: false, error: `No inventory item found for line ${lineId}` };
+    }
 
-    const { error } = await supabase
+    // ── Update internal state ─────────────────────────────────────────────────
+    const newRemaining = line.incoming_remaining - qtyToReceive;
+
+const { error: lineUpdateError } = await supabase
+  .from("purchase_order_lines")
+  .update({
+    incoming_remaining: newRemaining,
+    received_qty_units: (line.received_qty_units ?? 0) + qtyToReceive,
+    received_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", lineId)
+  .eq("tenant_id", tenantId);
+
+    if (lineUpdateError) throw new Error(`Line update failed: ${lineUpdateError.message}`);
+
+    // ── Recalculate PO status ─────────────────────────────────────────────────
+    // Re-fetch all lines to get fresh remaining values
+    const { data: freshLines } = await supabase
       .from("purchase_order_lines")
-      .update({
-        received_qty_units: newTotal,
-        received_at: now,
-        updated_at: now,
-      })
-      .eq("id", lineId)
+      .select("incoming_remaining, order_qty_units")
+      .eq("purchase_order_id", poId)
       .eq("tenant_id", tenantId);
 
-    if (error) throw new Error(`Failed to update line ${lineId}: ${error.message}`);
+    const allReceived = freshLines.every((l) => l.incoming_remaining === 0);
+    const newPOStatus = allReceived ? "received" : "partially_received";
 
-    // Update our local map for status calc below
-    lineMap[lineId] = { ...line, received_qty_units: newTotal };
-  }
-
-  // ── 4. Recalculate PO status ──────────────────────────────────────────────
-  const allLines = Object.values(lineMap);
-  const fullyReceived = allLines.every(
-    (l) => (l.received_qty_units ?? 0) >= l.order_qty_units
-  );
-  const anyReceived = allLines.some((l) => (l.received_qty_units ?? 0) > 0);
-
-  const newStatus = fullyReceived
-    ? "received"
-    : anyReceived
-    ? "partially_received"
-    : po.status;
-
-  const poUpdate = {
-    status: newStatus,
-    updated_at: now,
-    ...(fullyReceived && !po.received_at ? { received_at: now } : {}),
-  };
-
-  const { error: poUpdateError } = await supabase
-    .from("purchase_orders")
-    .update(poUpdate)
-    .eq("id", poId)
-    .eq("tenant_id", tenantId);
-
-  if (poUpdateError) throw new Error(`Failed to update PO status: ${poUpdateError.message}`);
-
-  // ── 5. Adjust Shopify ─────────────────────────────────────────────────────
-  try {
-    const credentials = await resolveTenantCredentials(supabase, tenantId);
-    const existingIncoming = await getExistingIncoming(supabase, poId);
-
-    // Build a map of line → pushed quantity for reversal calculation
-    const pushedByLine = {};
-    for (const row of existingIncoming) {
-      pushedByLine[row.purchase_order_line_id] =
-        (pushedByLine[row.purchase_order_line_id] ?? 0) + row.quantity_pushed;
+    const poUpdate = {
+      status: newPOStatus,
+      updated_at: new Date().toISOString(),
+    };
+    if (newPOStatus === "received") {
+      poUpdate.received_at = new Date().toISOString();
     }
 
-    const changes = [];
-    const rowsToReverse = [];
-
-    for (const { lineId, receivedQty } of receipts) {
-      const line = lineMap[lineId];
-      const shopifyItemId = line.inventory_item?.shopify_inventory_item_id;
-      const shopifyLocationId = existingIncoming.find(
-        (r) => r.purchase_order_line_id === lineId
-      )?.shopify_location_id;
-
-      if (!shopifyItemId || !shopifyLocationId) continue;
-
-      // Decrease incoming by received qty, increase available by received qty
-      changes.push(
-        { shopifyInventoryItemId: shopifyItemId, shopifyLocationId, delta: -receivedQty },  // incoming
-        { shopifyInventoryItemId: shopifyItemId, shopifyLocationId, delta: receivedQty }    // available
-      );
-
-      // Collect incoming log rows affected by this line for reversal marking
-      const affected = existingIncoming.filter(
-        (r) => r.purchase_order_line_id === lineId
-      );
-      rowsToReverse.push(...affected.map((r) => r.id));
-    }
-
-    if (changes.length > 0) {
-      const payload = buildAdjustPayload(changes, "received");
-      await callShopifyAdjust({ ...credentials, payload });
-    }
-
-    if (rowsToReverse.length > 0) {
-      await markIncomingReversed(supabase, rowsToReverse, "received");
-    }
-
-    await supabase
+    const { error: poUpdateError } = await supabase
       .from("purchase_orders")
-      .update({ shopify_synced_at: now, shopify_sync_error: null })
-      .eq("id", poId);
-  } catch (shopifyErr) {
-    // DB is already updated — log error but don't roll back receiving
-    // Shopify can be re-synced; we don't want to lose received quantities
-    await supabase
-      .from("purchase_orders")
-      .update({ shopify_sync_error: shopifyErr.message })
-      .eq("id", poId);
+      .update(poUpdate)
+      .eq("id", poId)
+      .eq("tenant_id", tenantId);
 
-    console.error("Shopify sync failed during receive:", shopifyErr.message);
+    if (poUpdateError) throw new Error(`PO status update failed: ${poUpdateError.message}`);
+
+    // ── Push to Shopify (if stock_buddy mode) ─────────────────────────────────
+    if (willPushToShopify) {
+      try {
+        const shopifyCreds = await resolveShopifyCredentials(tenantId);
+        const shopifyLocationId = await getShopifyLocationId(po.ship_to_location_id, tenantId);
+
+        await adjustShopifyAvailable(
+          shopifyCreds,
+          inventoryItem.shopify_inventory_item_id,
+          shopifyLocationId,
+          qtyToReceive // positive delta → increase available
+        );
+
+        await logShopifyIncoming({
+          tenantId,
+          poId,
+          lineId,
+          variantId: line.variant_id,
+          locationId: po.ship_to_location_id,
+          incomingQty: -qtyToReceive, // negative = reduction of incoming
+          action: "reverse",
+        });
+
+        // Stamp sync success
+        await supabase
+          .from("purchase_orders")
+          .update({ shopify_synced_at: new Date().toISOString(), shopify_sync_error: null })
+          .eq("id", poId)
+          .eq("tenant_id", tenantId);
+      } catch (shopifyErr) {
+        // DB is already updated — do NOT roll back
+        // Log the Shopify error but report partial success
+        await supabase
+          .from("purchase_orders")
+          .update({ shopify_sync_error: shopifyErr.message })
+          .eq("id", poId)
+          .eq("tenant_id", tenantId);
+
+        return {
+          success: true, // DB succeeded
+          newPOStatus,
+          shopifyError: shopifyErr.message,
+          warning: "Receiving recorded in Stock Buddy. Shopify sync failed — reconcile manually.",
+        };
+      }
+    }
+
+    return { success: true, newPOStatus };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
-
-  // ── 6. Return updated state ───────────────────────────────────────────────
-  const { data: updatedPO } = await supabase
-    .from("purchase_orders")
-    .select("*")
-    .eq("id", poId)
-    .single();
-
-  const { data: updatedLines } = await supabase
-    .from("purchase_order_lines")
-    .select("*")
-    .eq("purchase_order_id", poId)
-    .order("line_no", { ascending: true });
-
-  return { po: updatedPO, lines: updatedLines };
 }

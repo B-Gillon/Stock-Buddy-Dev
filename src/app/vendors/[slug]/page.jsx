@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { supabase, setTenantContext } from "@/lib/supabaseClient";
-import { getTenantIdFromHeaders } from "@/lib/tenants";
+import { getTenantFromHeaders } from "@/lib/tenants";
 import { notFound } from "next/navigation";
 import { getStoreSettings } from "@/shared/utils/getStoreSettings";
 import ClientVendorDetailPage from "./components/ClientVendorDetailPage";
@@ -19,7 +19,7 @@ export default async function VendorDetailPage({ params }) {
   const { slug } = await params;
 
   const headersList = await headers();
-  const tenantId = await getTenantIdFromHeaders(headersList);
+  const { tenantId, shopDomain } = await getTenantFromHeaders(headersList);
   await setTenantContext(supabase, tenantId);
 
   const { data: vendors } = await supabase
@@ -34,10 +34,12 @@ export default async function VendorDetailPage({ params }) {
       .from("products")
       .select("*")
       .eq("vendor", vendor.name)
-      .order("title", { ascending: true }),
+      .order("title", { ascending: true })
+      .limit(500),
     supabase
       .from("variants")
-      .select("product_id"),
+      .select("product_id")
+      .limit(2000),
     supabase
       .from("sync_status")
       .select("last_synced_at")
@@ -71,6 +73,7 @@ export default async function VendorDetailPage({ params }) {
       initialProducts={enrichedProducts}
       initialLastSyncedAt={lastSyncedAt}
       storeName={storeName}
+      shopDomain={`https://${shopDomain}`}
     />
   );
 }

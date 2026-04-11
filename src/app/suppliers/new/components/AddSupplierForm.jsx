@@ -225,7 +225,7 @@ export default function AddSupplierForm() {
       });
       if (!res.ok) throw new Error("Failed to create supplier");
       const { id } = await res.json();
-      router.push(`/suppliers/${id}`);
+      router.push(`/suppliers/${data.supplier_number}`);
     } catch (err) {
       console.error(err);
       setErrors({ _global: "Something went wrong. Please try again." });

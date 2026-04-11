@@ -10,6 +10,7 @@ import SortIcon from "@/shared/components/icons/SortIcon";
 const COLUMNS = [
   { key: "name",          label: "Location"        },
   { key: "primary_name",  label: "Primary Contact" },
+  { key: "primary_role",  label: "Role"            },
   { key: "primary_email", label: "Primary Email"   },
   { key: "primary_phone", label: "Primary Phone"   },
 ];
@@ -53,7 +54,7 @@ export default function ClientLocationsPage({ locations, lastSyncedAt }) {
     setSyncing(true);
     setBanner(null);
     try {
-      const res  = await fetch("/api/sync_Locations", { method: "POST" });
+      const res  = await fetch("/api/sync/locations", { method: "POST" });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Sync failed. Please try again.");
       setLastSynced(new Date().toISOString());
@@ -106,7 +107,7 @@ export default function ClientLocationsPage({ locations, lastSyncedAt }) {
         <tbody>
           {sortedRows.length === 0 ? (
             <tr>
-              <td colSpan={4} className="px-2 py-8 text-center text-gray-400">
+              <td colSpan={COLUMNS.length} className="px-2 py-8 text-center text-gray-400">
                 No locations found.
               </td>
             </tr>
@@ -118,7 +119,8 @@ export default function ClientLocationsPage({ locations, lastSyncedAt }) {
                 className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <td className="px-2 py-2 font-medium text-gray-900">{location.name || "—"}</td>
-                <td className="px-2 py-2 text-gray-600">{location.primary_name || "—"}</td>
+                <td className="px-2 py-2 text-gray-600">{location.primary_name  || "—"}</td>
+                <td className="px-2 py-2 text-gray-600">{location.primary_role  || "—"}</td>
                 <td className="px-2 py-2 text-gray-600">{location.primary_email || "—"}</td>
                 <td className="px-2 py-2 text-gray-600">{formatPhone(location.primary_phone)}</td>
               </tr>

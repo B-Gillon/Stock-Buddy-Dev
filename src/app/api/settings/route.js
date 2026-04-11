@@ -25,12 +25,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const tenantId = await getTenantId(request);
-    console.log("POST /api/settings tenantId:", tenantId);
 
     await setTenantContext(supabase, tenantId);
 
     const body = await request.json();
-    console.log("POST /api/settings body:", JSON.stringify(body));
 
     const rows = Object.entries(body).map(([key, value]) => ({
       tenant_id:  tenantId,

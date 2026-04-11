@@ -1,96 +1,80 @@
-// /src/app/api/suppliers/[id]/transmission/route.js
-import { supabase, setTenantContext } from '@/lib/supabaseClient';
-import { getTenantId } from '@/lib/tenants';
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabaseClient";
+import { getTenantId } from "@/lib/tenants";
 
-// GET /api/suppliers/[id]/transmission
-// Returns all recipients for a supplier ordered by sort_order
 export async function GET(request, { params }) {
-  const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
+  try {
+    const tenantId = await getTenantId(request);
+    const { id } = await params;
 
-  const { id } = await params;
+    const { data, error } = await supabase
+      .from("supplier_transmission_recipients")
+      .select("id, label, to_emails, cc_emails, bcc_emails, send_pdf, send_csv, sort_order")
+      .eq("tenant_id", tenantId)
+      .eq("supplier_id", id)
+      .order("sort_order", { ascending: true });
 
-  const { data, error } = await supabase
-    .from('supplier_transmission_recipients')
-    .select('*')
-    .eq('supplier_id', id)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true });
+    if (error) throw error;
 
-  if (error) {
-    console.error('GET supplier_transmission_recipients error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ recipients: data ?? [] });
+  } catch (err) {
+    console.error("GET /api/suppliers/[id]/transmission error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  return NextResponse.json({ recipients: data || [] });
 }
 
-// POST /api/suppliers/[id]/transmission
-// Replaces all recipients for a supplier in one shot
-// Body: { recipients: [{ id?, label, email, role, send_pdf, send_csv, sort_order }] }
 export async function POST(request, { params }) {
-  const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
-
-  const { id: supplier_id } = await params;
-
-  let body;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
+    const tenantId  = await getTenantId(request);
+    const { id: supplierId } = await params;
+    const { recipients } = await request.json();
 
-  const { recipients } = body;
-
-  if (!Array.isArray(recipients)) {
-    return NextResponse.json({ error: 'recipients must be an array' }, { status: 400 });
-  }
-
-  // Validate each recipient
-  for (const r of recipients) {
-    if (!r.email?.trim()) {
-      return NextResponse.json({ error: 'All recipients must have an email address' }, { status: 400 });
+    if (!Array.isArray(recipients)) {
+      return NextResponse.json({ error: "recipients must be an array" }, { status: 400 });
     }
-    if (!['Primary', 'CC', 'BCC'].includes(r.role)) {
-      return NextResponse.json({ error: `Invalid role: ${r.role}` }, { status: 400 });
+
+    // Validate: at least one record with a non-empty to_emails
+    const hasTo = recipients.some((r) => r.to_emails?.trim());
+    if (!hasTo) {
+      return NextResponse.json(
+        { error: "At least one record with a To email address is required." },
+        { status: 422 }
+      );
     }
-  }
 
-  // Delete all existing recipients for this supplier, then re-insert
-  const { error: deleteError } = await supabase
-    .from('supplier_transmission_recipients')
-    .delete()
-    .eq('supplier_id', supplier_id);
+    // Delete all existing rows for this supplier
+    const { error: deleteError } = await supabase
+      .from("supplier_transmission_recipients")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .eq("supplier_id", supplierId);
 
-  if (deleteError) {
-    console.error('DELETE supplier_transmission_recipients error:', deleteError);
-    return NextResponse.json({ error: deleteError.message }, { status: 500 });
-  }
+    if (deleteError) throw deleteError;
 
-  if (recipients.length > 0) {
-    const rows = recipients.map((r, idx) => ({
-      tenant_id:   tenantId,
-      supplier_id,
-      label:       r.label?.trim() || '',
-      email:       r.email.trim(),
-      role:        r.role,
-      send_pdf:    r.send_pdf ?? true,
-      send_csv:    r.send_csv ?? true,
-      sort_order:  idx,
-      updated_at:  new Date().toISOString(),
-    }));
+    // Re-insert
+    if (recipients.length > 0) {
+      const rows = recipients.map((r, index) => ({
+        tenant_id:  tenantId,
+        supplier_id: supplierId,
+        label:      r.label      ?? "",
+        to_emails:  r.to_emails  ?? "",
+        cc_emails:  r.cc_emails  || null,
+        bcc_emails: r.bcc_emails || null,
+        send_pdf:   r.send_pdf   ?? true,
+        send_csv:   r.send_csv   ?? true,
+        sort_order: index,
+      }));
 
-    const { error: insertError } = await supabase
-      .from('supplier_transmission_recipients')
-      .insert(rows);
+      const { error: insertError } = await supabase
+        .from("supplier_transmission_recipients")
+        .insert(rows);
 
-    if (insertError) {
-      console.error('INSERT supplier_transmission_recipients error:', insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      if (insertError) throw insertError;
     }
-  }
 
-  return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("POST /api/suppliers/[id]/transmission error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }

@@ -21,7 +21,8 @@ export default async function SupplierVariantDataEditPage() {
           products ( category, collection )
         )
       `)
-      .order("updated_at", { ascending: false }),
+      .order("updated_at", { ascending: false })
+      .limit(2000),
     supabase
       .from("sync_status")
       .select("last_synced_at")

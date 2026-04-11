@@ -2,9 +2,9 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Button from "@/shared/components/Button";
-import Badge from "@/shared/components/Badge";
-import { Toast, useToast } from "@/shared/components/Toast";
+import Button from "@/shared/components/ui/Button";
+import Badge from "@/shared/components/ui/Badge";
+import { Toast, useToast } from "@/shared/components/ui/Toast";
 
 function ConfirmReceiveModal({ isOpen, onClose, onConfirm, receipts, lines, isSubmitting }) {
   if (!isOpen) return null;
@@ -88,7 +88,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receipts }),
+        body: JSON.stringify({ lines: receipts.map((r) => ({ lineId: r.lineId, qtyToReceive: r.receivedQty })) }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? "Unknown error");

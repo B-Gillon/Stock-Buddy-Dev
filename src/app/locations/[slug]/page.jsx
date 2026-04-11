@@ -24,7 +24,7 @@ export default async function LocationDetailPage({ params }) {
   const location = (locations ?? []).find((l) => toSlug(l.name) === slug);
   if (!location) notFound();
 
-  const [inventoryRes, contactsRes] = await Promise.all([
+  const [inventoryRes, contactsRes, syncRes] = await Promise.all([
     supabase
       .from("inventory_levels")
       .select("available")
@@ -35,6 +35,11 @@ export default async function LocationDetailPage({ params }) {
       .eq("location_id", location.id)
       .order("is_primary", { ascending: false })
       .order("name", { ascending: true }),
+    supabase
+      .from("sync_status")
+      .select("last_synced_at")
+      .eq("sync_type", "locations")
+      .maybeSingle(),
   ]);
 
   const levels           = inventoryRes.data ?? [];
@@ -46,6 +51,7 @@ export default async function LocationDetailPage({ params }) {
     <ClientLocationDetailPage
       location={{ ...location, total_inventory, total_item_count, in_stock_count }}
       initialContacts={contactsRes.data ?? []}
+      lastSyncedAt={syncRes.data?.last_synced_at ?? null}
       slug={slug}
     />
   );

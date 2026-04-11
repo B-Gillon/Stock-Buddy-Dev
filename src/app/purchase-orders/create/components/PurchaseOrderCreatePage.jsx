@@ -9,6 +9,7 @@ import Button from "@/shared/components/ui/Button";
 import Badge from "@/shared/components/ui/Badge";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 import { usePurchaseOrderFormState } from "./usePurchaseOrderFormState";
+import { formatCurrency } from "@/shared/utils/formatCurrency";
 
 // ---------------------------------------------------------------------------
 // VariantSearch — inline typeahead used in each row
@@ -81,7 +82,7 @@ function VariantSearch({ value, variants, supplierVariants, supplierId, onSelect
 const cellClass     = "px-2 py-1 align-middle border-r border-gray-100 last:border-r-0";
 const readOnlyClass = `${cellClass} text-xs text-gray-500`;
 
-function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, onUpdate, onClear, onBlur, getInventoryLevel }) {
+function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, currencyCode, onUpdate, onClear, onBlur, getInventoryLevel }) {
   const isEmpty = !row.variant_id;
   const rowBg   = isEmpty
     ? rowIndex % 2 === 0 ? "bg-white" : "bg-gray-50/50"
@@ -171,14 +172,14 @@ function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, on
       {/* Unit Cost — read-only */}
       <td className={`${cellClass} text-xs text-gray-600`} style={{ width: "90px" }}>
         {row.unit_cost != null && row.unit_cost !== ""
-          ? `$${parseFloat(row.unit_cost).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          ? formatCurrency(row.unit_cost, currencyCode)
           : <span className="text-gray-200">—</span>}
       </td>
 
       {/* Extended Cost */}
       <td className={`${cellClass} text-xs text-gray-600`} style={{ width: "90px" }}>
         {row.extended_cost != null
-          ? <span className="font-medium">${row.extended_cost.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          ? <span className="font-medium">{formatCurrency(row.extended_cost, currencyCode)}</span>
           : <span className="text-gray-200">—</span>}
       </td>
 
@@ -207,7 +208,7 @@ const LINE_ITEMS_COLUMNS = [
 // ---------------------------------------------------------------------------
 // Main page component
 // ---------------------------------------------------------------------------
-export default function PurchaseOrderCreatePage({ suppliers, locations, variants, supplierVariants, inventoryLevels, editMode = false, existingPO = null, initialHeader = null, initialRows = null }) {
+export default function PurchaseOrderCreatePage({ suppliers, locations, variants, supplierVariants, inventoryLevels, editMode = false, existingPO = null, initialHeader = null, initialRows = null, poNextNumber = null }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const { toast, showToast } = useToast();
@@ -325,9 +326,19 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
         slug = data.slug;
       }
 
+      // If editing a released PO, automatically resend to supplier
+      if (editMode && existingPO && header.status === 'released') {
+        try {
+          await fetch(`/api/purchase-orders/${existingPO.id}/resend`, { method: 'POST' });
+        } catch {
+          // Non-fatal — PO saved successfully even if resend fails
+        }
+      }
+
+      isDirtyRef.current = false;
       setIsDirty(false);
-      showToast('Saved successfully.');
-      router.push(`/purchase-orders/${encodeURIComponent(slug)}`);
+      showToast(editMode && header.status === 'released' ? 'Changes saved and PO resent to supplier.' : 'Saved successfully.');
+      setTimeout(() => router.push(`/purchase-orders/${encodeURIComponent(slug)}`), 100);
     } catch (err) {
       showToast(err.message || 'Failed to save.', 'error');
     } finally {
@@ -338,6 +349,24 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
   const totalExtended = activeRows.reduce((sum, r) => sum + (r.extended_cost ?? 0), 0);
   const totalUnits    = activeRows.reduce((sum, r) => sum + (parseInt(r.order_qty, 10) || 0), 0);
   const headerComplete = !!(header.supplier_id && header.ship_to_location_id && header.po_date);
+
+  // Block PO creation if po_next_number not configured (create mode only)
+  if (!editMode && !poNextNumber) {
+    return (
+      <AppLayout title="New Purchase Order" showActionBar={false} bareLayout={true}>
+        <div className="bg-white rounded-lg border border-amber-200 shadow-sm p-8 text-center max-w-lg mx-auto mt-8">
+          <svg className="mx-auto h-10 w-10 text-amber-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <h2 className="text-base font-semibold text-gray-800 mb-2">PO Numbering Not Configured</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            You must set a starting PO number in Settings before creating purchase orders.
+          </p>
+          <Button onClick={() => router.push('/settings')}>Go to Settings</Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title={editMode ? "Edit Purchase Order" : "New Purchase Order"} showActionBar={false} bareLayout={true}>
@@ -352,7 +381,7 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
             <div className="flex items-center gap-3">
               <Badge status={editMode ? header.status ?? "draft" : "draft"} />
               <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-              <Button onClick={handleSaveDraft} disabled={saving}>{saving ? "Saving…" : "Save Draft"}</Button>
+              <Button onClick={handleSaveDraft} disabled={saving}>{saving ? "Saving…" : editMode ? "Save Changes" : "Save Draft"}</Button>
             </div>
           </div>
 
@@ -466,17 +495,6 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
                 {headerErrors.po_date && <p className="mt-1 text-xs text-red-500">{headerErrors.po_date}</p>}
               </div>
 
-              {/* PO Release Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">PO Release Date</label>
-                <input
-                  type="date"
-                  value={header.po_release_date ?? ''}
-                  onChange={(e) => markDirty("po_release_date", e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                />
-              </div>
-
               {/* Expected Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Expected Date</label>
@@ -546,6 +564,7 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
                     variants={variants}
                     supplierVariants={supplierVariants}
                     supplierId={header.supplier_id || null}
+                    currencyCode={selectedSupplier?.currency ?? 'USD'}
                     onUpdate={(rowId, changes) => { setIsDirty(true); updateRow(rowId, changes); }}
                     onClear={clearRow}
                     onBlur={blurRow}
@@ -570,7 +589,7 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
               <div className="text-right">
                 <p className="text-xs text-gray-400 uppercase tracking-wide">Total</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  ${totalExtended.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(totalExtended, selectedSupplier?.currency ?? 'USD')}
                 </p>
               </div>
             )}
@@ -584,7 +603,7 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
         {/* ── BOTTOM SAVE ─────────────────────────────────────────── */}
         <div className="flex justify-end gap-3 py-2">
           <Button variant="secondary" onClick={handleCancel}>Cancel</Button>
-          <Button onClick={handleSaveDraft} disabled={saving}>{saving ? "Saving…" : "Save Draft"}</Button>
+          <Button onClick={handleSaveDraft} disabled={saving}>{saving ? "Saving…" : editMode ? "Save Changes" : "Save Draft"}</Button>
         </div>
 
       </div>

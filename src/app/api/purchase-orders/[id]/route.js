@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { supabase, setTenantContext } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
+import { logPOActivity } from '@/lib/logPOActivity';
 
 export async function PATCH(request, { params }) {
   try {
@@ -32,33 +33,73 @@ export async function PATCH(request, { params }) {
       .eq('id', id);
     if (poError) throw poError;
 
-    const { error: deleteError } = await supabase
-      .from('purchase_order_lines')
-      .delete()
-      .eq('purchase_order_id', id);
-    if (deleteError) throw deleteError;
-
-    if (lines && lines.length > 0) {
-      const lineInserts = lines.map((line, index) => ({
-        tenant_id:           tenantId,
-        purchase_order_id:   id,
-        line_no:             index + 1,
-        variant_id:          line.variant_id,
-        supplier_variant_id: line.supplier_variant_id ?? null,
-        sku:                 line.sku ?? null,
-        title:               line.title ?? null,
-        order_qty_units:     Number.isFinite(line.order_qty_units) ? line.order_qty_units : 0,
-        order_qty_cases:     line.order_qty_cases ?? null,
-        case_pack_qty:       line.case_pack_qty ?? null,
-        unit_cost:           line.unit_cost ?? null,
-        extended_cost:       line.extended_cost ?? null,
-      }));
-
-      const { error: linesError } = await supabase
+    // Only touch lines if explicitly provided
+    if (lines !== undefined) {
+      // Fetch current lines to determine which exist (have po_shopify_incoming refs)
+      const { data: currentLines } = await supabase
         .from('purchase_order_lines')
-        .insert(lineInserts);
-      if (linesError) throw linesError;
+        .select('id, variant_id, received_qty_units')
+        .eq('purchase_order_id', id);
+
+      const existingByVariant = new Map(
+        (currentLines ?? []).map((l) => [l.variant_id, l.id])
+      );
+      const incomingVariantIds = new Set((lines ?? []).map((l) => l.variant_id));
+
+      // Delete only lines that are NOT referenced (i.e. removed lines on draft POs)
+      const toDelete = (currentLines ?? []).filter(
+        (l) => !incomingVariantIds.has(l.variant_id)
+      );
+      for (const line of toDelete) {
+        const { error } = await supabase
+          .from('purchase_order_lines')
+          .delete()
+          .eq('id', line.id);
+        if (error) throw error;
+      }
+
+      // Upsert each line — update if exists, insert if new
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
+        const existingId = existingByVariant.get(line.variant_id);
+        const lineData = {
+          tenant_id:           tenantId,
+          purchase_order_id:   id,
+          line_no:             index + 1,
+          variant_id:          line.variant_id,
+          supplier_variant_id: line.supplier_variant_id ?? null,
+          sku:                 line.sku ?? null,
+          title:               line.title ?? null,
+          order_qty_units:     Number.isFinite(line.order_qty_units) ? line.order_qty_units : 0,
+          order_qty_cases:     line.order_qty_cases ?? null,
+          case_pack_qty:       line.case_pack_qty ?? null,
+          unit_cost:           line.unit_cost ?? null,
+          extended_cost:       line.extended_cost ?? null,
+          updated_at:          new Date().toISOString(),
+        };
+
+        if (existingId) {
+          // Guard: never allow order_qty_units below already-received qty
+          const existingLine = (currentLines ?? []).find((l) => l.id === existingId);
+          const receivedQty = existingLine?.received_qty_units ?? 0;
+          if (lineData.order_qty_units < receivedQty) {
+            lineData.order_qty_units = receivedQty;
+          }
+          const { error } = await supabase
+            .from('purchase_order_lines')
+            .update(lineData)
+            .eq('id', existingId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('purchase_order_lines')
+            .insert(lineData);
+          if (error) throw error;
+        }
+      }
     }
+
+    await logPOActivity({ poId: id, tenantId, action: 'edited' });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {

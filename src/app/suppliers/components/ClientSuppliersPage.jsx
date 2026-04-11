@@ -86,7 +86,7 @@ export default function ClientSuppliersPage({ suppliers }) {
             sorted.map((supplier) => (
               <tr
                 key={supplier.id}
-                onClick={() => router.push(`/suppliers/${supplier.id}`)}
+                onClick={() => router.push(`/suppliers/${supplier.supplier_number}`)}
                 className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <td className="px-2 py-2 font-medium text-gray-900">{supplier.supplier_name}</td>

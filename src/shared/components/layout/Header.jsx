@@ -1,6 +1,6 @@
 "use client";
 
-// /src/shared/components/Header.jsx
+// /src/shared/components/layout/Header.jsx
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -19,7 +19,15 @@ const NAV_ITEMS = [
 const PRODUCTS_DROPDOWN = [
   { label: "All Products",          href: "/products" },
   { label: "Supplier Product Data", href: "/products/supplier-variant-data" },
+  { label: "Location Product Data", href: "/products/location-variant-data" },
 ];
+
+const gradientStyle = {
+  background: "linear-gradient(to right, #11E0FC, #0099FF)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
+};
 
 function ProductsDropdown() {
   const [open, setOpen] = useState(false);
@@ -98,24 +106,24 @@ export default function Header({
   const pathname = usePathname();
 
   return (
-    <header className="w-full bg-black text-white px-6 rounded-lg shadow" style={{ height: "88px" }}>
+    <header className="w-full bg-gray-800 text-white px-6 rounded-lg shadow" style={{ height: "88px" }}>
       <div className="h-full flex items-center justify-between gap-6">
 
         {/* Left: Mascot + Brand */}
         <Link href="/dashboard" className="shrink-0 flex items-center gap-3 hover:opacity-90 transition-opacity">
           <Image
-            src="/White_Stock_Buddy.png"
-            alt="Stock Buddy mascot"
+            src="/STOCK_BUDDY_LOGO__1_.png"
+            alt="Stock Buddy logo"
             width={88}
             height={88}
             className="h-16 w-auto object-contain"
           />
           <div>
             <div className="flex items-baseline gap-2">
-              <h1 className="text-2xl font-semibold">Stock Buddy</h1>
+              <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
               <span className="text-xs text-gray-400">v1.0</span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs mt-0.5" style={gradientStyle}>
               Inventory Management for the Modern Age
             </p>
           </div>

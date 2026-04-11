@@ -32,10 +32,11 @@ export default function POTable({ purchaseOrders }) {
         <tr className="border-b border-gray-200 bg-gray-50">
           <th className={TH}>PO Number</th>
           <th className={TH}>Supplier</th>
-          <th className={TH} style={{ width: '100px' }}>Status</th>
+          <th className={TH}>Location</th>
+          <th className={TH} style={{ width: '130px' }}>Status</th>
           <th className={TH} style={{ width: '100px' }}>PO Date</th>
           <th className={TH} style={{ width: '100px' }}>Expected</th>
-          <th className={TH} style={{ width: '100px' }}>Total Cost</th>
+          <th className={TH} style={{ width: '110px' }}>Total Cost</th>
         </tr>
       </thead>
       <tbody>
@@ -49,12 +50,13 @@ export default function POTable({ purchaseOrders }) {
           >
             <td className={TD}>{po.po_number}</td>
             <td className={TD}>{po.supplier_name ?? '—'}</td>
-            <td className={TD} style={{ width: '100px' }}>
+            <td className={TD}>{po.location_name ?? '—'}</td>
+            <td className={TD} style={{ width: '130px' }}>
               <POStatusBadge status={po.status} />
             </td>
             <td className={TD} style={{ width: '100px' }}>{formatDate(po.po_date)}</td>
             <td className={TD} style={{ width: '100px' }}>{po.expected_date ? formatDate(po.expected_date) : '—'}</td>
-            <td className={TD} style={{ width: '100px' }}>
+            <td className={TD} style={{ width: '110px' }}>
               {po.total_cost != null
                 ? `$${parseFloat(po.total_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                 : '—'}

@@ -47,8 +47,7 @@ export default function InventoryFilterModal({
   }
 
   function handleApply() {
-    setFilters(local);
-    onApply();
+    onApply(local);
   }
 
   function handleClear() {
@@ -65,7 +64,6 @@ export default function InventoryFilterModal({
       inventory_policy: null,
     };
     setLocal(cleared);
-    setFilters(cleared);
     onClear();
   }
 

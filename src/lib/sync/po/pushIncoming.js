@@ -1,93 +1,117 @@
 /**
  * pushIncoming.js
- * Pushes incoming inventory quantities to Shopify when a PO is released.
- * Also writes PO metafields to each affected inventory item.
  *
- * Idempotent: checks po_shopify_incoming for existing pushes before acting.
+ * Pushes incoming quantities to Shopify when a PO is released or edited.
+ *
+ * Rules:
+ * - Only push if receiving_source === 'stock_buddy'
+ * - Sets purchase_order_lines.incoming_qty = order_qty_units
+ * - Sets purchase_order_lines.incoming_remaining = incoming_qty
+ * - Adjusts Shopify available to reflect incoming (Stock Buddy tracks
+ *   incoming internally; Shopify available is adjusted on receive)
+ * - Logs every push to po_shopify_incoming
+ * - Stamps shopify_synced_at on the PO on success
+ *
+ * NOTE ON SHOPIFY "INCOMING":
+ * Shopify's inventory_levels do not have a native writable "incoming" field
+ * via REST. Stock Buddy tracks incoming internally in purchase_order_lines
+ * and only adjusts Shopify `available` when items are actually received.
+ * This function prepares the internal state for receiving.
  */
 
+import { supabase } from "@/lib/supabaseClient";
 import {
-  buildAdjustPayload,
-  callShopifyAdjust,
-  writeInventoryMetafields,
+  resolveShopifyCredentials,
+  fetchPOWithLines,
+  getShopifyLocationId,
+  updatePOLineIncoming,
   logShopifyIncoming,
-  getExistingIncoming,
-  resolveTenantCredentials,
-} from "./poSyncHelpers.js";
+} from "./poSyncHelpers";
 
 /**
- * @param {object} opts
- * @param {object} opts.supabase         - server supabase client (tenant-scoped)
- * @param {object} opts.po               - full purchase_orders row
- * @param {Array}  opts.lines            - purchase_order_lines rows, each must include:
- *                                          variant_id, order_qty_units,
- *                                          shopify_inventory_item_id (joined),
- *                                          shopify_location_id (joined from ship_to_location)
- * @param {string} opts.tenantId
+ * Push incoming quantities for a PO to internal DB state.
+ * Called on PO release and on PO edit (when order_qty_units changes).
+ *
+ * @param {string} poId - UUID of the purchase order
+ * @param {string} tenantId - UUID of the tenant
+ * @returns {Promise<{ success: boolean, linesProcessed: number, error?: string }>}
  */
-export async function pushIncoming({ supabase, po, lines, tenantId }) {
-  // Idempotency: skip lines already pushed and not yet reversed
-  const existingRows = await getExistingIncoming(supabase, po.id);
-  const alreadyPushedLineIds = new Set(existingRows.map((r) => r.purchase_order_line_id));
+export async function pushIncomingToShopify(poId, tenantId) {
+  let shopifyCreds;
+  let shopifyLocationId;
 
-  const linesToPush = lines.filter(
-    (l) => !alreadyPushedLineIds.has(l.id) && l.order_qty_units > 0
-  );
+  try {
+    const { po, lines } = await fetchPOWithLines(poId, tenantId);
 
-  if (linesToPush.length === 0) return { skipped: true };
+    // Guard: only push for stock_buddy receiving source
+    if (po.receiving_source !== "stock_buddy") {
+      return {
+        success: true,
+        linesProcessed: 0,
+        skipped: true,
+        reason: "receiving_source is external — skipping incoming push",
+      };
+    }
 
-  // Validate all lines have the required Shopify IDs
-  const missing = linesToPush.filter(
-    (l) => !l.shopify_inventory_item_id || !l.shopify_location_id
-  );
-  if (missing.length > 0) {
-    const skus = missing.map((l) => l.sku).join(", ");
-    throw new Error(
-      `Cannot push to Shopify: missing inventory item or location IDs for SKUs: ${skus}`
-    );
-  }
+    if (!po.ship_to_location_id) {
+      throw new Error("PO has no ship_to_location_id — cannot push incoming");
+    }
 
-  const credentials = await resolveTenantCredentials(supabase, tenantId);
+    shopifyCreds = await resolveShopifyCredentials(tenantId);
+    shopifyLocationId = await getShopifyLocationId(po.ship_to_location_id, tenantId);
 
-  // Build adjust payload — positive delta on "incoming" ledger
-  const changes = linesToPush.map((l) => ({
-    shopifyInventoryItemId: l.shopify_inventory_item_id,
-    shopifyLocationId: l.shopify_location_id,
-    delta: l.order_qty_units,
-  }));
+    let linesProcessed = 0;
 
-  const payload = buildAdjustPayload(changes, "received");
-  await callShopifyAdjust({ ...credentials, payload });
+    for (const line of lines) {
+      const incomingQty = line.order_qty_units;
+      const variantId = line.variant_id;
+      const inventoryItem = line.variants?.inventory_items?.[0];
 
-  // Write PO metafields to each affected inventory item (best-effort)
-  await Promise.allSettled(
-    linesToPush.map((l) =>
-      writeInventoryMetafields({
-        ...credentials,
-        shopifyInventoryItemId: l.shopify_inventory_item_id,
-        metafields: [
-          { namespace: "stock_buddy", key: "po_number", value: po.po_number, type: "single_line_text_field" },
-          { namespace: "stock_buddy", key: "po_released_at", value: po.released_at ?? new Date().toISOString(), type: "single_line_text_field" },
-          { namespace: "stock_buddy", key: "expected_date", value: po.expected_date ?? "", type: "single_line_text_field" },
-        ],
+      if (!inventoryItem?.shopify_inventory_item_id) {
+        console.warn(`No inventory item for PO line ${line.id} — skipping`);
+        continue;
+      }
+
+      // Update internal incoming state
+      await updatePOLineIncoming(line.id, tenantId, incomingQty, incomingQty);
+
+      // Log the push
+      await logShopifyIncoming({
+        tenantId,
+        poId,
+        lineId: line.id,
+        variantId,
+        locationId: po.ship_to_location_id,
+        incomingQty,
+        action: "push",
+      });
+
+      linesProcessed++;
+    }
+
+    // Stamp shopify_synced_at on the PO
+    await supabase
+      .from("purchase_orders")
+      .update({
+        shopify_synced_at: new Date().toISOString(),
+        shopify_sync_error: null,
+        updated_at: new Date().toISOString(),
       })
-    )
-  );
+      .eq("id", poId)
+      .eq("tenant_id", tenantId);
 
-  // Log to po_shopify_incoming for audit + future reversal
-  const now = new Date().toISOString();
-  const incomingRows = linesToPush.map((l) => ({
-    tenant_id: tenantId,
-    purchase_order_id: po.id,
-    purchase_order_line_id: l.id,
-    variant_id: l.variant_id,
-    shopify_inventory_item_id: l.shopify_inventory_item_id,
-    shopify_location_id: l.shopify_location_id,
-    quantity_pushed: l.order_qty_units,
-    pushed_at: now,
-  }));
+    return { success: true, linesProcessed };
+  } catch (err) {
+    // Stamp sync error on PO
+    await supabase
+      .from("purchase_orders")
+      .update({
+        shopify_sync_error: err.message,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", poId)
+      .eq("tenant_id", tenantId);
 
-  await logShopifyIncoming(supabase, incomingRows);
-
-  return { pushed: linesToPush.length };
+    return { success: false, linesProcessed: 0, error: err.message };
+  }
 }

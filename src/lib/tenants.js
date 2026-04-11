@@ -68,3 +68,29 @@ export async function getTenantIdFromHeaders(headersList) {
 
   return data.id;
 }
+
+/**
+ * getTenantFromHeaders(headersList)
+ * For use in server components that need both tenantId and shopDomain.
+ * Returns { tenantId, shopDomain }.
+ * Falls back to NEXT_PUBLIC_DEV_SHOP_DOMAIN in development.
+ * REMOVE the fallback before going to production.
+ */
+export async function getTenantFromHeaders(headersList) {
+  const shopDomain =
+    headersList.get('x-shop-domain') ||
+    process.env.NEXT_PUBLIC_DEV_SHOP_DOMAIN ||
+    process.env.DEV_SHOP_DOMAIN;
+
+  if (!shopDomain) throw new Error('Missing x-shop-domain header');
+
+  const { data, error } = await supabaseAdmin
+    .from('tenants')
+    .select('id, shop_domain')
+    .eq('shop_domain', shopDomain)
+    .single();
+
+  if (error || !data) throw new Error(`Tenant not found for domain: ${shopDomain}`);
+
+  return { tenantId: data.id, shopDomain: data.shop_domain };
+}

@@ -1,21 +1,28 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-export default function POFiltersRow({ suppliers, currentFilters }) {
+export default function POFiltersRow({ suppliers, locations, currentFilters }) {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const [search,     setSearch]     = useState(currentFilters.search ?? '');
+  const [search,     setSearch]     = useState(currentFilters.search      ?? '');
   const [supplierId, setSupplierId] = useState(currentFilters.supplier_id ?? '');
-  const [dateFrom,   setDateFrom]   = useState(currentFilters.date_from ?? '');
-  const [dateTo,     setDateTo]     = useState(currentFilters.date_to ?? '');
+  const [locationId, setLocationId] = useState(currentFilters.location_id ?? '');
+  const [dateFrom,   setDateFrom]   = useState(currentFilters.date_from   ?? '');
+  const [dateTo,     setDateTo]     = useState(currentFilters.date_to     ?? '');
 
   function applyFilters(overrides = {}) {
     const params = new URLSearchParams(searchParams.toString());
-    const values = { search, supplier_id: supplierId, date_from: dateFrom, date_to: dateTo, ...overrides };
-
+    const values = {
+      search,
+      supplier_id: supplierId,
+      location_id: locationId,
+      date_from:   dateFrom,
+      date_to:     dateTo,
+      ...overrides,
+    };
     Object.entries(values).forEach(([key, val]) => {
       if (val) { params.set(key, val); } else { params.delete(key); }
     });
@@ -26,14 +33,15 @@ export default function POFiltersRow({ suppliers, currentFilters }) {
   function clearFilters() {
     setSearch('');
     setSupplierId('');
+    setLocationId('');
     setDateFrom('');
     setDateTo('');
     const params = new URLSearchParams(searchParams.toString());
-    ['search', 'supplier_id', 'date_from', 'date_to', 'page'].forEach((k) => params.delete(k));
+    ['search', 'supplier_id', 'location_id', 'date_from', 'date_to', 'page'].forEach((k) => params.delete(k));
     router.push(`/purchase-orders?${params.toString()}`);
   }
 
-  const hasFilters = search || supplierId || dateFrom || dateTo;
+  const hasFilters = search || supplierId || locationId || dateFrom || dateTo;
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
@@ -62,6 +70,18 @@ export default function POFiltersRow({ suppliers, currentFilters }) {
         <option value="">All Suppliers</option>
         {suppliers.map((s) => (
           <option key={s.id} value={s.id}>{s.supplier_name}</option>
+        ))}
+      </select>
+
+      {/* Location */}
+      <select
+        value={locationId}
+        onChange={(e) => { setLocationId(e.target.value); applyFilters({ location_id: e.target.value }); }}
+        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      >
+        <option value="">All Locations</option>
+        {locations.map((l) => (
+          <option key={l.id} value={l.id}>{l.name}</option>
         ))}
       </select>
 

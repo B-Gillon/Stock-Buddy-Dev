@@ -1,140 +1,231 @@
 /**
  * poSyncHelpers.js
- * Shared utilities for PO → Shopify sync operations.
- * All functions are pure / side-effect-free except where noted.
+ * Shared utilities for PO sync pipeline.
+ * Handles Shopify API calls, credential resolution, and DB logging.
  */
+
+import { supabase } from "@/lib/supabaseClient";
+
+// ─── Credential Resolution ────────────────────────────────────────────────────
 
 /**
- * Build the Shopify adjust_quantities payload for a set of line deltas.
- *
- * @param {Array} changes - [{ shopifyInventoryItemId, shopifyLocationId, delta }]
- * @param {string} reason - Shopify ledger reason (e.g. "received")
- * @returns {object} Shopify REST payload
+ * Resolve Shopify credentials for a tenant.
+ * Returns { storeDomain, accessToken, apiVersion }
  */
-export function buildAdjustPayload(changes, reason = "received") {
-  return {
-    reason,
-    changes: changes.map((c) => ({
-      inventory_item_id: c.shopifyInventoryItemId,
-      location_id: c.shopifyLocationId,
-      delta: c.delta,
-    })),
-  };
-}
-
-/**
- * Call Shopify's adjust_quantities endpoint.
- * Uses the tenant's own credentials — never global.
- *
- * @param {object} opts
- * @param {string} opts.shopDomain
- * @param {string} opts.accessToken
- * @param {string} opts.apiVersion
- * @param {object} opts.payload  - result of buildAdjustPayload()
- * @returns {Promise<object>} Shopify response body
- */
-export async function callShopifyAdjust({ shopDomain, accessToken, apiVersion, payload }) {
-  const url = `https://${shopDomain}/admin/api/${apiVersion}/inventory_adjustments/adjust_quantities.json`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": accessToken,
-    },
-    body: JSON.stringify({ inventory_adjustment: payload }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Shopify adjust_quantities failed [${res.status}]: ${body}`);
-  }
-
-  return res.json();
-}
-
-/**
- * Write metafields to a Shopify inventory item.
- * Fire-and-forget friendly — caller decides whether to throw.
- */
-export async function writeInventoryMetafields({
-  shopDomain,
-  accessToken,
-  apiVersion,
-  shopifyInventoryItemId,
-  metafields,
-}) {
-  const url = `https://${shopDomain}/admin/api/${apiVersion}/inventory_items/${shopifyInventoryItemId}/metafields.json`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Access-Token": accessToken,
-    },
-    body: JSON.stringify({ metafield: metafields }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Shopify metafield write failed [${res.status}]: ${body}`);
-  }
-
-  return res.json();
-}
-
-/**
- * Log a successful Shopify incoming push to po_shopify_incoming.
- *
- * @param {object} supabase - server supabase client
- * @param {Array}  rows     - array of row objects matching po_shopify_incoming schema
- */
-export async function logShopifyIncoming(supabase, rows) {
-  const { error } = await supabase.from("po_shopify_incoming").insert(rows);
-  if (error) throw new Error(`Failed to log po_shopify_incoming: ${error.message}`);
-}
-
-/**
- * Fetch existing po_shopify_incoming rows for a PO.
- * Used to detect retries (idempotency) and to compute reversal deltas.
- */
-export async function getExistingIncoming(supabase, purchaseOrderId) {
-  const { data, error } = await supabase
-    .from("po_shopify_incoming")
-    .select("*")
-    .eq("purchase_order_id", purchaseOrderId)
-    .is("reversed_at", null);
-
-  if (error) throw new Error(`Failed to fetch po_shopify_incoming: ${error.message}`);
-  return data ?? [];
-}
-
-/**
- * Mark po_shopify_incoming rows as reversed.
- */
-export async function markIncomingReversed(supabase, ids, reason) {
-  const { error } = await supabase
-    .from("po_shopify_incoming")
-    .update({ reversed_at: new Date().toISOString(), reversal_reason: reason })
-    .in("id", ids);
-
-  if (error) throw new Error(`Failed to mark incoming reversed: ${error.message}`);
-}
-
-/**
- * Resolve tenant Shopify credentials from the tenants table.
- */
-export async function resolveTenantCredentials(supabase, tenantId) {
+export async function resolveShopifyCredentials(tenantId) {
   const { data, error } = await supabase
     .from("tenants")
     .select("shop_domain, access_token")
     .eq("id", tenantId)
     .single();
 
-  if (error || !data) throw new Error(`Failed to resolve tenant credentials: ${error?.message}`);
+  if (error || !data) throw new Error(`Tenant not found: ${tenantId}`);
+  if (!data.access_token) throw new Error(`No access token for tenant: ${tenantId}`);
+
   return {
-    shopDomain: data.shop_domain,
+    storeDomain: data.shop_domain,
     accessToken: data.access_token,
-    apiVersion: process.env.SHOPIFY_API_VERSION,
+    apiVersion: process.env.SHOPIFY_API_VERSION || "2024-01",
   };
+}
+
+// ─── Shopify Inventory API ────────────────────────────────────────────────────
+
+/**
+ * Fetch current inventory level from Shopify for a given
+ * inventory_item_id + location_id (Shopify IDs).
+ */
+export async function getShopifyInventoryLevel(
+  { storeDomain, accessToken, apiVersion },
+  shopifyInventoryItemId,
+  shopifyLocationId
+) {
+  const url = `https://${storeDomain}/admin/api/${apiVersion}/inventory_levels.json?inventory_item_ids=${shopifyInventoryItemId}&location_ids=${shopifyLocationId}`;
+  const res = await fetch(url, {
+    headers: { "X-Shopify-Access-Token": accessToken },
+  });
+  if (!res.ok) throw new Error(`Shopify inventory_levels fetch failed: ${res.status}`);
+  const json = await res.json();
+  return json.inventory_levels?.[0] ?? null;
+}
+
+/**
+ * Set Shopify incoming quantity for an inventory item at a location.
+ * Uses the inventory_levels/set.json endpoint.
+ * NOTE: Shopify does not have a native "incoming" field on inventory_levels/set.
+ * Incoming is managed via the inventory_items metafield or a custom approach.
+ * Per Stock Buddy architecture: we track incoming in our own DB and push
+ * available adjustments to Shopify directly. Incoming is our internal concept.
+ *
+ * This function adjusts the Shopify `available` quantity by a delta.
+ * Use positive delta to increase, negative to decrease.
+ */
+export async function adjustShopifyAvailable(
+  { storeDomain, accessToken, apiVersion },
+  shopifyInventoryItemId,
+  shopifyLocationId,
+  delta
+) {
+  const url = `https://${storeDomain}/admin/api/${apiVersion}/inventory_levels/adjust.json`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": accessToken,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      location_id: shopifyLocationId,
+      inventory_item_id: shopifyInventoryItemId,
+      available_adjustment: delta,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Shopify adjust failed (${res.status}): ${body}`);
+  }
+  return await res.json();
+}
+
+/**
+ * Set Shopify available to an absolute value.
+ */
+export async function setShopifyAvailable(
+  { storeDomain, accessToken, apiVersion },
+  shopifyInventoryItemId,
+  shopifyLocationId,
+  available
+) {
+  const url = `https://${storeDomain}/admin/api/${apiVersion}/inventory_levels/set.json`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "X-Shopify-Access-Token": accessToken,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      location_id: shopifyLocationId,
+      inventory_item_id: shopifyInventoryItemId,
+      available,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Shopify set failed (${res.status}): ${body}`);
+  }
+  return await res.json();
+}
+
+// ─── DB Helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Fetch a purchase order with its lines and variant/inventory data.
+ */
+export async function fetchPOWithLines(poId, tenantId) {
+  const { data: po, error: poError } = await supabase
+    .from("purchase_orders")
+    .select("*")
+    .eq("id", poId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (poError || !po) throw new Error(`PO not found: ${poId}`);
+
+  const { data: lines, error: linesError } = await supabase
+    .from("purchase_order_lines")
+    .select(`
+      *,
+      variants (
+        id,
+        shopify_variant_id,
+        inventory_items (
+          id,
+          shopify_inventory_item_id
+        )
+      )
+    `)
+    .eq("purchase_order_id", poId)
+    .eq("tenant_id", tenantId);
+
+  if (linesError) throw new Error(`PO lines fetch failed: ${linesError.message}`);
+
+  return { po, lines: lines || [] };
+}
+
+/**
+ * Fetch the Shopify location ID for a given SB location UUID.
+ */
+export async function getShopifyLocationId(locationId, tenantId) {
+  const { data, error } = await supabase
+    .from("locations")
+    .select("shopify_location_id")
+    .eq("id", locationId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (error || !data) throw new Error(`Location not found: ${locationId}`);
+  if (!data.shopify_location_id) throw new Error(`No Shopify location ID for: ${locationId}`);
+
+  return data.shopify_location_id;
+}
+
+/**
+ * Log a push to po_shopify_incoming.
+ */
+export async function logShopifyIncoming({
+  tenantId,
+  poId,
+  lineId,
+  variantId,
+  locationId,
+  incomingQty,
+  action = "push", // 'push' | 'reverse' | 'zero_out'
+}) {
+const { error } = await supabase.from("po_shopify_incoming").insert({
+  tenant_id: tenantId,
+  purchase_order_id: poId,
+  purchase_order_line_id: lineId,
+  variant_id: variantId,
+  quantity_pushed: incomingQty,  // ← was incoming_qty
+  action,
+  pushed_at: new Date().toISOString(),
+});
+
+  if (error) {
+    console.error("Failed to log po_shopify_incoming:", error.message);
+    // Non-fatal — log and continue
+  }
+}
+
+/**
+ * Update a PO line's incoming_qty and incoming_remaining.
+ */
+export async function updatePOLineIncoming(lineId, tenantId, incomingQty, incomingRemaining) {
+  const { error } = await supabase
+    .from("purchase_order_lines")
+    .update({
+      incoming_qty: incomingQty,
+      incoming_remaining: incomingRemaining,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", lineId)
+    .eq("tenant_id", tenantId);
+
+  if (error) throw new Error(`Failed to update PO line incoming: ${error.message}`);
+}
+
+/**
+ * Update PO status and optional timestamps.
+ */
+export async function updatePOStatus(poId, tenantId, status, extraFields = {}) {
+  const { error } = await supabase
+    .from("purchase_orders")
+    .update({
+      status,
+      ...extraFields,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", poId)
+    .eq("tenant_id", tenantId);
+
+  if (error) throw new Error(`Failed to update PO status: ${error.message}`);
 }
