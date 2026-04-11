@@ -5,9 +5,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/shared/components/layout/AppLayout";
-import { getImportData, clearImportData } from "../../importLocationStore";
-import { validateLocationImportRows, canSubmit } from "../../validateLocationImportRows";
-import { DELETE_MARKER, SUPPORTED_FIELDS, REQUIRED_FIELD } from "../../parseLocationImportCSV";
+import { getImportData, clearImportData } from "../../import/importLocationStore";
+import { validateLocationImportRows, canSubmit } from "../../import/validateLocationImportRows";
+import { DELETE_MARKER, SUPPORTED_FIELDS, REQUIRED_FIELD } from "../../import/parseLocationImportCSV";
 
 // ─── Cell display ─────────────────────────────────────────────────────────────
 
