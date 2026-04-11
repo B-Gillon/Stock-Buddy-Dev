@@ -10,13 +10,13 @@
  *
  * Returns: { success, error? }
  */
-
 import { NextResponse } from "next/server";
 import { getTenantId } from "@/lib/tenants";
 import { supabase } from "@/lib/supabaseClient";
 import { pushIncomingToShopify } from "@/lib/sync/po/pushIncoming";
 import { sendPOEmail } from "@/lib/sendPOEmail";
 import { logPOActivity } from "@/lib/logPOActivity";
+import { logError } from "@/lib/logError";
 
 export async function POST(request, { params }) {
   try {
@@ -36,55 +36,44 @@ export async function POST(request, { params }) {
 
     if (po.status !== "draft") {
       return NextResponse.json(
-        { success: false, error: `Cannot release a PO with status '${po.status}'` },
-        { status: 422 }
+        { success: false, error: `PO cannot be released from status: ${po.status}` },
+        { status: 400 }
       );
     }
 
-    const releasedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from("purchase_orders")
-      .update({ status: "released", released_at: releasedAt, updated_at: releasedAt })
-      .eq("id", poId)
-      .eq("tenant_id", tenantId);
+      .update({ status: "released", released_at: new Date().toISOString() })
+      .eq("id", poId);
 
     if (updateError) {
-      return NextResponse.json(
-        { success: false, error: `DB update failed: ${updateError.message}` },
-        { status: 500 }
-      );
+      await logError({ source: "releasePO/dbUpdate", error: updateError, tenantId, context: { poId } });
+      return NextResponse.json({ success: false, error: "Failed to update PO status" }, { status: 500 });
     }
 
-    const pushResult = await pushIncomingToShopify(poId, tenantId);
-
-    if (!pushResult.success) {
+    try {
+      await pushIncomingToShopify({ poId, tenantId });
+    } catch (shopifyErr) {
+      await logError({ source: "releasePO/pushIncoming", error: shopifyErr, tenantId, context: { poId } });
+      // Roll back DB status
       await supabase
         .from("purchase_orders")
-        .update({ status: "draft", released_at: null, updated_at: new Date().toISOString() })
-        .eq("id", poId)
-        .eq("tenant_id", tenantId);
-
-      return NextResponse.json(
-        { success: false, error: `Release failed — rolled back: ${pushResult.error}`, rolledBack: true },
-        { status: 500 }
-      );
+        .update({ status: "draft", released_at: null })
+        .eq("id", poId);
+      return NextResponse.json({ success: false, error: "Shopify sync failed — PO rolled back to draft" }, { status: 500 });
     }
 
-    await logPOActivity({ poId, tenantId, action: 'released' });
+    await logPOActivity({ poId, tenantId, action: "released" });
 
-    // Send email — non-blocking
-    const emailResult = await sendPOEmail(poId, { isResend: false });
-    if (!emailResult.success) {
-      console.warn(`[release] Email failed for PO ${poId}: ${emailResult.error}`);
-    }
-
-    return NextResponse.json({
-      success: true,
-      linesProcessed: pushResult.linesProcessed,
-      emailSent: emailResult.success,
+    // Send email non-blocking
+    sendPOEmail({ poId, tenantId }).catch(async (emailErr) => {
+      await logError({ source: "releasePO/sendEmail", error: emailErr, tenantId, context: { poId } });
     });
+
+    return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[POST /api/purchase-orders/[id]/release]", err);
+    const tenantId = null;
+    await logError({ source: "releasePO", error: err, tenantId });
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

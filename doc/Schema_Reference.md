@@ -11,7 +11,7 @@ Columns:
 • 	created_at — timestamptz — nullable — default: now()
 • 	updated_at — timestamptz — nullable — default: now()
 Relationships:
-• 	Referenced by: products.tenant_id, variants.tenant_id, vendors.tenant_id, suppliers.tenant_id, supplier_addresses.tenant_id, supplier_variants.tenant_id, locations.tenant_id, inventory_items.tenant_id, inventory_levels.tenant_id, purchase_orders.tenant_id, purchase_order_lines.tenant_id, sync_status.tenant_id, settings.tenant_id, supplier_csv_settings.tenant_id, supplier_transmission_recipients.tenant_id, supplier_location_receiving_defaults.tenant_id, po_shopify_incoming.tenant_id, po_activity_log.tenant_id, variant_location_bins.tenant_id, location_contacts.tenant_id, third_party_logistics.tenant_id
+• 	Referenced by: products.tenant_id, variants.tenant_id, vendors.tenant_id, suppliers.tenant_id, supplier_addresses.tenant_id, supplier_variants.tenant_id, locations.tenant_id, inventory_items.tenant_id, inventory_levels.tenant_id, purchase_orders.tenant_id, purchase_order_lines.tenant_id, sync_status.tenant_id, settings.tenant_id, supplier_csv_settings.tenant_id, supplier_transmission_recipients.tenant_id, supplier_location_receiving_defaults.tenant_id, po_shopify_incoming.tenant_id, po_activity_log.tenant_id, variant_location_bins.tenant_id, location_contacts.tenant_id, third_party_logistics.tenant_id, error_log.tenant_id
 
 ============================================================
 TABLE: inventory_items
@@ -478,5 +478,24 @@ Columns:
 -   updated_at — timestamptz — nullable — default: now()
 Relationships:
 -   location_id → locations.id
+-   tenant_id → tenants(id)
+-   Referenced by: nothing currently
+
+============================================================
+TABLE: error_log
+============================================================
+Columns:
+-   id — uuid — not null — default: gen_random_uuid()
+-   tenant_id — uuid — null — references tenants(id)
+-   source — text — not null
+-   message — text — not null
+-   stack — text — null
+-   context — jsonb — null
+-   created_at — timestamptz — not null — default: now()
+Indexes:
+-   index on (tenant_id)
+-   index on (created_at DESC)
+-   index on (source)
+Relationships:
 -   tenant_id → tenants(id)
 -   Referenced by: nothing currently

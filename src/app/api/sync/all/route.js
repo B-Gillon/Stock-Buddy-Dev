@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
+import { logError } from "@/lib/logError";
 import syncProducts        from "@/lib/sync/syncProducts";
 import syncVendors         from "@/lib/sync/syncVendors";
 import syncLocations       from "@/lib/sync/syncLocations";
@@ -21,6 +22,7 @@ export async function POST(request) {
     console.error("syncProducts failed:", err);
     errors.push(`products: ${err.message}`);
     results.products = "failed";
+    await logError({ source: "syncProducts", error: err, tenantId });
   }
 
   try {
@@ -30,6 +32,7 @@ export async function POST(request) {
     console.error("syncVendors failed:", err);
     errors.push(`vendors: ${err.message}`);
     results.vendors = "failed";
+    await logError({ source: "syncVendors", error: err, tenantId });
   }
 
   try {
@@ -39,6 +42,7 @@ export async function POST(request) {
     console.error("syncLocations failed:", err);
     errors.push(`locations: ${err.message}`);
     results.locations = "failed";
+    await logError({ source: "syncLocations", error: err, tenantId });
   }
 
   try {
@@ -48,6 +52,7 @@ export async function POST(request) {
     console.error("syncInventoryItems failed:", err);
     errors.push(`inventoryItems: ${err.message}`);
     results.inventoryItems = "failed";
+    await logError({ source: "syncInventoryItems", error: err, tenantId });
   }
 
   try {
@@ -57,6 +62,7 @@ export async function POST(request) {
     console.error("syncInventoryLevels failed:", err);
     errors.push(`inventoryLevels: ${err.message}`);
     results.inventoryLevels = "failed";
+    await logError({ source: "syncInventoryLevels", error: err, tenantId });
   }
 
   const last_synced_at = new Date().toISOString();
