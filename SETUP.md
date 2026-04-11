@@ -103,8 +103,8 @@ credentials stored in the tenants table. See TECH_DEBT.md #3.
 **Status:** Live as of 2026-04-11
 **Account:** vercel.com (b-gillon's projects, Hobby plan)
 **Dashboard:** https://vercel.com/b-gillons-projects
-**Current URL:** https://stock-buddy-delta.vercel.app
-**Target URL:** app.brandongillon.com (custom domain — configuration in progress)
+**Vercel URL:** https://stock-buddy-delta.vercel.app
+**Live URL:** https://stock-buddy.brandongillon.com (live as of 2026-04-11)
 
 ### How Deployment Works
 Every push to the main branch on GitHub automatically triggers a new deployment on Vercel.
@@ -139,12 +139,22 @@ public launch. See TECH_DEBT.md #2.
 
 **Registrar/Host:** Hostinger
 **Site builder:** Mobirise
-**Current use:** Portfolio website
-**Stock Buddy target:** app.brandongillon.com (subdomain)
+**Current use:** Portfolio website at brandongillon.com
+**Stock Buddy:** stock-buddy.brandongillon.com (live)
 
-### DNS Setup (in progress)
-- A CNAME record needs to be added in Hostinger pointing app.brandongillon.com to Vercel
-- Steps to be documented once configuration is complete
+### Subdomain Strategy
+Each Buddy System app gets its own subdomain under brandongillon.com:
+- stock-buddy.brandongillon.com — Stock Buddy (live)
+- transfer-buddy.brandongillon.com — future
+- [name]-buddy.brandongillon.com — future
+
+### DNS Configuration (Hostinger)
+- Type: CNAME
+- Name: stock-buddy
+- Points to: d6465572e024230f.vercel-dns-017.com.
+- TTL: 14400
+- SSL certificate provisioned automatically by Vercel
+- Live and verified as of 2026-04-11
 
 ---
 
@@ -210,7 +220,7 @@ npm run dev
 | 2026-04-11 | Shopify Admin API token rotated after accidental exposure |
 | 2026-04-11 | Hostinger email password rotated after accidental exposure |
 | 2026-04-11 | Vercel account created, app deployed to stock-buddy-delta.vercel.app |
-| 2026-04-11 | Custom domain configuration in progress (app.brandongillon.com) |
+| 2026-04-11 | Custom domain configured — live at stock-buddy.brandongillon.com |
 
 ---
 
