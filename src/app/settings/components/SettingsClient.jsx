@@ -91,8 +91,8 @@ function EmailTab() {
       try {
         const res  = await fetch('/api/settings?keys=email.subject,email.body,email.reply_to');
         const data = await res.json();
-        if (data['email.subject']) setSubject(data['email.subject']);
-        if (data['email.body'])    setBody(data['email.body']);
+        if (data['email.subject'])  setSubject(data['email.subject']);
+        if (data['email.body'])     setBody(data['email.body']);
         if (data['email.reply_to']) setReplyTo(data['email.reply_to']);
       } catch (e) {
         console.error('Failed to load email settings:', e);
@@ -116,9 +116,9 @@ function EmailTab() {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({
-          'email.subject':   subject,
-          'email.body':      body,
-          'email.reply_to':  replyTo,
+          'email.subject':  subject,
+          'email.body':     body,
+          'email.reply_to': replyTo,
         }),
       });
       if (!res.ok) throw new Error('Save failed');
@@ -175,8 +175,16 @@ function EmailTab() {
 
       <div>
         <Label>Reply-To Email Address</Label>
-        <Input type="email" value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="e.g. purchasing@company.com" className="max-w-sm" />
-        <p className="text-xs text-gray-500 mt-1">If set, supplier replies will go to this address instead of the sender.</p>
+        <Input
+          type="email"
+          value={replyTo}
+          onChange={(e) => setReplyTo(e.target.value)}
+          placeholder="e.g. purchasing@company.com"
+          className="max-w-sm"
+        />
+        <p className="text-xs text-gray-500 mt-1">
+          If set, supplier replies will go to this address instead of the sender.
+        </p>
       </div>
 
       <div className="flex items-center gap-3 pt-2">
@@ -194,106 +202,6 @@ function EmailTab() {
         {saveStatus === 'error' && (
           <span className="text-xs text-red-600 font-medium">Save failed</span>
         )}
-      </div>
-
-      <SaveButton onClick={handleSave} saving={saving} />
-
-      {previewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setPreviewOpen(false)} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-base font-semibold text-gray-900">Email Preview</h3>
-              <button type="button" onClick={() => setPreviewOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div className="bg-gray-50 rounded-md px-4 py-3 border border-gray-200">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Subject</p>
-                <p className="text-sm text-gray-900 font-medium">{renderedSubject}</p>
-              </div>
-              <div className="bg-gray-50 rounded-md px-4 py-3 border border-gray-200">
-                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Body</p>
-                <pre className="text-sm text-gray-800 whitespace-pre-wrap font-sans">{renderedBody}</pre>
-              </div>
-              {replyTo && (
-                <p className="text-xs text-gray-500">Reply-To: <span className="text-gray-700">{replyTo}</span></p>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
-              <button type="button" onClick={() => setPreviewOpen(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 transition-colors">
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-  const [subject, setSubject]         = useState(DEFAULT_EMAIL_SUBJECT);
-  const [body, setBody]               = useState(DEFAULT_EMAIL_BODY);
-  const [replyTo, setReplyTo]         = useState('');
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  function handleReset() {
-    setSubject(DEFAULT_EMAIL_SUBJECT);
-    setBody(DEFAULT_EMAIL_BODY);
-  }
-
-  function handleSave() {
-    setSaving(true);
-    setTimeout(() => setSaving(false), 800);
-  }
-
-  const renderedSubject = subject
-    .replace('{{po_number}}', 'PO-20260402-5181')
-    .replace('{{supplier_name}}', 'Brandon Supplier');
-
-  const renderedBody = body
-    .replace(/{{po_number}}/g, 'PO-20260402-5181')
-    .replace(/{{supplier_name}}/g, 'Brandon Supplier')
-    .replace(/{{po_date}}/g, '4/2/2026')
-    .replace(/{{expected_date}}/g, '4/15/2026');
-
-  return (
-    <div className="space-y-6">
-
-      <div className="bg-blue-50 border border-blue-100 rounded-md px-4 py-3">
-        <p className="text-xs text-blue-700 font-medium mb-1">Available template variables</p>
-        <p className="text-xs text-blue-600 font-mono">
-          {'{{po_number}}  {{supplier_name}}  {{po_date}}  {{expected_date}}'}
-        </p>
-      </div>
-
-      <div>
-        <Label>Email Subject Template</Label>
-        <Input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} />
-      </div>
-
-      <div>
-        <Label>Email Body Template</Label>
-        <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10} />
-      </div>
-
-      <div>
-        <Label>Reply-To Email Address</Label>
-        <Input type="email" value={replyTo} onChange={(e) => setReplyTo(e.target.value)} placeholder="e.g. purchasing@company.com" className="max-w-sm" />
-        <p className="text-xs text-gray-500 mt-1">If set, supplier replies will go to this address instead of the sender.</p>
-      </div>
-
-      <div className="flex items-center gap-3 pt-2">
-        <button type="button" onClick={handleReset}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
-          Reset to Default
-        </button>
-        <button type="button" onClick={() => setPreviewOpen(true)}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-50 transition-colors">
-          Preview Email
-        </button>
       </div>
 
       <SaveButton onClick={handleSave} saving={saving} />
@@ -434,7 +342,6 @@ function PurchaseOrdersTab({ poNextNumber: initialPoNextNumber }) {
     </div>
   );
 }
-
 
 // ── Main Settings component ────────────────────────────────────────────────────
 
