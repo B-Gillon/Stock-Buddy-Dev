@@ -138,7 +138,6 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
 
   return (
     <div className={`bg-white rounded-lg border shadow-sm overflow-hidden ${hasErrors ? 'border-red-300' : 'border-gray-200'}`}>
-      {/* Card header — name + view as tester button */}
       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <p className="text-sm font-semibold text-gray-900">{tester.contact_name}</p>
@@ -157,7 +156,6 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
         </button>
       </div>
 
-      {/* Stats table or not-connected state */}
       {stats ? (
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -207,12 +205,59 @@ export default function AdminActivityClient({
   poActivity,
   errors, errorCount,
 }) {
-  const [testers, setTesters]           = useState(betaTesters);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [testers, setTesters]             = useState(betaTesters);
+  const [showAddModal, setShowAddModal]   = useState(false);
   const [expandedError, setExpandedError] = useState(null);
 
   function handleTesterAdded(newTester) {
     setTesters(t => [newTester, ...t]);
+  }
+
+  // Sync stat rows: { label, count, lastSync }
+  const syncRows = [
+    { label: 'Products',              count: productCount,        lastSync: productLastSync },
+    { label: 'Variants',              count: variantCount,        lastSync: variantLastSync },
+    { label: 'Vendors',               count: vendorCount,         lastSync: vendorLastSync },
+    { label: 'Inventory',             count: null,                lastSync: inventoryLastSync },
+    { label: 'Suppliers',             count: supplierCount,       lastSync: null },
+    { label: 'Supplier Product Data', count: supplierVariantCount, lastSync: null },
+  ];
+
+  // PO stat rows: { label, count, lastSync }
+  const poRows = [
+    { label: 'Total POs',           count: poTotal,             lastSync: poLastCreated },
+    { label: 'Draft',               count: poDraft,             lastSync: null },
+    { label: 'Released',            count: poReleased,          lastSync: null },
+    { label: 'Partially Received',  count: poPartiallyReceived, lastSync: null },
+    { label: 'Received',            count: poReceived,          lastSync: null },
+    { label: 'Cancelled',           count: poCancelled,         lastSync: null },
+  ];
+
+  function StatTable({ rows }) {
+    return (
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Feature</th>
+            <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
+            <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Sync</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-50">
+          {rows.map(({ label, count, lastSync }) => (
+            <tr key={label} className="hover:bg-gray-50">
+              <td className="px-4 py-1.5 text-gray-700">{label}</td>
+              <td className="px-4 py-1.5 text-gray-900 font-medium">
+                {count !== null ? count.toLocaleString() : 'N/A'}
+              </td>
+              <td className="px-4 py-1.5 text-gray-500">
+                {lastSync ? formatDate(lastSync) : 'N/A'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
   }
 
   return (
@@ -314,47 +359,17 @@ export default function AdminActivityClient({
         {/* ── Global Stats — two side-by-side cards ── */}
         <SectionHeader>Global Stats</SectionHeader>
         <div className="grid grid-cols-2 gap-4">
-
-          {/* Left — Sync Stats */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Shopify Sync</h3>
-            {[
-              { label: 'Products',        value: productCount.toLocaleString() },
-              { label: 'Products – Last Sync',  value: formatDate(productLastSync) },
-              { label: 'Variants',        value: variantCount.toLocaleString() },
-              { label: 'Variants – Last Sync',  value: formatDate(variantLastSync) },
-              { label: 'Vendors',         value: vendorCount.toLocaleString() },
-              { label: 'Vendors – Last Sync',   value: formatDate(vendorLastSync) },
-              { label: 'Inventory – Last Sync', value: formatDate(inventoryLastSync) },
-              { label: 'Suppliers',       value: supplierCount.toLocaleString() },
-              { label: 'Most Recent Supplier',  value: formatDate(supplierLastCreated) },
-              { label: 'Supplier Product Data', value: supplierVariantCount.toLocaleString() },
-              { label: 'Most Recent SVD',       value: formatDate(supplierVariantLastCreated) },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-gray-600">{label}</span>
-                <span className="text-sm font-medium text-gray-900">{value}</span>
-              </div>
-            ))}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shopify Sync</h3>
+            </div>
+            <StatTable rows={syncRows} />
           </div>
-
-          {/* Right — PO Stats */}
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Purchase Orders</h3>
-            {[
-              { label: 'Total POs',           value: poTotal.toLocaleString() },
-              { label: 'Most Recent PO',       value: formatDate(poLastCreated) },
-              { label: 'Draft',                value: poDraft.toLocaleString() },
-              { label: 'Released',             value: poReleased.toLocaleString() },
-              { label: 'Partially Received',   value: poPartiallyReceived.toLocaleString() },
-              { label: 'Received',             value: poReceived.toLocaleString() },
-              { label: 'Cancelled',            value: poCancelled.toLocaleString() },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-gray-600">{label}</span>
-                <span className="text-sm font-medium text-gray-900">{value}</span>
-              </div>
-            ))}
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Purchase Orders</h3>
+            </div>
+            <StatTable rows={poRows} />
           </div>
         </div>
 
