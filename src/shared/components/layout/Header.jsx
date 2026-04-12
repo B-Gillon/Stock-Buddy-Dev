@@ -34,7 +34,6 @@ function ProductsDropdown() {
   const ref = useRef(null);
   const pathname = usePathname();
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(e) {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
@@ -43,7 +42,6 @@ function ProductsDropdown() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Close on navigation
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
@@ -106,10 +104,10 @@ export default function Header({
   const pathname = usePathname();
 
   return (
-    <header className="w-full bg-gray-800 text-white px-6 rounded-lg shadow" style={{ height: "88px" }}>
-      <div className="h-full flex items-center justify-between gap-6">
+    <header className="w-full bg-gray-800 text-white px-6 py-3 rounded-lg shadow">
+      <div className="flex items-center justify-between gap-4 min-w-0">
 
-        {/* Left: Mascot + Brand */}
+        {/* Left: Mascot + Brand — shrinks before right side does */}
         <Link href="/dashboard" className="shrink-0 flex items-center gap-3 hover:opacity-90 transition-opacity">
           <Image
             src="/STOCK_BUDDY_LOGO__1_.png"
@@ -118,7 +116,7 @@ export default function Header({
             height={88}
             className="h-16 w-auto object-contain"
           />
-          <div>
+          <div className="min-w-0">
             <div className="flex items-baseline gap-2">
               <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
               <span className="text-xs text-gray-400">v1.0</span>
@@ -129,33 +127,31 @@ export default function Header({
           </div>
         </Link>
 
-        {/* Right: sync row + nav */}
-        <div className="shrink-0 flex flex-col items-end justify-center gap-1.5 h-full">
+        {/* Right: sync row + nav — never clips, wraps gracefully */}
+        <div className="flex flex-col items-end justify-center gap-1.5 min-w-0">
 
-          {/* Sync row — always occupies space to keep nav position stable */}
-          <div className="flex items-center gap-3 h-7">
-            {onSync && (
-              <>
-                <span className="text-xs text-gray-400">
-                  {lastSyncedAt
-                    ? `Last Sync: ${formatTimestamp(lastSyncedAt)}`
-                    : "Last Sync: —"}
-                </span>
-                <button
-                  onClick={onSync}
-                  disabled={syncing}
-                  className={`px-4 py-1 rounded-md text-sm font-medium transition ${
-                    syncing ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                  }`}
-                >
-                  {syncing ? "Syncing..." : syncLabel}
-                </button>
-              </>
-            )}
-          </div>
+          {/* Sync row */}
+          {onSync && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400 whitespace-nowrap">
+                {lastSyncedAt
+                  ? `Last Sync: ${formatTimestamp(lastSyncedAt)}`
+                  : "Last Sync: —"}
+              </span>
+              <button
+                onClick={onSync}
+                disabled={syncing}
+                className={`whitespace-nowrap px-4 py-1 rounded-md text-sm font-medium transition ${
+                  syncing ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {syncing ? "Syncing..." : syncLabel}
+              </button>
+            </div>
+          )}
 
           {/* Nav */}
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1 flex-wrap justify-end">
             <ProductsDropdown />
 
             {NAV_ITEMS.map((item) => {
@@ -164,7 +160,7 @@ export default function Header({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition ${
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap ${
                     isActive
                       ? "text-white bg-white/20"
                       : "text-gray-200 hover:text-white hover:bg-white/10"
