@@ -1,6 +1,6 @@
 "use client";
 
-// /src/shared/components/layout/AppLayout.js
+// /src/shared/components/layout/AppLayout.jsx
 
 import { useMemo } from "react";
 import Header from "@/shared/components/layout/Header";
@@ -103,13 +103,16 @@ export default function AppLayout({
     : null;
 
   return (
-    <div className="bg-gray-100 flex flex-col items-center py-6">
+    // w-full + overflow-x-hidden: constrains layout to iframe width.
+    // Without this, the app side-scrolls inside the Shopify Admin iframe
+    // because the outer div has no width boundary.
+    <div className="w-full overflow-x-hidden bg-gray-100 flex flex-col items-center py-6">
 
       {/* Session tracker — silent, non-blocking */}
       <SessionTracker />
 
       {/* GLOBAL HEADER — sync button lives here */}
-      <div className="w-full max-w-6xl mb-3">
+      <div className="w-full max-w-6xl mb-3 px-4">
         <Header
           pageName={title}
           syncLabel={syncLabel}
@@ -122,13 +125,13 @@ export default function AppLayout({
 
       {/* PAGE TITLE — gray area between header and content */}
       {title && (
-        <div className="w-full max-w-6xl mb-3">
+        <div className="w-full max-w-6xl mb-3 px-4">
           <h1 className="text-xl font-semibold text-gray-800">{title}</h1>
         </div>
       )}
 
       {/* PAGE CARD WRAPPER */}
-      <div className="w-full max-w-6xl">
+      <div className="w-full max-w-6xl px-4">
         {bareLayout ? (
           <>
             {/* ACTION BAR — floating pill above content */}

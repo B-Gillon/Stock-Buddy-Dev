@@ -73,8 +73,25 @@ These were accidentally set to the same value once — double-check if auth issu
 ## Shopify
 
 **Dev Store:** brandongtest.myshopify.com
-**Connection type:** Hardcoded single-store credentials (dev only)
-**Status:** OAuth onboarding flow not yet built — beta testers use dev store only
+**App handle:** stock-buddy-1
+**Embedding:** Embedded in Shopify Admin iframe (App Bridge v4)
+**OAuth status:** Fully implemented and tested as of 2026-04-12
+
+### Shopify Dev Dashboard
+**URL:** https://dev.shopify.com
+**Organization:** Brandon Test Account
+**App:** Stock Buddy
+App configuration (App URL, redirect URLs, scopes) is managed in the Dev Dashboard.
+NOT in the Partners Dashboard — Shopify moved app config to the Dev Dashboard.
+
+### Current App Configuration (production)
+- **App URL:** https://stock-buddy.brandongillon.com
+- **Allowed redirect URL:** https://stock-buddy.brandongillon.com/api/shopify/callback
+
+### Current App Configuration (local dev with ngrok)
+- **App URL:** https://{ngrok-url}/api/shopify/install
+- **Allowed redirect URL:** https://{ngrok-url}/api/shopify/callback
+- Create a new version in Dev Dashboard every time the ngrok URL changes
 
 ### API Scopes
 ```
@@ -90,11 +107,38 @@ write_inventory
 SHOPIFY_STORE_DOMAIN
 SHOPIFY_ADMIN_API_TOKEN          ← rotated 2026-04-11 after accidental exposure
 SHOPIFY_API_VERSION
+SHOPIFY_API_KEY                  ← Client ID from Dev Dashboard Settings → Credentials
+NEXT_PUBLIC_SHOPIFY_API_KEY      ← Same value as SHOPIFY_API_KEY (needs NEXT_PUBLIC_ for browser)
+SHOPIFY_API_SECRET               ← Client secret from Dev Dashboard Settings → Credentials (shpss_ format)
+SHOPIFY_APP_URL                  ← https://stock-buddy.brandongillon.com in production
 ```
 
-### Note
-Before public launch, hardcoded credentials must be replaced with per-tenant OAuth
-credentials stored in the tenants table. See TECH_DEBT.md #3.
+### ngrok (local dev tunnel)
+**Installed at:** C:\ngrok\ngrok.exe
+**Account:** B-Gillon (free plan)
+**Auth token:** configured via `ngrok config add-authtoken`
+**Usage:**
+```powershell
+ngrok http 3000 --request-header-add "ngrok-skip-browser-warning: true"
+```
+Note: Free plan generates a new URL on every restart. Update Dev Dashboard and
+.env.local SHOPIFY_APP_URL every time the URL changes.
+
+### Cloudflare Tunnel
+**Status:** Installed but unreliable on Windows due to DNS issues
+**Installed via:** `npm install -g cloudflared`
+**Not recommended** for local dev on Windows — use ngrok or deploy to Vercel instead.
+
+### OAuth Flow
+Stock Buddy uses Shopify OAuth 2.0 for app installation.
+See Engineering_Specs.txt Sections 21-23 for full architecture documentation.
+
+Key files:
+- src/lib/shopify/hmac.js — HMAC verification
+- src/lib/shopify/sessionToken.js — JWT session token verification
+- src/lib/shopify/stateCookie.js — Signed cookie for CSRF protection
+- src/app/api/shopify/install/route.js — OAuth install entry point
+- src/app/api/shopify/callback/route.js — OAuth callback, token exchange
 
 ---
 
@@ -123,6 +167,10 @@ SUPABASE_SERVICE_ROLE_KEY
 SHOPIFY_STORE_DOMAIN
 SHOPIFY_ADMIN_API_TOKEN
 SHOPIFY_API_VERSION
+SHOPIFY_API_KEY
+NEXT_PUBLIC_SHOPIFY_API_KEY
+SHOPIFY_API_SECRET
+SHOPIFY_APP_URL
 SMTP_HOST
 SMTP_PORT
 SMTP_USER
@@ -187,10 +235,19 @@ npm run dev
 ```
 **Local URL:** http://localhost:3000
 
+### Running with ngrok (for OAuth testing)
+Open two terminals:
+1. Terminal 1: `npm run dev`
+2. Terminal 2: `ngrok http 3000 --request-header-add "ngrok-skip-browser-warning: true"`
+
+Then update SHOPIFY_APP_URL in .env.local and the Dev Dashboard with the ngrok URL.
+
 ### Troubleshooting
 - If you see a Tailwind resolve error: `Remove-Item -Recurse -Force .next` then `npm run dev`
 - If tenant lookup fails, verify SUPABASE_SERVICE_ROLE_KEY is the service_role key not the anon key
 - If Shopify sync fails, verify SHOPIFY_ADMIN_API_TOKEN is current (was rotated 2026-04-11)
+- If OAuth HMAC fails, verify SHOPIFY_API_SECRET is the Client secret (shpss_ format) from Dev Dashboard
+- If ngrok URL changes, update SHOPIFY_APP_URL in .env.local AND create a new version in Dev Dashboard
 
 ---
 
@@ -201,6 +258,12 @@ npm run dev
 | src/lib/supabaseClient.js | Supabase client — server-side only |
 | src/lib/supabaseAdmin.js | Supabase admin client — tenant lookups only |
 | src/lib/tenants.js | Tenant resolution helpers |
+| src/lib/shopify/hmac.js | HMAC verification for OAuth and webhooks |
+| src/lib/shopify/sessionToken.js | JWT session token verification for embedded app |
+| src/lib/shopify/stateCookie.js | Signed cookie utility for OAuth CSRF protection |
+| src/app/api/shopify/install/route.js | Shopify OAuth install entry point |
+| src/app/api/shopify/callback/route.js | Shopify OAuth callback and token exchange |
+| src/app/components/AppBridgeProvider.jsx | App Bridge v4 initializer |
 | src/proxy.js | Next.js proxy (formerly middleware) |
 | .env.local | Local environment variables — never commit |
 | .gitignore | Files excluded from Git |
@@ -221,7 +284,12 @@ npm run dev
 | 2026-04-11 | Hostinger email password rotated after accidental exposure |
 | 2026-04-11 | Vercel account created, app deployed to stock-buddy-delta.vercel.app |
 | 2026-04-11 | Custom domain configured — live at stock-buddy.brandongillon.com |
+| 2026-04-12 | Shopify OAuth flow fully implemented and tested |
+| 2026-04-12 | App Bridge v4 wired up in app shell |
+| 2026-04-12 | Stock Buddy successfully loading inside Shopify Admin iframe |
+| 2026-04-12 | ngrok installed for local OAuth testing |
+| 2026-04-12 | New Shopify API credentials added to .env.local and Vercel |
 
 ---
 
-*Last updated: 2026-04-11*
+*Last updated: 2026-04-12*
