@@ -37,6 +37,11 @@ All files must be placed in the correct folder:
     - globals.css
     - API routes under /api
 
+/src/app/components
+    - App-level components shared across the root layout
+    - AppBridgeProvider.jsx lives here — do not move it to /shared/components/
+      because it is tightly coupled to layout.js and Next.js app shell concerns
+
 /src/app/<route>/components
     - Components used exclusively by that route
     - Co-located with the page they belong to
@@ -443,6 +448,10 @@ Current dev configuration (revert before production):
   SHOPIFY_STORE_DOMAIN
   SHOPIFY_ADMIN_API_TOKEN
   SHOPIFY_API_VERSION
+  SHOPIFY_API_KEY               ← Client ID from Shopify Dev Dashboard
+  NEXT_PUBLIC_SHOPIFY_API_KEY   ← Same value as SHOPIFY_API_KEY — needs NEXT_PUBLIC_ prefix for App Bridge (browser)
+  SHOPIFY_API_SECRET            ← Client secret from Shopify Dev Dashboard
+  SHOPIFY_APP_URL               ← ngrok tunnel URL in dev, production URL in prod
   SMTP_HOST
   SMTP_PORT
   SMTP_USER
@@ -466,8 +475,14 @@ The exported function must be named "proxy" not "middleware".
 The proxy:
 - Reads shop domain from x-shop-domain header, ?shop query param,
   or NEXT_PUBLIC_DEV_SHOP_DOMAIN env var (dev fallback)
+- Reads host param from x-shopify-host header or ?host query param
 - Sets x-shop-domain header on every request for downstream use
+- Sets x-shopify-host header on every request for App Bridge use
 - Passes through /_next/static, /_next/image, /favicon.ico
+
+BEFORE GOING TO PRODUCTION:
+- Remove NEXT_PUBLIC_DEV_SHOP_DOMAIN fallback from proxy.js
+- Enforce rejection of requests with no shop domain instead of passing through
 
 
 =====================================================================
@@ -519,3 +534,215 @@ CSV toggle pattern (used in both CSVTab and supplier CSV Overrides):
   to avoid thumb positioning issues
 - Three-column layout: Header Fields | Line Item Fields | Optional Internal Fields
 - Required fields show "Req" badge and cannot be toggled
+
+=====================================================================
+SECTION 21 — SHOPIFY OAUTH FLOW
+=====================================================================
+
+Stock Buddy uses Shopify's OAuth 2.0 flow for app installation.
+All OAuth-related files live in /src/lib/shopify/ and /src/app/api/shopify/.
+
+### File locations
+- src/lib/shopify/hmac.js          — HMAC verification utility
+- src/lib/shopify/sessionToken.js  — Session token (JWT) verification
+- src/app/api/shopify/install/route.js   — Install entry point
+- src/app/api/shopify/callback/route.js  — OAuth callback, token exchange
+
+### OAuth flow sequence
+1. Shopify hits /api/shopify/install with shop, hmac, timestamp params
+2. Install route verifies HMAC, builds authorization URL, redirects merchant to Shopify
+3. Merchant approves the app on Shopify
+4. Shopify redirects to /api/shopify/callback with shop, code, state, hmac params
+5. Callback route verifies HMAC, exchanges code for permanent access token
+6. Callback upserts tenant record in Supabase (shop_domain + access_token)
+7. Merchant is redirected into the embedded app in Shopify Admin
+
+### Required scopes
+read_products, read_inventory, write_inventory, read_locations,
+read_merchant_managed_fulfillment_orders
+
+### Shop domain validation
+All routes that accept a shop param must validate it with this regex:
+  /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/
+Never trust or redirect to an unvalidated shop domain.
+
+### HMAC verification
+All OAuth requests from Shopify must have their HMAC verified before
+any processing occurs. Use verifyOAuthHmac(searchParams) from
+@/lib/shopify/hmac for install and callback routes.
+
+### State param (CSRF protection)
+The install route generates a random nonce (crypto.randomUUID()) and
+passes it as the state param to Shopify. Shopify returns it unchanged
+in the callback. In production, this must be stored in a signed cookie
+during install and compared in the callback.
+TODO: Implement signed cookie CSRF protection before production.
+
+### Tenant upsert on install
+The callback route upserts into the tenants table using onConflict: "shop_domain".
+This handles both first installs and reinstalls correctly.
+On reinstall, access_token is updated and uninstalled_at is cleared.
+
+### Redirect after OAuth
+After successful OAuth, the merchant is redirected to:
+  https://{shop}/admin/apps/{app-handle}
+This loads Stock Buddy inside the Shopify Admin iframe.
+
+### Dev Dashboard
+App configuration (App URL, redirect URLs, scopes) is managed at:
+  https://dev.shopify.com (Shopify Dev Dashboard)
+Not in the Partners Dashboard — Shopify moved app config to the Dev Dashboard.
+
+### ngrok for local development
+Shopify cannot redirect to localhost. Use ngrok to expose a public HTTPS URL:
+  ngrok http 3000
+Update SHOPIFY_APP_URL in .env.local and the App URL + redirect URL in the
+Dev Dashboard every time the ngrok URL changes (free plan generates a new URL
+on each restart). The redirect URL to whitelist is:
+  https://{ngrok-url}/api/shopify/callback
+
+BEFORE GOING TO PRODUCTION:
+- Replace ngrok URL with real production URL in SHOPIFY_APP_URL
+- Update App URL and redirect URL in Dev Dashboard to production URL
+- Implement signed cookie CSRF check for state param in callback route
+
+
+=====================================================================
+SECTION 22 — SHOPIFY EMBEDDED APP (APP BRIDGE)
+=====================================================================
+
+Stock Buddy is an embedded Shopify app — it runs inside an iframe
+within the Shopify Admin. This affects how authentication works on
+every API request.
+
+### Why session tokens are required
+Embedded apps run inside an iframe. Browsers block third-party cookies
+in iframes, so standard cookie-based sessions don't work. Instead,
+Shopify's App Bridge JS library automatically attaches a short-lived
+JWT (session token) to every API request the frontend makes.
+
+### Session token structure
+Shopify session tokens are HS256-signed JWTs containing:
+  iss  — issuer: "https://{shop}/admin"
+  dest — destination: "https://{shop}" (use this to extract shop domain)
+  aud  — audience: your SHOPIFY_API_KEY (client ID)
+  sub  — merchant user ID
+  exp  — expiration (tokens are short-lived, ~60 seconds)
+  nbf  — not before
+  iat  — issued at
+  jti  — unique token ID
+  sid  — session ID
+
+### Session token verification utility
+File: src/lib/shopify/sessionToken.js
+Export: getShopFromSessionToken(request)
+
+Usage in API routes:
+  import { getShopFromSessionToken } from "@/lib/shopify/sessionToken";
+  const shop = await getShopFromSessionToken(request);
+  if (!shop) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+Verifies: signature, algorithm (HS256), expiration, not-before,
+audience (must match SHOPIFY_API_KEY), shop domain format.
+
+### Authorization header format
+App Bridge sends the token as:
+  Authorization: Bearer {jwt}
+
+### Dev fallback
+getShopFromSessionToken() falls back to DEV_SHOP_DOMAIN if no
+Authorization header is present. This allows local dev to work
+without App Bridge running.
+REMOVE THIS FALLBACK BEFORE GOING TO PRODUCTION.
+
+### App Bridge frontend wiring (COMPLETE)
+App Bridge is installed and initialized in the app shell.
+- @shopify/app-bridge-react is installed
+- AppBridgeProvider.jsx lives at src/app/components/AppBridgeProvider.jsx
+- AppBridgeProvider is wrapped in Suspense in layout.js (required by useSearchParams)
+- Reads shop and host params from URL — both supplied by Shopify when loading in iframe
+- If shop/host are absent (local dev), renders children directly without App Bridge
+- NEXT_PUBLIC_SHOPIFY_API_KEY is the env var used by AppBridgeProvider (browser-accessible)
+- proxy.js forwards the host param as x-shopify-host on every request
+
+Remaining before production:
+- Remove DEV_SHOP_DOMAIN fallbacks from sessionToken.js and tenants.js
+- Verify session tokens are being sent on API requests when running inside Shopify Admin
+- Verify all API routes reject requests with invalid or missing session tokens
+
+### Production auth sequence
+1. Merchant opens app in Shopify Admin
+2. App Bridge initializes, fetches a session token from Shopify
+3. Frontend attaches token to every API request as Authorization: Bearer {jwt}
+4. API routes call getShopFromSessionToken(request) to verify and get shop
+5. Shop domain is used to resolve tenantId via getTenantId() in tenants.js
+6. All Supabase queries are scoped to that tenantId
+
+BEFORE GOING TO PRODUCTION:
+- Remove DEV_SHOP_DOMAIN fallback from sessionToken.js
+- Remove DEV_SHOP_DOMAIN fallback from tenants.js
+- Verify all API routes reject requests with invalid or missing session tokens
+
+
+=====================================================================
+SECTION 23 — SHOPIFY AUTH FILE REFERENCE
+=====================================================================
+
+All Shopify authentication utilities live in src/lib/shopify/.
+This folder is separate from src/lib/sync/ (which handles data sync).
+
+### src/lib/shopify/hmac.js
+Purpose: HMAC-SHA256 verification for OAuth requests and webhooks.
+Exports:
+  verifyOAuthHmac(searchParams)
+    - Input: URLSearchParams from the incoming request URL
+    - Strips hmac param, sorts remaining params, signs, compares
+    - Returns: Promise<boolean>
+    - Use in: install route, callback route
+
+  verifyWebhookHmac(rawBody, signature)
+    - Input: raw request body (string/Buffer/Uint8Array), X-Shopify-Hmac-SHA256 header value
+    - Signs raw body, compares to base64-encoded signature
+    - Returns: Promise<boolean>
+    - Use in: webhook handler routes
+    - IMPORTANT: must receive raw body before JSON.parse()
+
+Uses Web Crypto API — works in Node.js 18+ and Edge Runtime.
+Uses constant-time comparison (safeEqual) to prevent timing attacks.
+Reads SHOPIFY_API_SECRET from environment.
+
+### src/lib/shopify/sessionToken.js
+Purpose: JWT verification for embedded app session tokens.
+Exports:
+  getShopFromSessionToken(request)
+    - Input: Next.js API route Request object
+    - Reads Authorization: Bearer {jwt} header
+    - Verifies signature, exp, nbf, aud, shop domain
+    - Returns: Promise<string|null> — shop domain or null if invalid
+    - Falls back to DEV_SHOP_DOMAIN in dev (remove before production)
+    - Use in: all API routes that need tenant identity
+
+### src/app/components/AppBridgeProvider.jsx
+Purpose: Initializes Shopify App Bridge in the embedded app iframe.
+- Client component — uses useSearchParams() and browser APIs
+- Reads shop and host from URL params
+- Wraps children in Shopify's <Provider> when params are present
+- Renders children directly when params are absent (local dev fallback)
+- Imported by layout.js, wrapped in Suspense
+
+### src/app/api/shopify/install/route.js
+Purpose: OAuth install entry point.
+- Validates shop param format
+- Verifies HMAC
+- Builds Shopify authorization URL with required scopes
+- Generates nonce (state param) for CSRF protection
+- Redirects merchant to Shopify for app approval
+
+### src/app/api/shopify/callback/route.js
+Purpose: OAuth callback — completes the install flow.
+- Validates shop param format
+- Verifies HMAC
+- Validates state param presence
+- Exchanges temporary code for permanent access token
+- Upserts tenant in Supabase (handles installs and reinstalls)
+- Redirects merchant into the embedded app
