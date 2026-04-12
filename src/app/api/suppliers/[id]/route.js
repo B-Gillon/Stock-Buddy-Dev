@@ -2,38 +2,27 @@
 import { supabase, setTenantContext } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logError";
 
 export async function PATCH(request, { params }) {
-  const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
-
-  const { id } = await params;
-
-  let body;
+  let tenantId = null;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    tenantId = await getTenantId(request);
+    await setTenantContext(supabase, tenantId);
+    const { id } = await params;
+    const body = await request.json();
+
+    const { id: _id, supplier_number: _sn, created_at: _ca, updated_at: _ua, supplier_addresses: _addr, ...updateData } = body;
+
+    const { error } = await supabase
+      .from("suppliers")
+      .update({ ...updateData, updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    if (error) throw error;
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (err) {
+    await logError({ source: 'api/suppliers/[id]/PATCH', error: err, tenantId });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  const {
-    id: _id,
-    supplier_number: _supplier_number,
-    created_at: _created_at,
-    updated_at: _updated_at,
-    supplier_addresses: _addresses,
-    ...updateData
-  } = body;
-
-  const { error } = await supabase
-    .from("suppliers")
-    .update({ ...updateData, updated_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) {
-    console.error("Supplier PATCH error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ success: true }, { status: 200 });
 }

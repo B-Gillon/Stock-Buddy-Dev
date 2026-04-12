@@ -27,17 +27,6 @@ function SectionHeader({ children }) {
   );
 }
 
-const ACTION_COLORS = {
-  created:   'bg-blue-100 text-blue-700',
-  released:  'bg-green-100 text-green-700',
-  resent:    'bg-purple-100 text-purple-700',
-  cancelled: 'bg-red-100 text-red-700',
-  edited:    'bg-yellow-100 text-yellow-700',
-  received:  'bg-teal-100 text-teal-700',
-  error:     'bg-red-100 text-red-700',
-  closed:    'bg-gray-100 text-gray-600',
-};
-
 // ── Add Tester Modal ──────────────────────────────────────────────────────────
 
 function AddTesterModal({ adminKey, onClose, onAdded }) {
@@ -50,27 +39,18 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
   }
 
   async function handleSave() {
-    if (!form.contact_name.trim()) {
-      setError('Contact name is required.');
-      return;
-    }
+    if (!form.contact_name.trim()) { setError('Contact name is required.'); return; }
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/admin/beta-testers?key=${adminKey}`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(form),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       });
       if (!res.ok) throw new Error('Failed to add tester');
-      const newTester = await res.json();
-      onAdded(newTester);
+      onAdded(await res.json());
       onClose();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -80,29 +60,22 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-base font-semibold text-gray-900">Add Beta Tester</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
         <div className="px-6 py-5 space-y-4">
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name <span className="text-red-500">*</span></label>
-            <input name="contact_name" value={form.contact_name} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Jane Smith" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
-            <input name="contact_email" value={form.contact_email} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="jane@company.com" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Phone</label>
-            <input name="contact_phone" value={form.contact_phone} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="704-555-1234" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Expected Shopify Domain</label>
-            <input name="shopify_domain" value={form.shopify_domain} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="their-store.myshopify.com" />
-          </div>
+          {[
+            { name: 'contact_name', label: 'Contact Name', required: true, placeholder: 'Jane Smith' },
+            { name: 'contact_email', label: 'Contact Email', placeholder: 'jane@company.com' },
+            { name: 'contact_phone', label: 'Contact Phone', placeholder: '704-555-1234' },
+            { name: 'shopify_domain', label: 'Expected Shopify Domain', placeholder: 'their-store.myshopify.com' },
+          ].map(({ name, label, required, placeholder }) => (
+            <div key={name}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
+              <input name={name} value={form[name]} onChange={handleChange} placeholder={placeholder} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          ))}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
             <textarea name="notes" value={form.notes} onChange={handleChange} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Any notes about this tester..." />
@@ -110,9 +83,7 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
         </div>
         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Adding…' : 'Add Tester'}
-          </button>
+          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">{saving ? 'Adding…' : 'Add Tester'}</button>
         </div>
       </div>
     </div>
@@ -129,11 +100,10 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
     { label: 'Inventory',             total: '—',                                   date: stats?.inventoryLastSync ?? null },
     { label: 'Suppliers',             total: stats?.supplierCount ?? '—',          date: null },
     { label: 'Supplier Product Data', total: stats?.supplierVariantCount ?? '—',   date: null },
-    { label: 'POs – Created',         total: stats?.poCreated ?? '—',              date: null },
-    { label: 'POs – Released',        total: stats?.poReleased ?? '—',             date: null },
-    { label: 'POs – Received',        total: stats?.poReceived ?? '—',             date: null },
+    { label: 'POs Created',           total: stats?.poCreated ?? '—',              date: null },
+    { label: 'POs Released',          total: stats?.poReleased ?? '—',             date: null },
+    { label: 'POs Received',          total: stats?.poReceived ?? '—',             date: null },
   ];
-
   const hasErrors = (stats?.errorCount ?? 0) > 0;
 
   return (
@@ -141,21 +111,12 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
       <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <p className="text-sm font-semibold text-gray-900">{tester.contact_name}</p>
-          {hasErrors && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-              {stats.errorCount} error{stats.errorCount !== 1 ? 's' : ''}
-            </span>
-          )}
+          {hasErrors && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">{stats.errorCount} error{stats.errorCount !== 1 ? 's' : ''}</span>}
         </div>
-        <button
-          disabled
-          className="px-3 py-1.5 text-xs font-medium text-gray-400 border border-gray-200 rounded-md cursor-not-allowed opacity-50"
-          title="Available after OAuth is built"
-        >
+        <button disabled className="px-3 py-1.5 text-xs font-medium text-gray-400 border border-gray-200 rounded-md cursor-not-allowed opacity-50" title="Available after OAuth is built">
           View as Tester (available after OAuth)
         </button>
       </div>
-
       {stats ? (
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -172,97 +133,77 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
                 <td className="px-4 py-2 text-gray-700">{row.label}</td>
                 <td className="px-4 py-2 text-gray-900 font-medium">{typeof row.total === 'number' ? row.total.toLocaleString() : row.total}</td>
                 <td className="px-4 py-2 text-gray-500">{row.date ? formatDate(row.date) : '—'}</td>
-                <td className="px-4 py-2">
-                  {row.label.startsWith('POs') || row.label === 'Products' || row.label === 'Inventory'
-                    ? (hasErrors ? <span className="text-red-600 text-xs font-medium">See error log</span> : <span className="text-green-600 text-xs">✓</span>)
-                    : '—'
-                  }
-                </td>
+                <td className="px-4 py-2">{row.label.startsWith('POs') || row.label === 'Products' || row.label === 'Inventory' ? (hasErrors ? <span className="text-red-600 text-xs font-medium">See error log</span> : <span className="text-green-600 text-xs">checkmark</span>) : '—'}</td>
               </tr>
             ))}
           </tbody>
         </table>
       ) : (
-        <div className="px-5 py-6 text-center">
-          <p className="text-sm text-gray-400 italic">Not yet connected to Shopify</p>
-        </div>
+        <div className="px-5 py-6 text-center"><p className="text-sm text-gray-400 italic">Not yet connected to Shopify</p></div>
       )}
     </div>
+  );
+}
+
+// ── Stat Table ────────────────────────────────────────────────────────────────
+
+function StatTable({ rows }) {
+  return (
+    <table className="w-full text-sm">
+      <thead className="bg-gray-50 border-b border-gray-100">
+        <tr>
+          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Feature</th>
+          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
+          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Sync</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-50">
+        {rows.map(({ label, count, lastSync }) => (
+          <tr key={label} className="hover:bg-gray-50">
+            <td className="px-4 py-1.5 text-gray-700">{label}</td>
+            <td className="px-4 py-1.5 text-gray-900 font-medium">{count !== null ? count.toLocaleString() : 'N/A'}</td>
+            <td className="px-4 py-1.5 text-gray-500">{lastSync ? formatDate(lastSync) : 'N/A'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminActivityClient({
-  adminKey,
-  betaTesters, lastSessionMap, tenantStats,
+  adminKey, betaTesters, lastSessionMap, tenantStats,
   productCount, variantCount, productLastSync, variantLastSync,
-  vendorCount, vendorLastSync,
-  inventoryLastSync,
-  supplierCount, supplierLastCreated,
-  supplierVariantCount, supplierVariantLastCreated,
+  vendorCount, vendorLastSync, inventoryLastSync,
+  supplierCount, supplierLastCreated, supplierVariantCount, supplierVariantLastCreated,
   poTotal, poDraft, poReleased, poPartiallyReceived, poReceived, poCancelled, poLastCreated,
-  poActivity,
   errors, errorCount,
 }) {
   const [testers, setTesters]             = useState(betaTesters);
   const [showAddModal, setShowAddModal]   = useState(false);
   const [expandedError, setExpandedError] = useState(null);
 
-  function handleTesterAdded(newTester) {
-    setTesters(t => [newTester, ...t]);
-  }
-
-  // Sync stat rows: { label, count, lastSync }
   const syncRows = [
-    { label: 'Products',              count: productCount,        lastSync: productLastSync },
-    { label: 'Variants',              count: variantCount,        lastSync: variantLastSync },
-    { label: 'Vendors',               count: vendorCount,         lastSync: vendorLastSync },
-    { label: 'Inventory',             count: null,                lastSync: inventoryLastSync },
-    { label: 'Suppliers',             count: supplierCount,       lastSync: null },
+    { label: 'Products',              count: productCount,         lastSync: productLastSync },
+    { label: 'Variants',              count: variantCount,         lastSync: variantLastSync },
+    { label: 'Vendors',               count: vendorCount,          lastSync: vendorLastSync },
+    { label: 'Inventory',             count: null,                 lastSync: inventoryLastSync },
+    { label: 'Suppliers',             count: supplierCount,        lastSync: null },
     { label: 'Supplier Product Data', count: supplierVariantCount, lastSync: null },
   ];
 
-  // PO stat rows: { label, count, lastSync }
   const poRows = [
-    { label: 'Total POs',           count: poTotal,             lastSync: poLastCreated },
-    { label: 'Draft',               count: poDraft,             lastSync: null },
-    { label: 'Released',            count: poReleased,          lastSync: null },
-    { label: 'Partially Received',  count: poPartiallyReceived, lastSync: null },
-    { label: 'Received',            count: poReceived,          lastSync: null },
-    { label: 'Cancelled',           count: poCancelled,         lastSync: null },
+    { label: 'Total POs',          count: poTotal,             lastSync: poLastCreated },
+    { label: 'Draft',              count: poDraft,             lastSync: null },
+    { label: 'Released',           count: poReleased,          lastSync: null },
+    { label: 'Partially Received', count: poPartiallyReceived, lastSync: null },
+    { label: 'Received',           count: poReceived,          lastSync: null },
+    { label: 'Cancelled',          count: poCancelled,         lastSync: null },
   ];
-
-  function StatTable({ rows }) {
-    return (
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 border-b border-gray-100">
-          <tr>
-            <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Feature</th>
-            <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">#</th>
-            <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Sync</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-50">
-          {rows.map(({ label, count, lastSync }) => (
-            <tr key={label} className="hover:bg-gray-50">
-              <td className="px-4 py-1.5 text-gray-700">{label}</td>
-              <td className="px-4 py-1.5 text-gray-900 font-medium">
-                {count !== null ? count.toLocaleString() : 'N/A'}
-              </td>
-              <td className="px-4 py-1.5 text-gray-500">
-                {lastSync ? formatDate(lastSync) : 'N/A'}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-gray-900 text-white px-8 py-5">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div>
@@ -275,45 +216,29 @@ export default function AdminActivityClient({
 
       <div className="max-w-6xl mx-auto px-8 py-8">
 
-        {/* Error banner */}
         {errorCount > 0 && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg px-5 py-4 flex items-center gap-3">
-            <svg className="h-5 w-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-            <p className="text-sm text-red-700 font-medium">
-              {errorCount} error{errorCount !== 1 ? 's' : ''} recorded — see Error Log below
-            </p>
+            <svg className="h-5 w-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+            <p className="text-sm text-red-700 font-medium">{errorCount} error{errorCount !== 1 ? 's' : ''} recorded — see Error Log below</p>
           </div>
         )}
 
-        {/* ── Beta Tester Registry ── */}
+        {/* Beta Tester Registry */}
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-gray-800">Beta Tester Registry</h2>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-          >
-            + Add Tester
-          </button>
+          <button onClick={() => setShowAddModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">+ Add Tester</button>
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-8">
           {testers.length === 0 ? (
-            <div className="px-6 py-8 text-center">
-              <p className="text-sm text-gray-400 italic">No beta testers added yet. Click "Add Tester" to invite someone.</p>
-            </div>
+            <div className="px-6 py-8 text-center"><p className="text-sm text-gray-400 italic">No beta testers added yet. Click "Add Tester" to invite someone.</p></div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Shopify Domain</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Invited</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Installed</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Connected</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Accessed</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active</th>
+                  {['Contact', 'Shopify Domain', 'Invited', 'Installed', 'Connected', 'Last Accessed', 'Active'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -328,9 +253,7 @@ export default function AdminActivityClient({
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(t.invited_at)}</td>
                     <td className="px-4 py-3"><StatusPill value={!!t.installed_at} /></td>
                     <td className="px-4 py-3"><StatusPill value={!!t.connected_at} /></td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
-                      {t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}
-                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}</td>
                     <td className="px-4 py-3"><StatusPill value={t.is_active} trueLabel="Active" falseLabel="Inactive" /></td>
                   </tr>
                 ))}
@@ -339,109 +262,58 @@ export default function AdminActivityClient({
           )}
         </div>
 
-        {/* ── Per-Tester Activity Cards ── */}
+        {/* Per-Tester Activity */}
         {testers.length > 0 && (
           <>
             <SectionHeader>Tester Activity</SectionHeader>
             <div className="space-y-4">
               {testers.map((t) => (
-                <TesterActivityCard
-                  key={t.id}
-                  tester={t}
-                  stats={t.tenant_id ? tenantStats[t.tenant_id] : null}
-                  lastAccessed={t.tenant_id ? lastSessionMap[t.tenant_id] : null}
-                />
+                <TesterActivityCard key={t.id} tester={t} stats={t.tenant_id ? tenantStats[t.tenant_id] : null} lastAccessed={t.tenant_id ? lastSessionMap[t.tenant_id] : null} />
               ))}
             </div>
           </>
         )}
 
-        {/* ── Global Stats — two side-by-side cards ── */}
+        {/* Global Stats */}
         <SectionHeader>Global Stats</SectionHeader>
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shopify Sync</h3>
-            </div>
+            <div className="px-4 py-3 border-b border-gray-100"><h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Shopify Sync</h3></div>
             <StatTable rows={syncRows} />
           </div>
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Purchase Orders</h3>
-            </div>
+            <div className="px-4 py-3 border-b border-gray-100"><h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Purchase Orders</h3></div>
             <StatTable rows={poRows} />
           </div>
         </div>
 
-        {/* ── PO Activity Feed ── */}
-        <SectionHeader>Recent PO Activity</SectionHeader>
-        {poActivity.length === 0 ? (
-          <p className="text-sm text-gray-400 italic">No activity recorded yet.</p>
-        ) : (
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">PO Number</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Comments</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">When</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {poActivity.map((a) => (
-                  <tr key={a.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{a.po_number}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ACTION_COLORS[a.action] ?? 'bg-gray-100 text-gray-600'}`}>
-                        {a.action}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{a.comments ?? '—'}</td>
-                    <td className="px-4 py-3 text-gray-500">{formatDate(a.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ── Error Log ── */}
+        {/* Error Log */}
         <SectionHeader>
-          Error Log{errorCount > 0 && (
-            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-              {errorCount}
-            </span>
-          )}
+          Error Log{errorCount > 0 && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">{errorCount}</span>}
         </SectionHeader>
         {errors.length === 0 ? (
           <div className="bg-green-50 border border-green-200 rounded-lg px-5 py-4">
-            <p className="text-sm text-green-700 font-medium">✓ No errors recorded</p>
+            <p className="text-sm text-green-700 font-medium">No errors recorded</p>
           </div>
         ) : (
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">When</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Source</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Message</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Context</th>
+                  {['When', 'Source', 'Message', 'Context'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {errors.map((e) => (
                   <tr key={e.id} className="hover:bg-red-50 cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(e.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span>
-                    </td>
+                    <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span></td>
                     <td className="px-4 py-3 text-red-700">
                       <div>{e.message}</div>
                       {expandedError === e.id && e.context && (
-                        <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-600 whitespace-pre-wrap">
-                          {JSON.stringify(e.context, null, 2)}
-                        </pre>
+                        <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-600 whitespace-pre-wrap">{JSON.stringify(e.context, null, 2)}</pre>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{e.context ? 'Click to expand' : '—'}</td>
@@ -454,14 +326,7 @@ export default function AdminActivityClient({
 
       </div>
 
-      {/* Add Tester Modal */}
-      {showAddModal && (
-        <AddTesterModal
-          adminKey={adminKey}
-          onClose={() => setShowAddModal(false)}
-          onAdded={handleTesterAdded}
-        />
-      )}
+      {showAddModal && <AddTesterModal adminKey={adminKey} onClose={() => setShowAddModal(false)} onAdded={(t) => setTesters(prev => [t, ...prev])} />}
     </div>
   );
 }

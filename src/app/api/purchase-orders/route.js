@@ -3,31 +3,22 @@ import { NextResponse } from 'next/server';
 import { supabase, setTenantContext } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
 import { logPOActivity } from '@/lib/logPOActivity';
+import { logError } from '@/lib/logError';
 
 export async function POST(request) {
+  let tenantId = null;
   try {
-    const tenantId = await getTenantId(request);
+    tenantId = await getTenantId(request);
     await setTenantContext(supabase, tenantId);
 
     const body = await request.json();
     const { header, lines } = body;
 
-    if (!header?.supplier_id) {
-      return NextResponse.json({ error: 'Supplier is required' }, { status: 400 });
-    }
-    if (!header?.po_date) {
-      return NextResponse.json({ error: 'PO Date is required' }, { status: 400 });
-    }
-    if (!lines || lines.length === 0) {
-      return NextResponse.json({ error: 'At least one line item is required' }, { status: 400 });
-    }
+    if (!header?.supplier_id) return NextResponse.json({ error: 'Supplier is required' }, { status: 400 });
+    if (!header?.po_date) return NextResponse.json({ error: 'PO Date is required' }, { status: 400 });
+    if (!lines || lines.length === 0) return NextResponse.json({ error: 'At least one line item is required' }, { status: 400 });
 
-    // Enforce po_next_number is configured before allowing PO creation
-    const { data: settingsRows } = await supabase
-      .from('settings')
-      .select('key, value')
-      .in('key', ['po_next_number', 'po_format']);
-
+    const { data: settingsRows } = await supabase.from('settings').select('key, value').in('key', ['po_next_number', 'po_format']);
     const settings = Object.fromEntries((settingsRows ?? []).map((r) => [r.key, r.value]));
     const poNextNumber = settings.po_next_number ? parseInt(settings.po_next_number, 10) : null;
 
@@ -78,19 +69,14 @@ export async function POST(request) {
       extended_cost:       line.extended_cost ?? null,
     }));
 
-    const { error: linesError } = await supabase
-      .from('purchase_order_lines')
-      .insert(lineInserts);
-
+    const { error: linesError } = await supabase.from('purchase_order_lines').insert(lineInserts);
     if (linesError) {
-      console.error('[POST /api/purchase-orders] lines insert error:', linesError);
       await supabase.from('purchase_orders').delete().eq('id', po.id);
       throw new Error(`Failed to save line items: ${linesError.message}`);
     }
 
     await logPOActivity({ poId: po.id, tenantId, action: 'created' });
 
-    // Increment po_next_number for the next PO
     await supabase.from('settings').upsert(
       { tenant_id: tenantId, key: 'po_next_number', value: String(poNextNumber + 1), updated_at: new Date().toISOString() },
       { onConflict: 'key' }
@@ -98,7 +84,7 @@ export async function POST(request) {
 
     return NextResponse.json({ id: po.id, slug: po.po_number }, { status: 201 });
   } catch (err) {
-    console.error('[POST /api/purchase-orders]', err);
+    await logError({ source: 'api/purchase-orders/POST', error: err, tenantId });
     return NextResponse.json({ error: err.message ?? 'Internal server error' }, { status: 500 });
   }
 }

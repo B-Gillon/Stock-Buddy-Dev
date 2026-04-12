@@ -2,22 +2,20 @@
 import { NextResponse } from "next/server";
 import { supabase, setTenantContext } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
+import { logError } from "@/lib/logError";
 
 export async function GET(request) {
-  const tenantId = await getTenantId(request);
-  await setTenantContext(supabase, tenantId);
+  let tenantId = null;
+  try {
+    tenantId = await getTenantId(request);
+    await setTenantContext(supabase, tenantId);
 
-  const { data, error } = await supabase
-    .from("sync_status")
-    .select("sync_type, last_synced_at");
+    const { data, error } = await supabase.from("sync_status").select("sync_type, last_synced_at");
+    if (error) throw error;
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json(Object.fromEntries((data || []).map((r) => [r.sync_type, r.last_synced_at])));
+  } catch (err) {
+    await logError({ source: 'api/sync-status/GET', error: err, tenantId });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
-
-  const result = Object.fromEntries(
-    (data || []).map((r) => [r.sync_type, r.last_synced_at])
-  );
-
-  return NextResponse.json(result);
 }

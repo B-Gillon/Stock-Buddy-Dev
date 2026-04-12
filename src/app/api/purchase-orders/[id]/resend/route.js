@@ -3,14 +3,15 @@ import { NextResponse } from 'next/server';
 import { getTenantId } from '@/lib/tenants';
 import { sendPOEmail } from '@/lib/sendPOEmail';
 import { logPOActivity } from '@/lib/logPOActivity';
+import { logError } from '@/lib/logError';
 import { supabase } from '@/lib/supabaseClient';
 
 export async function POST(request, { params }) {
+  let tenantId = null;
   try {
-    const tenantId = await getTenantId(request);
+    tenantId = await getTenantId(request);
     const { id } = await params;
 
-    // Fetch To addresses for the log comment
     const { data: po } = await supabase
       .from('purchase_orders')
       .select('supplier_id, supplier:suppliers(id, po_email)')
@@ -25,47 +26,24 @@ export async function POST(request, { params }) {
 
     let toComment = '';
     if (recipients && recipients.length > 0) {
-      const allTo = recipients
-        .flatMap((r) => (r.to_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean));
-      toComment = allTo.join(', ');
+      toComment = recipients.flatMap((r) => (r.to_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean)).join(', ');
     } else if (po?.supplier?.po_email) {
       toComment = po.supplier.po_email;
     }
 
-    // Log resent immediately before sending (Option B — optimistic)
-    await logPOActivity({
-      poId:     id,
-      tenantId,
-      action:   'resent',
-      comments: toComment || null,
-    });
+    await logPOActivity({ poId: id, tenantId, action: 'resent', comments: toComment || null });
 
-    // Return 200 immediately — send email in background
     Promise.resolve().then(async () => {
       const result = await sendPOEmail(id, { isResend: true });
       if (!result.success) {
-        console.error('Resend email error:', result.error);
-        await logPOActivity({
-          poId:     id,
-          tenantId,
-          action:   'error',
-          comments: `Email send failed: ${result.error}`,
-        });
+        await logError({ source: 'api/purchase-orders/[id]/resend/email', error: new Error(result.error), tenantId, context: { poId: id } });
+        await logPOActivity({ poId: id, tenantId, action: 'error', comments: `Email send failed: ${result.error}` });
       }
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Resend route error:', err);
-    try {
-      const { id } = await params;
-      await logPOActivity({
-        poId:     id,
-        tenantId: null,
-        action:   'error',
-        comments: `Resend failed: ${err.message}`,
-      });
-    } catch (_) {}
+    await logError({ source: 'api/purchase-orders/[id]/resend', error: err, tenantId });
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
