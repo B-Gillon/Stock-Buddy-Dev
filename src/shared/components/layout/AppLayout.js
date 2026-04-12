@@ -1,9 +1,10 @@
 "use client";
 
-// /src/shared/components/AppLayout.js
+// /src/shared/components/layout/AppLayout.js
 
 import { useMemo } from "react";
 import Header from "@/shared/components/layout/Header";
+import SessionTracker from "@/shared/components/layout/SessionTracker";
 
 import {
   SearchIcon,
@@ -103,6 +104,9 @@ export default function AppLayout({
 
   return (
     <div className="bg-gray-100 flex flex-col items-center py-6">
+
+      {/* Session tracker — silent, non-blocking */}
+      <SessionTracker />
 
       {/* GLOBAL HEADER — sync button lives here */}
       <div className="w-full max-w-6xl mb-3">

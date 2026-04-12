@@ -11,7 +11,7 @@ Columns:
 • 	created_at — timestamptz — nullable — default: now()
 • 	updated_at — timestamptz — nullable — default: now()
 Relationships:
-• 	Referenced by: products.tenant_id, variants.tenant_id, vendors.tenant_id, suppliers.tenant_id, supplier_addresses.tenant_id, supplier_variants.tenant_id, locations.tenant_id, inventory_items.tenant_id, inventory_levels.tenant_id, purchase_orders.tenant_id, purchase_order_lines.tenant_id, sync_status.tenant_id, settings.tenant_id, supplier_csv_settings.tenant_id, supplier_transmission_recipients.tenant_id, supplier_location_receiving_defaults.tenant_id, po_shopify_incoming.tenant_id, po_activity_log.tenant_id, variant_location_bins.tenant_id, location_contacts.tenant_id, third_party_logistics.tenant_id, error_log.tenant_id
+• 	Referenced by: products.tenant_id, variants.tenant_id, vendors.tenant_id, suppliers.tenant_id, supplier_addresses.tenant_id, supplier_variants.tenant_id, locations.tenant_id, inventory_items.tenant_id, inventory_levels.tenant_id, purchase_orders.tenant_id, purchase_order_lines.tenant_id, sync_status.tenant_id, settings.tenant_id, supplier_csv_settings.tenant_id, supplier_transmission_recipients.tenant_id, supplier_location_receiving_defaults.tenant_id, po_shopify_incoming.tenant_id, po_activity_log.tenant_id, variant_location_bins.tenant_id, location_contacts.tenant_id, third_party_logistics.tenant_id, error_log.tenant_id, beta_testers.tenant_id, beta_tester_sessions.tenant_id
 
 ============================================================
 TABLE: inventory_items
@@ -496,6 +496,48 @@ Indexes:
 -   index on (tenant_id)
 -   index on (created_at DESC)
 -   index on (source)
+Relationships:
+-   tenant_id → tenants(id)
+-   Referenced by: nothing currently
+
+============================================================
+TABLE: beta_testers
+============================================================
+Columns:
+-   id — uuid — not null — default: gen_random_uuid()
+-   tenant_id — uuid — null — references tenants(id)
+-   contact_name — text — not null
+-   contact_email — text — null
+-   contact_phone — text — null
+-   notes — text — null
+-   shopify_domain — text — null
+-   store_name — text — null
+-   owner_name — text — null
+-   owner_email — text — null
+-   is_active — boolean — not null — default: true
+-   invited_at — timestamptz — not null — default: now()
+-   installed_at — timestamptz — null
+-   connected_at — timestamptz — null
+-   created_at — timestamptz — not null — default: now()
+-   updated_at — timestamptz — not null — default: now()
+Indexes:
+-   index on (tenant_id)
+-   index on (shopify_domain)
+Relationships:
+-   tenant_id → tenants(id)
+-   Referenced by: nothing currently
+
+============================================================
+TABLE: beta_tester_sessions
+============================================================
+Columns:
+-   id — uuid — not null — default: gen_random_uuid()
+-   tenant_id — uuid — not null — references tenants(id)
+-   accessed_at — timestamptz — not null — default: now()
+-   path — text — null
+Indexes:
+-   index on (tenant_id)
+-   index on (accessed_at DESC)
 Relationships:
 -   tenant_id → tenants(id)
 -   Referenced by: nothing currently
