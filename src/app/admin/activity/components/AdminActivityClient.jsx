@@ -123,41 +123,41 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
 
 function TesterActivityCard({ tester, stats, lastAccessed }) {
   const rows = [
-    { label: 'Products',              total: stats?.productCount ?? '—',         date: stats?.productLastSync ?? null },
-    { label: 'Variants',              total: stats?.variantCount ?? '—',          date: null },
-    { label: 'Vendors',               total: stats?.vendorCount ?? '—',           date: null },
-    { label: 'Inventory',             total: '—',                                  date: stats?.inventoryLastSync ?? null },
-    { label: 'Suppliers',             total: stats?.supplierCount ?? '—',         date: null },
-    { label: 'Supplier Product Data', total: stats?.supplierVariantCount ?? '—',  date: null },
-    { label: 'POs – Created',         total: stats?.poCreated ?? '—',             date: null },
-    { label: 'POs – Released',        total: stats?.poReleased ?? '—',            date: null },
-    { label: 'POs – Received',        total: stats?.poReceived ?? '—',            date: null },
+    { label: 'Products',              total: stats?.productCount ?? '—',          date: stats?.productLastSync ?? null },
+    { label: 'Variants',              total: stats?.variantCount ?? '—',           date: null },
+    { label: 'Vendors',               total: stats?.vendorCount ?? '—',            date: null },
+    { label: 'Inventory',             total: '—',                                   date: stats?.inventoryLastSync ?? null },
+    { label: 'Suppliers',             total: stats?.supplierCount ?? '—',          date: null },
+    { label: 'Supplier Product Data', total: stats?.supplierVariantCount ?? '—',   date: null },
+    { label: 'POs – Created',         total: stats?.poCreated ?? '—',              date: null },
+    { label: 'POs – Released',        total: stats?.poReleased ?? '—',             date: null },
+    { label: 'POs – Received',        total: stats?.poReceived ?? '—',             date: null },
   ];
 
   const hasErrors = (stats?.errorCount ?? 0) > 0;
 
   return (
     <div className={`bg-white rounded-lg border shadow-sm overflow-hidden ${hasErrors ? 'border-red-300' : 'border-gray-200'}`}>
-      {/* Card header */}
-      <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between">
-        <div>
+      {/* Card header — name + view as tester button */}
+      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <p className="text-sm font-semibold text-gray-900">{tester.contact_name}</p>
-          {tester.contact_email && <p className="text-xs text-gray-500 mt-0.5">{tester.contact_email}</p>}
-          {tester.contact_phone && <p className="text-xs text-gray-500">{tester.contact_phone}</p>}
-          {tester.shopify_domain && <p className="text-xs text-blue-600 mt-1 font-mono">{tester.shopify_domain}</p>}
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-gray-400">Last accessed</p>
-          <p className="text-xs font-medium text-gray-700">{formatDate(lastAccessed)}</p>
           {hasErrors && (
-            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
               {stats.errorCount} error{stats.errorCount !== 1 ? 's' : ''}
             </span>
           )}
         </div>
+        <button
+          disabled
+          className="px-3 py-1.5 text-xs font-medium text-gray-400 border border-gray-200 rounded-md cursor-not-allowed opacity-50"
+          title="Available after OAuth is built"
+        >
+          View as Tester (available after OAuth)
+        </button>
       </div>
 
-      {/* Stats table */}
+      {/* Stats table or not-connected state */}
       {stats ? (
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -187,9 +187,6 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
       ) : (
         <div className="px-5 py-6 text-center">
           <p className="text-sm text-gray-400 italic">Not yet connected to Shopify</p>
-          <button className="mt-3 px-3 py-1.5 text-xs font-medium text-gray-500 border border-gray-300 rounded-md hover:bg-gray-50 cursor-not-allowed opacity-50" disabled>
-            View as Tester (available after OAuth)
-          </button>
         </div>
       )}
     </div>
@@ -210,7 +207,7 @@ export default function AdminActivityClient({
   poActivity,
   errors, errorCount,
 }) {
-  const [testers, setTesters]       = useState(betaTesters);
+  const [testers, setTesters]           = useState(betaTesters);
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedError, setExpandedError] = useState(null);
 
@@ -314,54 +311,48 @@ export default function AdminActivityClient({
           </>
         )}
 
-        {/* ── Global Sync Stats ── */}
-        <SectionHeader>Global Sync Stats</SectionHeader>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { title: 'Products', rows: [{ label: 'Total', value: productCount.toLocaleString() }, { label: 'Last Sync', value: formatDate(productLastSync) }] },
-            { title: 'Variants',  rows: [{ label: 'Total', value: variantCount.toLocaleString() }, { label: 'Last Sync', value: formatDate(variantLastSync) }] },
-            { title: 'Vendors',   rows: [{ label: 'Total', value: vendorCount.toLocaleString() }, { label: 'Last Sync', value: formatDate(vendorLastSync) }] },
-            { title: 'Inventory', rows: [{ label: 'Last Full Sync', value: formatDate(inventoryLastSync) }] },
-          ].map(({ title, rows }) => (
-            <div key={title} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</h3>
-              {rows.map(({ label, value }) => (
-                <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                  <span className="text-sm text-gray-600">{label}</span>
-                  <span className="text-sm font-semibold text-gray-900">{value}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+        {/* ── Global Stats — two side-by-side cards ── */}
+        <SectionHeader>Global Stats</SectionHeader>
+        <div className="grid grid-cols-2 gap-4">
 
-        {/* ── Global PO Stats ── */}
-        <SectionHeader>Global Purchase Orders</SectionHeader>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Left — Sync Stats */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">All POs</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Shopify Sync</h3>
             {[
-              { label: 'Total', value: poTotal.toLocaleString() },
-              { label: 'Most Recent', value: formatDate(poLastCreated) },
+              { label: 'Products',        value: productCount.toLocaleString() },
+              { label: 'Products – Last Sync',  value: formatDate(productLastSync) },
+              { label: 'Variants',        value: variantCount.toLocaleString() },
+              { label: 'Variants – Last Sync',  value: formatDate(variantLastSync) },
+              { label: 'Vendors',         value: vendorCount.toLocaleString() },
+              { label: 'Vendors – Last Sync',   value: formatDate(vendorLastSync) },
+              { label: 'Inventory – Last Sync', value: formatDate(inventoryLastSync) },
+              { label: 'Suppliers',       value: supplierCount.toLocaleString() },
+              { label: 'Most Recent Supplier',  value: formatDate(supplierLastCreated) },
+              { label: 'Supplier Product Data', value: supplierVariantCount.toLocaleString() },
+              { label: 'Most Recent SVD',       value: formatDate(supplierVariantLastCreated) },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                 <span className="text-sm text-gray-600">{label}</span>
-                <span className="text-sm font-semibold text-gray-900">{value}</span>
+                <span className="text-sm font-medium text-gray-900">{value}</span>
               </div>
             ))}
           </div>
+
+          {/* Right — PO Stats */}
           <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">By Status</h3>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Purchase Orders</h3>
             {[
-              { label: 'Draft',              value: poDraft },
-              { label: 'Released',           value: poReleased },
-              { label: 'Partially Received', value: poPartiallyReceived },
-              { label: 'Received',           value: poReceived },
-              { label: 'Cancelled',          value: poCancelled },
+              { label: 'Total POs',           value: poTotal.toLocaleString() },
+              { label: 'Most Recent PO',       value: formatDate(poLastCreated) },
+              { label: 'Draft',                value: poDraft.toLocaleString() },
+              { label: 'Released',             value: poReleased.toLocaleString() },
+              { label: 'Partially Received',   value: poPartiallyReceived.toLocaleString() },
+              { label: 'Received',             value: poReceived.toLocaleString() },
+              { label: 'Cancelled',            value: poCancelled.toLocaleString() },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
                 <span className="text-sm text-gray-600">{label}</span>
-                <span className="text-sm font-semibold text-gray-900">{value.toLocaleString()}</span>
+                <span className="text-sm font-medium text-gray-900">{value}</span>
               </div>
             ))}
           </div>
