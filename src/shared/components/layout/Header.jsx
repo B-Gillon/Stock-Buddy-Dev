@@ -9,11 +9,11 @@ import { usePathname } from "next/navigation";
 
 
 const NAV_ITEMS = [
-  { label: "Inventory",       href: "/inventory"       },
-  { label: "Locations",       href: "/locations"       },
-  { label: "Suppliers",       href: "/suppliers"       },
-  { label: "Vendors",         href: "/vendors"         },
-  { label: "Purchase Orders", href: "/purchase-orders" },
+  { label: "Inventory",  href: "/inventory"       },
+  { label: "Locations",  href: "/locations"       },
+  { label: "Suppliers",  href: "/suppliers"       },
+  { label: "Vendors",    href: "/vendors"         },
+  { label: "POs",        href: "/purchase-orders" },
 ];
 
 const PRODUCTS_DROPDOWN = [
@@ -52,7 +52,7 @@ function ProductsDropdown() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-md transition ${
+        className={`flex items-center gap-1 px-2 py-1.5 text-sm font-medium rounded-md transition ${
           isProductsActive
             ? "text-white bg-white/20"
             : "text-gray-200 hover:text-white hover:bg-white/10"
@@ -104,10 +104,10 @@ export default function Header({
   const pathname = usePathname();
 
   return (
-    <header className="w-full bg-gray-800 text-white px-6 py-3 rounded-lg shadow">
+    <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
       <div className="flex items-center justify-between gap-4 min-w-0">
 
-        {/* Left: Mascot + Brand — shrinks before right side does */}
+        {/* Left: Mascot + Brand */}
         <Link href="/dashboard" className="shrink-0 flex items-center gap-3 hover:opacity-90 transition-opacity">
           <Image
             src="/STOCK_BUDDY_LOGO__1_.png"
@@ -127,12 +127,12 @@ export default function Header({
           </div>
         </Link>
 
-        {/* Right: sync row + nav — never clips, wraps gracefully */}
+        {/* Right: sync row + nav */}
         <div className="flex flex-col items-end justify-center gap-1.5 min-w-0">
 
           {/* Sync row */}
           {onSync && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400 whitespace-nowrap">
                 {lastSyncedAt
                   ? `Last Sync: ${formatTimestamp(lastSyncedAt)}`
@@ -141,7 +141,7 @@ export default function Header({
               <button
                 onClick={onSync}
                 disabled={syncing}
-                className={`whitespace-nowrap px-4 py-1 rounded-md text-sm font-medium transition ${
+                className={`whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium transition ${
                   syncing ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
@@ -151,7 +151,7 @@ export default function Header({
           )}
 
           {/* Nav */}
-          <nav className="flex items-center gap-1 flex-wrap justify-end">
+          <nav className="flex items-center gap-0.5">
             <ProductsDropdown />
 
             {NAV_ITEMS.map((item) => {
@@ -160,7 +160,7 @@ export default function Header({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap ${
+                  className={`px-2 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap ${
                     isActive
                       ? "text-white bg-white/20"
                       : "text-gray-200 hover:text-white hover:bg-white/10"
