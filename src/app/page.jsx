@@ -1,12 +1,11 @@
-/**
- * src/app/page.jsx
- *
- * Root route — redirects to the dashboard.
- * This is what Shopify loads when opening the embedded app.
- */
+// src/app/page.jsx
+// Root landing page — shown when the app is accessed outside of Shopify Admin.
+// Collects the merchant's shop domain and redirects to the OAuth install flow.
 
-import { redirect } from "next/navigation";
+export const dynamic = "force-dynamic";
 
-export default function RootPage() {
-  redirect("/dashboard");
+import InstallPage from "./components/InstallPage";
+
+export default function RootPage({ searchParams }) {
+  return <InstallPage />;
 }
