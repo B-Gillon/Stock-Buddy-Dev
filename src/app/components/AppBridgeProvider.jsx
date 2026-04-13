@@ -27,19 +27,19 @@ export default function AppBridgeProvider({ children }) {
       return;
     }
 
-    // Set App Bridge config on window
+    // Set App Bridge config on window — no forceRedirect to avoid
+    // postMessage origin mismatch errors in the iframe
     if (typeof window !== "undefined") {
       window.__appBridgeConfig = {
         apiKey: SHOPIFY_API_KEY,
         host,
-        forceRedirect: true,
       };
     }
 
     async function exchangeToken() {
       try {
-        // Wait for App Bridge to initialize
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        // Wait for App Bridge to fully initialize
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         // Get session token from App Bridge v4
         const sessionToken = await window.shopify?.idToken();
