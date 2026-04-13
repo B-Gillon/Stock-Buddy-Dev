@@ -34,6 +34,11 @@ const LOCATIONS_QUERY = `
 `;
 
 export default async function fetchLocations(credentials = {}) {
+  console.log("fetchLocations credentials:", {
+    shopDomain: credentials.shopDomain,
+    token_prefix: credentials.accessToken?.slice(0, 10),
+  });
+
   const allLocations = [];
   let cursor = null;
   let hasNextPage = true;
