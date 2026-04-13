@@ -13,7 +13,6 @@ export default function InstallPage() {
 
   function validate(value) {
     const trimmed = value.trim().toLowerCase();
-    // Accept either "store" or "store.myshopify.com"
     if (!trimmed) return null;
     const domain = trimmed.includes(".myshopify.com")
       ? trimmed
@@ -50,24 +49,12 @@ export default function InstallPage() {
       overflow: "hidden",
     }}>
 
-      {/* Google Font */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap');
-
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-        }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(24px); }
           to   { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse-ring {
-          0%   { transform: scale(0.95); opacity: 0.6; }
-          50%  { transform: scale(1.05); opacity: 0.2; }
-          100% { transform: scale(0.95); opacity: 0.6; }
         }
 
         .install-input {
@@ -119,10 +106,6 @@ export default function InstallPage() {
         .card {
           animation: fadeUp 0.6s ease both;
         }
-
-        .logo-wrap {
-          animation: float 4s ease-in-out infinite;
-        }
       `}</style>
 
       {/* Background glow */}
@@ -152,7 +135,7 @@ export default function InstallPage() {
       }}>
 
         {/* Logo */}
-        <div className="logo-wrap" style={{ textAlign: "center", marginBottom: "32px" }}>
+        <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <img
             src="/STOCK_BUDDY_LOGO__1_.png"
             alt="Stock Buddy"

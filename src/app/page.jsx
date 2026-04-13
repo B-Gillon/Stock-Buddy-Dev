@@ -1,11 +1,23 @@
 // src/app/page.jsx
-// Root landing page — shown when the app is accessed outside of Shopify Admin.
-// Collects the merchant's shop domain and redirects to the OAuth install flow.
+// Root route.
+// - If loaded inside Shopify (host + shop params present): redirect to /dashboard
+// - Otherwise: show the install landing page for new merchants
 
 export const dynamic = "force-dynamic";
 
+import { redirect } from "next/navigation";
 import InstallPage from "./components/InstallPage";
 
-export default function RootPage({ searchParams }) {
+export default async function RootPage({ searchParams }) {
+  const params = await searchParams;
+  const host = params.host;
+  const shop = params.shop;
+
+  // If Shopify params are present, we're inside the Admin iframe — go to dashboard
+  if (host && shop) {
+    redirect(`/dashboard?shop=${shop}&host=${host}`);
+  }
+
+  // Otherwise show the install landing page
   return <InstallPage />;
 }
