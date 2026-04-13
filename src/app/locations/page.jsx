@@ -3,6 +3,8 @@
 import { supabase } from "@/lib/supabaseClient";
 import ClientLocationsPage from "@/app/locations/components/ClientLocationsPage";
 
+export const dynamic = "force-dynamic";
+
 function toSlug(name) {
   return name
     .toLowerCase()
