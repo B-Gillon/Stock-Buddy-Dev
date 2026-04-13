@@ -8,12 +8,13 @@ import AppLayout from "@/shared/components/layout/AppLayout";
 import SortIcon from "@/shared/components/icons/SortIcon";
 
 const ALL_COLUMNS = [
-  { key: "name",              label: "Vendor",           hideable: false },
-  { key: "product_types",     label: "Product Types",    hideable: true  },
-  { key: "product_count",     label: "Products",         hideable: true  },
-  { key: "variant_count",     label: "Variants",         hideable: true  },
-  { key: "active_count",      label: "Active / Inactive",hideable: true  },
-  { key: "latest_updated_at", label: "Last Updated",     hideable: true  },
+  { key: "name",              label: "Vendor",            hideable: false },
+  { key: "product_types",     label: "Product Types",     hideable: true  },
+  { key: "product_count",     label: "Products",          hideable: true  },
+  { key: "variant_count",     label: "Variants",          hideable: true  },
+  { key: "active_count",      label: "Active Products",   hideable: true  },
+  { key: "inactive_count",    label: "Inactive Products", hideable: true  },
+  { key: "latest_updated_at", label: "Last Updated",      hideable: true  },
 ];
 
 const STORAGE_KEY = "vendors_column_visibility";
@@ -100,6 +101,42 @@ function sortRows(rows, key, direction) {
   });
 }
 
+function exportToCSV(rows) {
+  const headers = [
+    "Vendor",
+    "Product Types",
+    "Products",
+    "Variants",
+    "Active Products",
+    "Inactive Products",
+    "Last Updated",
+  ];
+
+  const csvRows = rows.map((v) => [
+    v.name ?? "",
+    v.product_types ?? "",
+    v.product_count ?? 0,
+    v.variant_count ?? 0,
+    v.active_count ?? 0,
+    v.inactive_count ?? 0,
+    v.latest_updated_at
+      ? new Date(v.latest_updated_at).toLocaleDateString()
+      : "",
+  ]);
+
+  const csv = [headers, ...csvRows]
+    .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = "vendors.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
   const router      = useRouter();
   const vendors_raw = vendors ?? [];
@@ -110,7 +147,6 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
   const [sortKey,    setSortKey]    = useState("name");
   const [sortDir,    setSortDir]    = useState("asc");
 
-  // Column visibility — default on first render, hydrate from localStorage in effect
   const [visibility, setVisibility] = useState(DEFAULT_VISIBILITY);
   useEffect(() => {
     setVisibility(loadVisibility());
@@ -149,7 +185,7 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
     }
   }
 
-  const sortedRows    = sortRows(vendors_raw, sortKey, sortDir);
+  const sortedRows     = sortRows(vendors_raw, sortKey, sortDir);
   const visibleColumns = ALL_COLUMNS.filter((c) => !c.hideable || visibility[c.key]);
 
   function renderCell(col, vendor) {
@@ -163,13 +199,9 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
       case "variant_count":
         return <span className="text-gray-700">{vendor.variant_count.toLocaleString()}</span>;
       case "active_count":
-        return (
-          <>
-            <span className="text-green-700 font-medium">{vendor.active_count}</span>
-            <span className="text-gray-400 mx-1">/</span>
-            <span className="text-gray-500">{vendor.inactive_count}</span>
-          </>
-        );
+        return <span className="text-green-700 font-medium">{vendor.active_count}</span>;
+      case "inactive_count":
+        return <span className="text-gray-500">{vendor.inactive_count}</span>;
       case "latest_updated_at":
         return (
           <span className="text-gray-500 whitespace-nowrap">
@@ -191,6 +223,7 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
         syncing:      syncing,
         lastSyncedAt: lastSynced,
         syncLabel:    "Sync Vendors",
+        onExport:     () => exportToCSV(sortedRows),
         columnsMenu: (
           <ColumnToggleMenu
             visibility={visibility}

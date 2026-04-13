@@ -63,8 +63,11 @@ export default async function VendorsPage() {
     const productTypes = [
       ...new Set(vendorProducts.map((p) => p.product_type).filter(Boolean)),
     ].join(", ") || "—";
+
+    // active = status is exactly "active"; inactive = everything else
     const activeCount   = vendorProducts.filter((p) => p.status === "active").length;
     const inactiveCount = vendorProducts.filter((p) => p.status !== "active").length;
+
     const latestUpdatedAt = vendorProducts.reduce((latest, p) => {
       if (!p.updated_at) return latest;
       if (!latest) return p.updated_at;
