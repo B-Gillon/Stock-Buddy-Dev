@@ -1,4 +1,5 @@
 // /src/lib/sync/processLocations.js
+
 export default function processLocations(rawLocations, tenantId) {
   return rawLocations.map((location) => {
     const shopifyId = location.id.replace("gid://shopify/Location/", "");
@@ -22,9 +23,6 @@ export default function processLocations(rawLocations, tenantId) {
       inventory_controlled_by: fs?.inventoryManagement ? fs.serviceName : "Shopify",
       provides_tracking: fs
         ? fs.trackingSupport ? "Yes" : "No"
-        : "N/A",
-      sku_sharing_allowed: fs
-        ? fs.permitsSkuSharing ? "Yes" : "No"
         : "N/A",
       orders_api_type: fs
         ? fs.fulfillmentOrdersOptIn ? "Fulfillment Orders" : "Legacy"
