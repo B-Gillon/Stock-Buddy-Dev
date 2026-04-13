@@ -1,15 +1,22 @@
+// /src/app/suppliers/[slug]/setup/page.jsx
+
 import { supabase } from "@/lib/supabaseClient";
 import ClientSupplierSetupPage from "./components/ClientSupplierSetupPage";
+import { notFound } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export default async function SupplierSetupPage({ params }) {
-  const { id } = await params;
+  const { slug } = await params;
 
-  // Fetch supplier name for display
+  // Fetch supplier by supplier_number (slug)
   const { data: supplier } = await supabase
     .from("suppliers")
-    .select("id, supplier_name")
-    .eq("id", id)
+    .select("id, supplier_name, supplier_number")
+    .eq("supplier_number", slug)
     .single();
+
+  if (!supplier) notFound();
 
   // Fetch all products with vendor and category
   const { data: products } = await supabase
@@ -52,15 +59,17 @@ export default async function SupplierSetupPage({ params }) {
 
   // Fetch already-associated product IDs so they show pre-checked
   const { data: existingAssociations } = await supabase
-    .from("supplier_products")
-    .select("product_id")
-    .eq("supplier_id", id);
+    .from("supplier_variants")
+    .select("variant_id, variants!inner(product_id)")
+    .eq("supplier_id", supplier.id);
 
-  const associatedProductIds = (existingAssociations ?? []).map((r) => r.product_id);
+  const associatedProductIds = [
+    ...new Set((existingAssociations ?? []).map((r) => r.variants?.product_id).filter(Boolean))
+  ];
 
   return (
     <ClientSupplierSetupPage
-      supplier={supplier ?? { id, supplier_name: "Supplier" }}
+      supplier={supplier}
       products={enrichedProducts}
       vendors={vendors ?? []}
       categories={categories}

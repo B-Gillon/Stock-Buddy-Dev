@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+// /src/app/suppliers/[slug]/setup/components/ClientSupplierSetupPage.jsx
 
+import { useState, useMemo } from "react";
 import Image from "next/image";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import Button from "@/shared/components/ui/Button";
@@ -13,14 +14,12 @@ export default function ClientSupplierSetupPage({
   categories,
   associatedProductIds = [],
 }) {
-  
-
-  const [selectedVendor, setSelectedVendor]     = useState("");
+  const [selectedVendor,   setSelectedVendor]   = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [search, setSearch]                     = useState("");
-  const [selected, setSelected] = useState(() => new Set(associatedProductIds));
-  const [submitting, setSubmitting]             = useState(false);
-  const [error, setError]                       = useState(null);
+  const [search,           setSearch]           = useState("");
+  const [selected,         setSelected]         = useState(() => new Set(associatedProductIds));
+  const [submitting,       setSubmitting]       = useState(false);
+  const [error,            setError]            = useState(null);
 
   // ── filtered products ──────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -72,9 +71,9 @@ export default function ClientSupplierSetupPage({
     setError(null);
     try {
       const res = await fetch(`/api/suppliers/${supplier.id}/associate-products`, {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_ids: [...selected] }),
+        body:    JSON.stringify({ product_ids: [...selected] }),
       });
       if (!res.ok) throw new Error("Failed to associate products");
       window.location.replace(`/suppliers/${supplier.supplier_number}`);
@@ -104,6 +103,7 @@ export default function ClientSupplierSetupPage({
 
       {/* Filter bar */}
       <div className="flex items-center gap-3 mb-4">
+
         {/* Vendor */}
         <select
           value={selectedVendor}
@@ -119,14 +119,11 @@ export default function ClientSupplierSetupPage({
           ))}
         </select>
 
-        {/* Category */}
+        {/* Category — always enabled */}
         <select
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
-          disabled={!selectedVendor}
-          className={`border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
-            !selectedVendor ? "opacity-40 cursor-not-allowed" : ""
-          }`}
+          className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="">All Categories</option>
           {categories.map((c) => (
@@ -134,22 +131,14 @@ export default function ClientSupplierSetupPage({
           ))}
         </select>
 
-        {/* Search */}
-        <div className="relative flex-1 max-w-sm">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products…"
-            className="w-full border border-gray-300 rounded-md pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          <svg
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-          </svg>
-        </div>
+        {/* Search — no icon */}
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search products…"
+          className="flex-1 max-w-sm border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
 
         {/* Selected count badge */}
         {selected.size > 0 && (
