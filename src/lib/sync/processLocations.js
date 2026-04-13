@@ -1,9 +1,11 @@
-export default function processLocations(rawLocations) {
+// /src/lib/sync/processLocations.js
+export default function processLocations(rawLocations, tenantId) {
   return rawLocations.map((location) => {
     const shopifyId = location.id.replace("gid://shopify/Location/", "");
     const fs = location.fulfillmentService ?? null;
 
     return {
+      tenant_id: tenantId,
       shopify_location_id: parseInt(shopifyId, 10),
       name: location.name ?? null,
       active: location.isActive ?? false,
