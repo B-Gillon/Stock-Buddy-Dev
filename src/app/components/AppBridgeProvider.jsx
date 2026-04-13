@@ -5,9 +5,10 @@
  *
  * App Bridge v4 initializer for the Shopify embedded app.
  *
- * On mount, if running inside the Shopify Admin iframe, calls the
- * token exchange route to ensure the tenant's access token is always
- * fresh in the database. This replaces the legacy OAuth callback flow.
+ * On mount, if running inside the Shopify Admin iframe, uses
+ * window.shopify.idToken() to get the App Bridge session token,
+ * then calls the token exchange route to store a fresh offline
+ * access token in the tenants table.
  */
 
 import { useEffect } from "react";
@@ -26,7 +27,7 @@ export default function AppBridgeProvider({ children }) {
       return;
     }
 
-    // Set App Bridge config on window for any App Bridge utilities that need it
+    // Set App Bridge config on window
     if (typeof window !== "undefined") {
       window.__appBridgeConfig = {
         apiKey: SHOPIFY_API_KEY,
@@ -35,19 +36,26 @@ export default function AppBridgeProvider({ children }) {
       };
     }
 
-    // Exchange the App Bridge session token for an offline access token
-    // and store it in the tenants table. This ensures sync operations
-    // always have a valid token without requiring the legacy OAuth flow.
     async function exchangeToken() {
       try {
-        // Wait briefly for App Bridge to initialize and attach its token
+        // Wait for App Bridge to initialize
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Fetch a session token from App Bridge
-        // App Bridge v4 attaches tokens automatically to fetch() calls
-        // made within the iframe, so we make a fetch to our own route.
+        // Get session token from App Bridge v4
+        const sessionToken = await window.shopify?.idToken();
+
+        if (!sessionToken) {
+          console.warn("[AppBridge] No session token available from window.shopify.idToken().");
+          return;
+        }
+
+        console.log("[AppBridge] Got session token, exchanging...");
+
         const response = await fetch("/api/shopify/token-exchange", {
           method: "POST",
+          headers: {
+            Authorization: `Bearer ${sessionToken}`,
+          },
         });
 
         if (!response.ok) {
