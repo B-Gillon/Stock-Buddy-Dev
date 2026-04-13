@@ -1,3 +1,5 @@
+// /src/lib/sync/fetchLocations.js
+
 import { shopifyGraphQL } from "@/lib/sync/shopifyHelpers";
 
 const LOCATIONS_QUERY = `
@@ -31,13 +33,13 @@ const LOCATIONS_QUERY = `
   }
 `;
 
-export default async function fetchLocations() {
+export default async function fetchLocations(credentials = {}) {
   const allLocations = [];
   let cursor = null;
   let hasNextPage = true;
 
   while (hasNextPage) {
-    const data = await shopifyGraphQL(LOCATIONS_QUERY, { cursor });
+    const data = await shopifyGraphQL(LOCATIONS_QUERY, { cursor }, credentials);
     const { nodes, pageInfo } = data.locations;
 
     allLocations.push(...nodes);
