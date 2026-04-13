@@ -22,7 +22,6 @@ const EMPTY_ADDRESS = {
 const REQUIRED_TOP     = ["supplier_name", "supplier_number", "company_name", "currency"];
 const REQUIRED_ADDRESS = ["address1", "city", "state_province", "postal_code", "country"];
 
-// Format 10- or 11-digit phone strings as ###-###-####
 function formatPhone(raw) {
   if (!raw) return "";
   const digits = raw.replace(/\D/g, "");
@@ -32,7 +31,7 @@ function formatPhone(raw) {
   if (digits.length === 11 && digits[0] === "1") {
     return `${digits.slice(1,4)}-${digits.slice(4,7)}-${digits.slice(7)}`;
   }
-  return raw; // return as-is if not a recognisable format
+  return raw;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -149,7 +148,6 @@ export default function AddSupplierForm() {
     };
   }
 
-  // Format phone fields on blur
   function handlePhoneBlur(field) {
     return () => {
       setForm((f) => ({ ...f, [field]: formatPhone(f[field]) }));
@@ -224,8 +222,8 @@ export default function AddSupplierForm() {
         body:    JSON.stringify({ form, addresses }),
       });
       if (!res.ok) throw new Error("Failed to create supplier");
-      const { id } = await res.json();
-      router.push(`/suppliers/${data.supplier_number}`);
+      await res.json();
+      router.push(`/suppliers/${form.supplier_number}`);
     } catch (err) {
       console.error(err);
       setErrors({ _global: "Something went wrong. Please try again." });
