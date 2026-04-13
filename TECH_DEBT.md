@@ -45,15 +45,26 @@ environment variables in Vercel.
 
 ---
 
-### 3. Shopify OAuth — Wire Per-Tenant Credentials into API Calls
-**Status:** OAuth install flow is built and working. API calls still use hardcoded env vars.
-**Risk:** Current setup exchanges OAuth tokens and stores them in the tenants table correctly,
-but all Shopify API calls (sync, inventory updates, etc.) still read from hardcoded
+### 3. Shopify OAuth — Wire Per-Tenant Credentials into All Sync Routes
+**Status:** Partially complete — locations sync fixed, other sync routes still use env vars
+**Risk:** Sync routes for products, inventory, variants, etc. still read from hardcoded
 SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_API_TOKEN env vars instead of the tenant record.
-**What needs to happen:**
-- Update all Shopify API calls in src/lib/sync/ and src/lib/sync/po/ to read
-  credentials from the tenants table instead of env vars
-- Remove SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_API_TOKEN from env vars once complete
+This means syncs will fail for any tenant other than the dev store.
+
+**What was done (2026-04-13):**
+- `shopifyHelpers.js` updated to accept credentials as parameters (falls back to env vars)
+- `fetchLocations.js`, `syncLocations.js`, and `src/app/api/sync/locations/route.js`
+  updated to look up tenant credentials from the `tenants` table and pass them through
+- `supabaseHelpers.js` env var corrected: `SUPABASE_URL` → `NEXT_PUBLIC_SUPABASE_URL`
+- `inventory_levels` upsert conflict column fixed: was `shopify_inventory_level_id`
+  (does not exist), now correctly uses composite key `inventory_item_id,location_id`
+
+**What still needs to happen:**
+- Apply the same credentials pattern to all other sync routes:
+  - `src/app/api/sync/products/route.js` + `syncProducts.js` + `fetchProducts.js`
+  - `src/app/api/sync/inventory/route.js` + `syncInventory.js` + `fetchInventory.js`
+  - All PO sync files in `src/lib/sync/po/`
+- Remove `SHOPIFY_STORE_DOMAIN` and `SHOPIFY_ADMIN_API_TOKEN` from env vars once complete
 
 ---
 
@@ -85,16 +96,38 @@ but the architecture should be formally locked down
 **Status:** Utility built (src/lib/shopify/sessionToken.js) but not yet called by API routes
 **Risk:** API routes currently rely on the dev fallback (DEV_SHOP_DOMAIN) for tenant resolution.
 In production, every API route must verify the App Bridge session token.
+
+**Context (2026-04-13):** Investigated App Bridge v4 token exchange as a mechanism to
+keep tenant access tokens fresh without the legacy OAuth callback. Found that
+`window.shopify.idToken()` is unavailable because the App Bridge CDN script is not
+loading in the iframe context. Token exchange route was built
+(`src/app/api/shopify/token-exchange/route.js`) and `src/lib/shopify/tokenExchange.js`
+created, but the flow is not yet functional. The OAuth callback correctly writes the
+initial access token on first install.
+
 **What needs to happen:**
-- Update all API routes to call `getShopFromSessionToken(request)` before getTenantId()
+- Resolve App Bridge v4 script loading so `window.shopify` is available in the iframe
+- Wire `window.shopify.idToken()` → `/api/shopify/token-exchange` to keep tokens fresh
+- Update all API routes to call `getShopFromSessionToken(request)` before `getTenantId()`
 - Remove DEV_SHOP_DOMAIN fallback from sessionToken.js
 - Verify session tokens are being sent correctly from App Bridge v4
 
 ---
 
+### 7. Next.js Page Caching — force-dynamic Added to All Pages
+**Status:** Resolved for known pages — verify sub-pages are covered
+**What was done (2026-04-13):**
+- Added `export const dynamic = "force-dynamic"` to all main server pages:
+  products, inventory, suppliers, vendors, purchase-orders, settings, dashboard,
+  locations, and all sub-pages under /products and /admin
+**Risk:** Any new server page added in the future must also include this export or
+it may serve stale cached data after a sync.
+
+---
+
 ## MODERATE — Should Fix Before or Shortly After Launch
 
-### 7. App Handle is Hardcoded
+### 8. App Handle is Hardcoded
 **Status:** Deferred
 **Location:** src/app/api/shopify/callback/route.js — `const APP_HANDLE = "stock-buddy-1"`
 **Risk:** If the app handle changes in the Dev Dashboard, the post-OAuth redirect breaks
@@ -105,27 +138,24 @@ SHOPIFY_APP_HANDLE=stock-buddy-1
 
 ---
 
-### 8. Debug Console Logs in OAuth Routes
-**Status:** Active — added during debugging
-**Location:** src/app/api/shopify/install/route.js and src/app/api/shopify/callback/route.js
-**What to do:** Remove all `console.log` statements before production to avoid
-leaking sensitive information (shop domains, token exchange details) to server logs.
+### 9. Debug Console Logs in OAuth and Sync Routes
+**Status:** Active — added during debugging on 2026-04-13
+**Locations:**
+- `src/app/api/shopify/install/route.js`
+- `src/app/api/shopify/callback/route.js`
+- `src/app/api/sync/locations/route.js`
+- `src/lib/sync/fetchLocations.js`
+**What to do:** Remove all `console.log` and `console.error` debug statements before
+production to avoid leaking sensitive information (shop domains, token prefixes,
+credentials) to server logs.
 
 ---
 
-### 9. ngrok-skip-browser-warning Header in next.config.mjs
+### 10. ngrok-skip-browser-warning Header in next.config.mjs
 **Status:** Active — required for local dev with ngrok
 **Risk:** Should not be sent in production responses
 **Location:** next.config.mjs headers() function
 **What to do:** Remove the `ngrok-skip-browser-warning` header entry before production.
-
----
-
-### 10. App Width in Shopify Admin Iframe
-**Status:** Known issue — app renders too wide inside the Shopify Admin iframe
-**Risk:** Poor UX for merchants — app shares horizontal space with the Admin sidebar
-**What to do:** Audit and update CSS/layout to account for the reduced iframe width.
-The Shopify Admin sidebar takes approximately 240px on the left.
 
 ---
 
@@ -144,9 +174,17 @@ Verify the state cookie is set and read correctly in the production OAuth flow.
 
 ---
 
+### 13. Shopify App Icon
+**Status:** Using default Shopify app icon
+**What to do:** Upload the SB logo as the app icon in the Shopify Dev Dashboard:
+dev.shopify.com → Stock Buddy → Configuration → App icon
+This icon appears in the Shopify Admin title bar, sidebar, and app listing.
+
+---
+
 ## LOW — Nice to Have Before Launch
 
-### 13. Git Branch Cleanup
+### 14. Git Branch Cleanup
 **Status:** A `sandbox` branch exists locally but is now identical to `main`
 **What to do:** Delete the sandbox branch when convenient
 ```powershell
@@ -167,7 +205,18 @@ git branch -d sandbox
 | Session token verification utility | 2026-04-12 | src/lib/shopify/sessionToken.js |
 | Signed state cookie CSRF protection | 2026-04-12 | src/lib/shopify/stateCookie.js |
 | Stock Buddy loading in Shopify Admin iframe | 2026-04-12 | Via Vercel production URL |
+| Iframe side-scroll fixed | 2026-04-13 | Added w-full overflow-x-hidden to AppLayout outer wrapper |
+| Header nav clipping fixed | 2026-04-13 | Abbreviated "Purchase Orders" to "POs", reduced nav padding |
+| Install landing page | 2026-04-13 | src/app/page.jsx + src/app/components/InstallPage.jsx |
+| Root route redirects to dashboard inside Shopify | 2026-04-13 | Detects host+shop params and redirects |
+| Location sync tenant_id fix | 2026-04-13 | processLocations now writes tenant_id on every row |
+| Sync credentials fixed for locations | 2026-04-13 | Reads shop_domain + access_token from tenants table |
+| supabaseHelpers env var corrected | 2026-04-13 | SUPABASE_URL → NEXT_PUBLIC_SUPABASE_URL |
+| inventory_levels conflict column fixed | 2026-04-13 | Now uses composite key inventory_item_id,location_id |
+| force-dynamic added to all server pages | 2026-04-13 | Prevents stale cache after sync operations |
+| Legacy install flow enabled | 2026-04-13 | App URL set to /api/shopify/install in Dev Dashboard |
+| Token exchange route built | 2026-04-13 | src/app/api/shopify/token-exchange/route.js — not yet functional |
 
 ---
 
-*Last updated: 2026-04-12*
+*Last updated: 2026-04-13*

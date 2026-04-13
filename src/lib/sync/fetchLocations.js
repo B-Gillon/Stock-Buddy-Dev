@@ -46,5 +46,10 @@ export default async function fetchLocations(credentials = {}) {
     cursor = pageInfo.endCursor;
   }
 
+  console.log("Shopify locations raw:", JSON.stringify(
+    allLocations.map(l => ({ id: l.id, name: l.name, isActive: l.isActive })),
+    null, 2
+  ));
+
   return allLocations;
 }
