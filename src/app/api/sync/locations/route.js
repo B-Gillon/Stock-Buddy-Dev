@@ -10,8 +10,15 @@ export async function POST(request) {
   const results = {};
   const errors  = [];
 
-  try { await syncLocations(tenantId); results.locations = "ok"; }
-  catch (err) { errors.push(`locations: ${err.message}`); results.locations = "failed"; await logError({ source: 'sync/locations/syncLocations', error: err, tenantId }); }
+  try {
+    await syncLocations(tenantId);
+    results.locations = "ok";
+  } catch (err) {
+    console.error("syncLocations error:", err.message, err.stack);
+    errors.push(`locations: ${err.message}`);
+    results.locations = "failed";
+    await logError({ source: 'sync/locations/syncLocations', error: err, tenantId });
+  }
 
   const last_synced_at = new Date().toISOString();
   await supabase.from("sync_status").upsert({ sync_type: "locations", last_synced_at, tenant_id: tenantId }, { onConflict: "sync_type" });
