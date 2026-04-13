@@ -330,7 +330,7 @@ function GeneralInfoTab({ supplier, router, copyToClipboard }) {
 
 // ─── Tab: Product Data ────────────────────────────────────────────────────────
 
-function ProductDataTab({ supplier, products, router, copyToClipboard }) {
+function ProductDataTab({ supplier, products, router, copyToClipboard, shopDomain }) {
   const defaultColVis = useMemo(() => {
     const def = {};
     PRODUCT_COLUMNS.forEach((c) => { def[c.key] = c.defaultVisible !== false; });
