@@ -18,6 +18,14 @@ export async function POST(request) {
     .eq("id", tenantId)
     .single();
 
+  console.log("tenant lookup:", {
+    tenantId,
+    shop_domain: tenant?.shop_domain,
+    has_token: !!tenant?.access_token,
+    token_prefix: tenant?.access_token?.slice(0, 10),
+    tenantError: tenantError?.message,
+  });
+
   if (tenantError || !tenant?.access_token) {
     return NextResponse.json(
       { success: false, error: "Tenant credentials not found" },
