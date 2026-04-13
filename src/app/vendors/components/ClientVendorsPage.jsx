@@ -10,7 +10,6 @@ import SortIcon from "@/shared/components/icons/SortIcon";
 const ALL_COLUMNS = [
   { key: "name",              label: "Vendor",            hideable: false },
   { key: "product_types",     label: "Product Types",     hideable: true  },
-  { key: "product_count",     label: "Products",          hideable: true  },
   { key: "variant_count",     label: "Variants",          hideable: true  },
   { key: "active_count",      label: "Active Products",   hideable: true  },
   { key: "inactive_count",    label: "Inactive Products", hideable: true  },
@@ -47,8 +46,6 @@ function ColumnToggleMenu({ visibility, onChange }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const hideableColumns = ALL_COLUMNS.filter((c) => c.hideable);
-
   return (
     <div className="relative" ref={ref}>
       <button
@@ -66,7 +63,7 @@ function ColumnToggleMenu({ visibility, onChange }) {
           <p className="px-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wide">
             Show / Hide Columns
           </p>
-          {hideableColumns.map((col) => (
+          {ALL_COLUMNS.filter((c) => c.hideable).map((col) => (
             <label
               key={col.key}
               className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
@@ -82,6 +79,74 @@ function ColumnToggleMenu({ visibility, onChange }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Filter Modal ─────────────────────────────────────────────────────────────
+function FilterModal({ isOpen, onClose, filters, onApply, productTypes }) {
+  const [local, setLocal] = useState(filters);
+
+  useEffect(() => { setLocal(filters); }, [filters]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+        <h2 className="text-base font-semibold text-gray-900 mb-4">Filter Vendors</h2>
+
+        <div className="space-y-4">
+          {/* Product Type */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Product Type
+            </label>
+            <select
+              value={local.product_type ?? ""}
+              onChange={(e) => setLocal((p) => ({ ...p, product_type: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">All</option>
+              {productTypes.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Has inactive products */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">
+              Status
+            </label>
+            <select
+              value={local.status ?? ""}
+              onChange={(e) => setLocal((p) => ({ ...p, status: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option value="">All Vendors</option>
+              <option value="has_inactive">Has Inactive Products</option>
+              <option value="all_active">All Products Active</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <button
+            onClick={() => { setLocal({}); onApply({}); onClose(); }}
+            className="flex-1 px-4 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => { onApply(local); onClose(); }}
+            className="flex-1 px-4 py-2 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+          >
+            Apply
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -101,33 +166,38 @@ function sortRows(rows, key, direction) {
   });
 }
 
+function applyFilters(rows, filters) {
+  let result = rows;
+  if (filters.product_type) {
+    result = result.filter((v) =>
+      v.product_types?.split(", ").includes(filters.product_type)
+    );
+  }
+  if (filters.status === "has_inactive") {
+    result = result.filter((v) => v.inactive_count > 0);
+  }
+  if (filters.status === "all_active") {
+    result = result.filter((v) => v.inactive_count === 0);
+  }
+  return result;
+}
+
 function exportToCSV(rows) {
   const headers = [
-    "Vendor",
-    "Product Types",
-    "Products",
-    "Variants",
-    "Active Products",
-    "Inactive Products",
-    "Last Updated",
+    "Vendor", "Product Types", "Variants",
+    "Active Products", "Inactive Products", "Last Updated",
   ];
-
   const csvRows = rows.map((v) => [
     v.name ?? "",
     v.product_types ?? "",
-    v.product_count ?? 0,
     v.variant_count ?? 0,
     v.active_count ?? 0,
     v.inactive_count ?? 0,
-    v.latest_updated_at
-      ? new Date(v.latest_updated_at).toLocaleDateString()
-      : "",
+    v.latest_updated_at ? new Date(v.latest_updated_at).toLocaleDateString() : "",
   ]);
-
   const csv = [headers, ...csvRows]
     .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
     .join("\n");
-
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
@@ -141,16 +211,16 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
   const router      = useRouter();
   const vendors_raw = vendors ?? [];
 
-  const [syncing,    setSyncing]    = useState(false);
-  const [lastSynced, setLastSynced] = useState(lastSyncedAt);
-  const [banner,     setBanner]     = useState(null);
-  const [sortKey,    setSortKey]    = useState("name");
-  const [sortDir,    setSortDir]    = useState("asc");
+  const [syncing,       setSyncing]       = useState(false);
+  const [lastSynced,    setLastSynced]    = useState(lastSyncedAt);
+  const [banner,        setBanner]        = useState(null);
+  const [sortKey,       setSortKey]       = useState("name");
+  const [sortDir,       setSortDir]       = useState("asc");
+  const [filterOpen,    setFilterOpen]    = useState(false);
+  const [activeFilters, setActiveFilters] = useState({});
 
   const [visibility, setVisibility] = useState(DEFAULT_VISIBILITY);
-  useEffect(() => {
-    setVisibility(loadVisibility());
-  }, []);
+  useEffect(() => { setVisibility(loadVisibility()); }, []);
 
   function handleVisibilityChange(key, checked) {
     setVisibility((prev) => {
@@ -185,17 +255,27 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
     }
   }
 
+  // Derive product types for filter dropdown
+  const productTypes = [
+    ...new Set(
+      vendors_raw.flatMap((v) =>
+        v.product_types ? v.product_types.split(", ").filter(Boolean) : []
+      )
+    ),
+  ].sort();
+
   const sortedRows     = sortRows(vendors_raw, sortKey, sortDir);
+  const filteredRows   = applyFilters(sortedRows, activeFilters);
   const visibleColumns = ALL_COLUMNS.filter((c) => !c.hideable || visibility[c.key]);
+
+  const hasActiveFilters = Object.values(activeFilters).some(Boolean);
 
   function renderCell(col, vendor) {
     switch (col.key) {
       case "name":
         return <span className="font-medium text-gray-900">{vendor.name ?? "—"}</span>;
       case "product_types":
-        return <span className="text-gray-600">{vendor.product_types}</span>;
-      case "product_count":
-        return <span className="text-gray-700">{vendor.product_count.toLocaleString()}</span>;
+        return <span className="text-gray-600">{vendor.product_types || "—"}</span>;
       case "variant_count":
         return <span className="text-gray-700">{vendor.variant_count.toLocaleString()}</span>;
       case "active_count":
@@ -216,71 +296,94 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
   }
 
   return (
-    <AppLayout
-      title="Vendors"
-      actions={{
-        onSync:       handleSync,
-        syncing:      syncing,
-        lastSyncedAt: lastSynced,
-        syncLabel:    "Sync Vendors",
-        onExport:     () => exportToCSV(sortedRows),
-        columnsMenu: (
-          <ColumnToggleMenu
-            visibility={visibility}
-            onChange={handleVisibilityChange}
-          />
-        ),
-      }}
-    >
-      {banner && (
-        <div className={`mb-4 px-4 py-3 rounded-md text-sm font-medium ${
-          banner.type === "success"
-            ? "bg-green-50 text-green-700 border border-green-200"
-            : "bg-red-50 text-red-700 border border-red-200"
-        }`}>
-          {banner.message}
-        </div>
-      )}
+    <>
+      <FilterModal
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        filters={activeFilters}
+        onApply={setActiveFilters}
+        productTypes={productTypes}
+      />
 
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="bg-gray-200 border-b border-gray-300">
-            {visibleColumns.map((col) => (
-              <th
-                key={col.key}
-                onClick={() => handleSort(col.key)}
-                className="text-left px-2 py-2 font-medium cursor-pointer select-none hover:bg-gray-300 transition-colors whitespace-nowrap"
-              >
-                {col.label}
-                <SortIcon direction={sortKey === col.key ? sortDir : null} />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedRows.length === 0 ? (
-            <tr>
-              <td colSpan={visibleColumns.length} className="px-2 py-8 text-center text-gray-400">
-                No vendors found. Run a sync to populate this table.
-              </td>
+      <AppLayout
+        title="Vendors"
+        actions={{
+          onSync:       handleSync,
+          syncing:      syncing,
+          lastSyncedAt: lastSynced,
+          syncLabel:    "Sync Vendors",
+          onFilter:     () => setFilterOpen(true),
+          onExport:     () => exportToCSV(filteredRows),
+          columnsMenu: (
+            <ColumnToggleMenu
+              visibility={visibility}
+              onChange={handleVisibilityChange}
+            />
+          ),
+        }}
+      >
+        {banner && (
+          <div className={`mb-4 px-4 py-3 rounded-md text-sm font-medium ${
+            banner.type === "success"
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          }`}>
+            {banner.message}
+          </div>
+        )}
+
+        {hasActiveFilters && (
+          <div className="mb-3 flex items-center gap-2 text-sm text-blue-700">
+            <span>Filters active</span>
+            <button
+              onClick={() => setActiveFilters({})}
+              className="underline hover:no-underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="bg-gray-200 border-b border-gray-300">
+              {visibleColumns.map((col) => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className="text-left px-2 py-2 font-medium cursor-pointer select-none hover:bg-gray-300 transition-colors whitespace-nowrap"
+                >
+                  {col.label}
+                  <SortIcon direction={sortKey === col.key ? sortDir : null} />
+                </th>
+              ))}
             </tr>
-          ) : (
-            sortedRows.map((vendor) => (
-              <tr
-                key={vendor.id}
-                onClick={() => router.push(`/vendors/${vendor.slug}`)}
-                className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                {visibleColumns.map((col) => (
-                  <td key={col.key} className="px-2 py-3">
-                    {renderCell(col, vendor)}
-                  </td>
-                ))}
+          </thead>
+          <tbody>
+            {filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={visibleColumns.length} className="px-2 py-8 text-center text-gray-400">
+                  No vendors found.
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </AppLayout>
+            ) : (
+              filteredRows.map((vendor) => (
+                <tr
+                  key={vendor.id}
+                  onClick={() => router.push(`/vendors/${vendor.slug}`)}
+                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                >
+                  {visibleColumns.map((col) => (
+                    <td key={col.key} className="px-2 py-3">
+                      {renderCell(col, vendor)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </AppLayout>
+    </>
   );
 }

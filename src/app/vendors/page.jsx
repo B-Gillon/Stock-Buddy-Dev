@@ -56,7 +56,6 @@ export default async function VendorsPage() {
 
   const enrichedVendors = (vendors ?? []).map((vendor) => {
     const vendorProducts = productsByVendor.get(vendor.id) ?? [];
-    const productCount   = vendorProducts.length;
     const variantCount   = vendorProducts.reduce(
       (sum, p) => sum + (variantCountByProduct.get(p.id) ?? 0), 0
     );
@@ -64,9 +63,9 @@ export default async function VendorsPage() {
       ...new Set(vendorProducts.map((p) => p.product_type).filter(Boolean)),
     ].join(", ") || "—";
 
-    // active = status is exactly "active"; inactive = everything else
-    const activeCount   = vendorProducts.filter((p) => p.status === "active").length;
-    const inactiveCount = vendorProducts.filter((p) => p.status !== "active").length;
+    // Shopify syncs status as uppercase "ACTIVE"
+    const activeCount   = vendorProducts.filter((p) => p.status === "ACTIVE").length;
+    const inactiveCount = vendorProducts.filter((p) => p.status !== "ACTIVE").length;
 
     const latestUpdatedAt = vendorProducts.reduce((latest, p) => {
       if (!p.updated_at) return latest;
@@ -78,7 +77,6 @@ export default async function VendorsPage() {
       id:                vendor.id,
       name:              vendor.name,
       slug:              toSlug(vendor.name),
-      product_count:     productCount,
       variant_count:     variantCount,
       product_types:     productTypes,
       active_count:      activeCount,
