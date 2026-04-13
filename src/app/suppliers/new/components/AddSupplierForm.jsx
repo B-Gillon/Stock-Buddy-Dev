@@ -154,6 +154,13 @@ export default function AddSupplierForm() {
     };
   }
 
+  // Supplier number: alphanumerics and dashes only
+  function handleSupplierNumberChange(e) {
+    const sanitized = e.target.value.replace(/[^a-zA-Z0-9-]/g, "");
+    setForm((f) => ({ ...f, supplier_number: sanitized }));
+    if (errors.supplier_number) setErrors((err) => ({ ...err, supplier_number: null }));
+  }
+
   function openAddAddress() {
     setAddressDraft(EMPTY_ADDRESS);
     setAddressDraftErrors({});
@@ -261,7 +268,12 @@ export default function AddSupplierForm() {
             <Input value={form.supplier_name} onChange={set("supplier_name")} error={errors.supplier_name} placeholder="e.g. Acme Co." />
           </Field>
           <Field label="Supplier Number" required error={errors.supplier_number}>
-            <Input value={form.supplier_number} onChange={set("supplier_number")} error={errors.supplier_number} placeholder="e.g. SUP-001" />
+            <Input
+              value={form.supplier_number}
+              onChange={handleSupplierNumberChange}
+              error={errors.supplier_number}
+              placeholder="e.g. SUP-001"
+            />
           </Field>
           <Field label="Company Name" required error={errors.company_name}>
             <Input value={form.company_name} onChange={set("company_name")} error={errors.company_name} placeholder="Legal company name" />
@@ -280,31 +292,13 @@ export default function AddSupplierForm() {
         </div>
         <div className="grid grid-cols-3 gap-4">
           <Field label="Phone">
-            <Input
-              type="tel"
-              value={form.phone}
-              onChange={set("phone")}
-              onBlur={handlePhoneBlur("phone")}
-              placeholder="555-000-0000"
-            />
+            <Input type="tel" value={form.phone} onChange={set("phone")} onBlur={handlePhoneBlur("phone")} placeholder="555-000-0000" />
           </Field>
           <Field label="Phone Toll Free">
-            <Input
-              type="tel"
-              value={form.phone_toll_free}
-              onChange={set("phone_toll_free")}
-              onBlur={handlePhoneBlur("phone_toll_free")}
-              placeholder="800-000-0000"
-            />
+            <Input type="tel" value={form.phone_toll_free} onChange={set("phone_toll_free")} onBlur={handlePhoneBlur("phone_toll_free")} placeholder="800-000-0000" />
           </Field>
           <Field label="Fax">
-            <Input
-              type="tel"
-              value={form.fax}
-              onChange={set("fax")}
-              onBlur={handlePhoneBlur("fax")}
-              placeholder="555-000-0001"
-            />
+            <Input type="tel" value={form.fax} onChange={set("fax")} onBlur={handlePhoneBlur("fax")} placeholder="555-000-0001" />
           </Field>
         </div>
       </SectionCard>
