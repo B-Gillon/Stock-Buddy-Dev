@@ -7,6 +7,8 @@ import { getTenantFromHeaders } from "@/lib/tenants";
 import { getStoreSettings } from "@/shared/utils/getStoreSettings";
 import ClientProductsPage from "@/app/products/components/ClientProductsPage";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 20;
 
 // Parse a comma-separated param into an array of non-empty strings
@@ -56,7 +58,6 @@ export default async function ProductsPage({ searchParams }) {
   if (collections.length)query = query.in("collection", collections);
   if (statuses.length)   query = query.in("status", statuses);
   if (tags.length) {
-    // Each tag filter requires the tags array to contain that tag — AND logic
     tags.forEach((t) => { query = query.contains("tags", [t]); });
   }
 

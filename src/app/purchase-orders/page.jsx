@@ -1,5 +1,9 @@
+// /src/app/purchase-orders/page.jsx
+
 import { supabase } from '@/lib/supabaseClient';
 import PurchaseOrdersLandingPage from './components/PurchaseOrdersLandingPage';
+
+export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }) {
   const params = await searchParams;
@@ -27,16 +31,13 @@ export default async function Page({ searchParams }) {
     .order('po_date', { ascending: false });
 
   if (status === 'overdue') {
-    // Overdue tab — past expected date, not draft/cancelled/received
     const today = new Date().toISOString().split('T')[0];
     query = query
       .lt('expected_date', today)
       .not('status', 'in', '("draft","cancelled","received")');
   } else if (status) {
-    // Specific status tab
     query = query.eq('status', status);
   } else {
-    // "All Open" tab — exclude closed statuses
     query = query.not('status', 'in', '("cancelled","received")');
   }
 
@@ -62,7 +63,6 @@ export default async function Page({ searchParams }) {
     });
   }
 
-  // Flatten
   const purchaseOrders = (posRaw ?? []).map((po) => ({
     id:                  po.id,
     po_number:           po.po_number,
@@ -75,13 +75,11 @@ export default async function Page({ searchParams }) {
     total_cost:          totalsMap[po.id] ?? null,
   }));
 
-  // Suppliers for filter dropdown
   const { data: suppliers } = await supabase
     .from('suppliers')
     .select('id, supplier_name')
     .order('supplier_name');
 
-  // Locations for filter dropdown
   const { data: locations } = await supabase
     .from('locations')
     .select('id, name')

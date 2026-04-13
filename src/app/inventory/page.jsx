@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { getTenantIdFromHeaders } from "@/lib/tenants";
 import ClientInventoryPage from "@/app/inventory/components/ClientInventoryPage";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 20;
 
 function parseList(val) {
@@ -48,7 +50,6 @@ export default async function InventoryPage({ searchParams }) {
   if (statuses.length)   query = query.in("status", statuses);
   if (tags.length)       tags.forEach((t) => { query = query.contains("tags", [t]); });
 
-  // Availability filters (against aggregated columns in the view)
   if (availability === "in_stock")     query = query.gt("available_total", 0);
   if (availability === "out_of_stock") query = query.eq("available_total", 0);
   if (availability === "low_stock")    query = query.gt("available_total", 0).lte("available_total", 4);
@@ -58,12 +59,10 @@ export default async function InventoryPage({ searchParams }) {
   if (total_value === "no_value")      query = query.eq("total_value", 0);
   if (inventory_policy)                query = query.ilike("inventory_policy", inventory_policy);
 
-  // Sort
   const validSortKeys = ["display_title", "vendor_name", "sku", "status", "available_total", "incoming_total", "total_value"];
   const safeSortKey   = validSortKeys.includes(sortKey) ? sortKey : "display_title";
   query = query.order(safeSortKey, { ascending: sortDir !== "desc" });
 
-  // Paginate
   const from = (page - 1) * PAGE_SIZE;
   query = query.range(from, from + PAGE_SIZE - 1);
 
@@ -102,7 +101,6 @@ export default async function InventoryPage({ searchParams }) {
     }
   }
 
-  // ── Enrich rows with location breakdown ───────────────────────────────────
   const inventory = (summaryRows ?? []).map((row) => ({
     id:              row.variant_id,
     display_title:   row.display_title ?? "—",
@@ -121,7 +119,6 @@ export default async function InventoryPage({ searchParams }) {
     location_rows:   locationRowsByVariant[row.variant_id] ?? [],
   }));
 
-  // Filter by location (after joining location data)
   const filteredInventory = locations.length > 0
     ? inventory.filter((r) => r.location_rows.some((l) => locations.includes(l.location_name)))
     : inventory;

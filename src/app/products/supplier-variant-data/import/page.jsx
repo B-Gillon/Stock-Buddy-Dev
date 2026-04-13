@@ -3,6 +3,8 @@
 import { supabase } from "@/lib/supabaseClient";
 import ClientImportPage from "./components/ClientImportPage";
 
+export const dynamic = "force-dynamic";
+
 export default async function ImportSupplierVariantInfoPage() {
   const [suppliersRes, syncRes] = await Promise.all([
     supabase
@@ -23,3 +25,4 @@ export default async function ImportSupplierVariantInfoPage() {
     />
   );
 }
+

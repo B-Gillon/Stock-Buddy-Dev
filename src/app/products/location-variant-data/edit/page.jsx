@@ -5,6 +5,8 @@ import { getTenantIdFromHeaders } from "@/lib/tenants";
 import { supabase } from "@/lib/supabaseClient";
 import ClientLocationVariantEditPage from "./components/ClientLocationVariantEditPage";
 
+export const dynamic = "force-dynamic";
+
 export default async function LocationVariantDataEditPage() {
   const headersList = await headers();
   const tenantId = await getTenantIdFromHeaders(headersList);
@@ -90,3 +92,4 @@ export default async function LocationVariantDataEditPage() {
     />
   );
 }
+

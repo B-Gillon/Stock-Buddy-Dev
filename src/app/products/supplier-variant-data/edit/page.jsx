@@ -3,6 +3,8 @@
 import { supabase } from "@/lib/supabaseClient";
 import ClientSupplierVariantEditPage from "./components/ClientSupplierVariantEditPage";
 
+export const dynamic = "force-dynamic";
+
 export default async function SupplierVariantDataEditPage() {
 
   const [suppliersRes, rowsRes, syncRes] = await Promise.all([
@@ -72,3 +74,4 @@ export default async function SupplierVariantDataEditPage() {
     />
   );
 }
+

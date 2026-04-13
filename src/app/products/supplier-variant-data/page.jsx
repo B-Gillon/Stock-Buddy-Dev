@@ -3,6 +3,8 @@
 import { supabase } from "@/lib/supabaseClient";
 import ClientSupplierVariantDataPage from "./components/ClientSupplierVariantDataPage";
 
+export const dynamic = "force-dynamic";
+
 export default async function SupplierVariantDataPage() {
   const { data: syncRes } = await supabase
     .from("sync_status")
@@ -16,3 +18,4 @@ export default async function SupplierVariantDataPage() {
     />
   );
 }
+

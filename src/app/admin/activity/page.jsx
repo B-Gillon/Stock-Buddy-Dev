@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import AdminActivityClient from './components/AdminActivityClient';
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminActivityPage({ searchParams }) {
   const { key } = await searchParams;
   if (key !== process.env.ADMIN_SECRET_KEY) redirect('/dashboard');
@@ -102,3 +104,4 @@ export default async function AdminActivityPage({ searchParams }) {
     />
   );
 }
+
