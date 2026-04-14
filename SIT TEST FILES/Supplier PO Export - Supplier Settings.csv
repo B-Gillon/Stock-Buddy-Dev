@@ -1,0 +1,7 @@
+﻿PO Number,Expected Date,Ship To Name,Ship To Address1,Ship To Address2,Ship To City,Ship To State,Ship To Zip,Ship To Country,Notes
+"PO-20260414-0005","4/16/2026","California Warehouse!","2602 N Locust Ave","","Rialto","California","92377","United States",""
+
+Line No,SKU,Barcode,Order Qty,Bin Location
+"1","beachball","UPC00000000001","150","123456"
+"2","bch-flops-bl-l","UPC00000000018","200","XYZ-001"
+"3","bch-flops-bl-m","UPC00000000017","300","ABC-001"
