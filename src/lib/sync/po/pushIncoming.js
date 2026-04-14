@@ -36,7 +36,7 @@ import {
  * @param {string} tenantId - UUID of the tenant
  * @returns {Promise<{ success: boolean, linesProcessed: number, error?: string }>}
  */
-export async function pushIncomingToShopify(poId, tenantId) {
+export async function pushIncomingToShopify({ poId, tenantId }) {
   let shopifyCreds;
   let shopifyLocationId;
 

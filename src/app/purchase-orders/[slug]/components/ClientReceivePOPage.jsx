@@ -93,7 +93,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? "Unknown error");
       setShowConfirm(false);
-      showToast("Receipt submitted successfully.");
+      showToast("Receipt submitted successfully.", "info");
       setTimeout(() => router.push(`/purchase-orders/${slug}`), 1200);
     } catch (err) {
       setShowConfirm(false);
