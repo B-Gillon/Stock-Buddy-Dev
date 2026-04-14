@@ -31,7 +31,7 @@ import {
  * @param {string} tenantId    - UUID of the tenant
  * @returns {Promise<{ success: boolean, newPOStatus?: string, error?: string }>}
  */
-export async function receiveInStockBuddy(poId, lineId, qtyToReceive, tenantId) {
+export async function receiveInStockBuddy({ poId, lineId, qtyToReceive, tenantId }) {
   if (!Number.isInteger(qtyToReceive) || qtyToReceive <= 0) {
     return { success: false, error: "qty_to_receive must be a positive integer" };
   }
