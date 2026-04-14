@@ -41,10 +41,11 @@ const CSV_COLUMNS = [
     label: 'Header Fields',
     fields: [
       { key: 'csv_export.po_number',       label: 'PO Number',                   editable: false, default: true  },
+      { key: 'csv_export.po_date',         label: 'PO Date',                     editable: true,  default: true  },
       { key: 'csv_export.supplier_name',   label: 'Supplier Name',               editable: true,  default: true  },
+      { key: 'csv_export.supplier_number', label: 'Supplier Number',             editable: true,  default: false },
       { key: 'csv_export.ship_to_name',    label: 'Ship To Name',                editable: false, default: true  },
       { key: 'csv_export.ship_to_address', label: 'Ship To Address',             editable: false, default: true  },
-      { key: 'csv_export.po_date',         label: 'PO Date',                     editable: true,  default: true  },
       { key: 'csv_export.expected_date',   label: 'Expected Date',               editable: true,  default: true  },
       { key: 'csv_export.notes_supplier',  label: 'Notes for Supplier',          editable: true,  default: true  },
     ],
@@ -54,11 +55,11 @@ const CSV_COLUMNS = [
     fields: [
       { key: 'csv_export.line_no',         label: 'Line No',                     editable: false, default: true  },
       { key: 'csv_export.sku',             label: 'SKU',                         editable: false, default: true  },
-      { key: 'csv_export.title',           label: 'Title',                       editable: true,  default: true  },
-      { key: 'csv_export.quantity',        label: 'Quantity',                    editable: false, default: true  },
-      { key: 'csv_export.unit_cost',       label: 'Unit Cost',                   editable: true,  default: true  },
       { key: 'csv_export.supplier_sku',    label: 'Supplier SKU',                editable: true,  default: false },
       { key: 'csv_export.barcode',         label: 'Barcode',                     editable: true,  default: true  },
+      { key: 'csv_export.title',           label: 'Title',                       editable: true,  default: true  },
+      { key: 'csv_export.quantity',        label: 'Order Qty',                   editable: false, default: true  },
+      { key: 'csv_export.unit_cost',       label: 'Unit Cost',                   editable: true,  default: true  },
       { key: 'csv_export.extended_cost',   label: 'Extended Cost',               editable: true,  default: false },
     ],
   },
@@ -224,7 +225,6 @@ function GeneralInfoTab({ supplier, router, copyToClipboard }) {
   return (
     <div className="flex gap-4 items-stretch">
 
-      {/* Card 1 — Supplier Info */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 shrink-0">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-gray-700">Supplier Info</h2>
@@ -253,7 +253,6 @@ function GeneralInfoTab({ supplier, router, copyToClipboard }) {
         </div>
       </div>
 
-      {/* Card 2 — Contact */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 shrink-0">
         <div className="mb-3"><h2 className="text-sm font-semibold text-gray-700">Contact</h2></div>
         <div className="space-y-1">
@@ -280,7 +279,6 @@ function GeneralInfoTab({ supplier, router, copyToClipboard }) {
         </div>
       </div>
 
-      {/* Card 3 — Addresses */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex-1 min-w-0">
         <div className="mb-3"><h2 className="text-sm font-semibold text-gray-700">Addresses</h2></div>
         <div className="space-y-3">
@@ -299,7 +297,6 @@ function GeneralInfoTab({ supplier, router, copyToClipboard }) {
         </div>
       </div>
 
-      {/* Card 4 — Notes */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex-1 min-w-0">
         <div className="mb-3"><h2 className="text-sm font-semibold text-gray-700">Notes</h2></div>
         <div className="space-y-3">
@@ -864,7 +861,6 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
   const router = useRouter();
   const [toast, setToast] = useState(null);
 
-  // Read active tab from URL param so it persists across navigation
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -876,7 +872,6 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
 
   function handleTabClick(tab) {
     setActiveTab(tab);
-    // Update URL so the active tab is preserved on back navigation
     const url = new URL(window.location.href);
     url.searchParams.set("tab", tab);
     window.history.replaceState({}, "", url.toString());

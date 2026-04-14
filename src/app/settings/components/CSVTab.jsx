@@ -7,44 +7,45 @@ const COLUMNS = [
   {
     label: 'Header Fields',
     fields: [
-      { key: 'csv_export.po_number',      label: 'PO Number',                   editable: false, default: true  },
-      { key: 'csv_export.supplier_name',  label: 'Supplier Name',               editable: true,  default: true  },
-      { key: 'csv_export.ship_to_name',   label: 'Ship To Name',                editable: false, default: true  },
-      { key: 'csv_export.ship_to_address',label: 'Ship To Address',             editable: false, default: true  },
-      { key: 'csv_export.po_date',        label: 'PO Date',                     editable: true,  default: true  },
-      { key: 'csv_export.expected_date',  label: 'Expected Date',               editable: true,  default: true  },
-      { key: 'csv_export.notes_supplier', label: 'Notes for Supplier',          editable: true,  default: true  },
+      { key: 'csv_export.po_number',       label: 'PO Number',                   editable: false, default: true  },
+      { key: 'csv_export.po_date',         label: 'PO Date',                     editable: true,  default: true  },
+      { key: 'csv_export.supplier_name',   label: 'Supplier Name',               editable: true,  default: true  },
+      { key: 'csv_export.supplier_number', label: 'Supplier Number',             editable: true,  default: false },
+      { key: 'csv_export.ship_to_name',    label: 'Ship To Name',                editable: false, default: true  },
+      { key: 'csv_export.ship_to_address', label: 'Ship To Address',             editable: false, default: true  },
+      { key: 'csv_export.expected_date',   label: 'Expected Date',               editable: true,  default: true  },
+      { key: 'csv_export.notes_supplier',  label: 'Notes for Supplier',          editable: true,  default: true  },
     ],
   },
   {
     label: 'Line Item Fields',
     fields: [
-      { key: 'csv_export.line_no',        label: 'Line No',                     editable: false, default: true  },
-      { key: 'csv_export.sku',            label: 'SKU',                         editable: false, default: true  },
-      { key: 'csv_export.title',          label: 'Title',                       editable: true,  default: true  },
-      { key: 'csv_export.quantity',       label: 'Quantity',                    editable: false, default: true  },
-      { key: 'csv_export.unit_cost',      label: 'Unit Cost',                   editable: true,  default: true  },
-      { key: 'csv_export.supplier_sku',   label: 'Supplier SKU',                editable: true,  default: false },
-      { key: 'csv_export.barcode',        label: 'Barcode',                     editable: true,  default: true  },
-      { key: 'csv_export.extended_cost',  label: 'Extended Cost',               editable: true,  default: false },
+      { key: 'csv_export.line_no',         label: 'Line No',                     editable: false, default: true  },
+      { key: 'csv_export.sku',             label: 'SKU',                         editable: false, default: true  },
+      { key: 'csv_export.supplier_sku',    label: 'Supplier SKU',                editable: true,  default: false },
+      { key: 'csv_export.barcode',         label: 'Barcode',                     editable: true,  default: true  },
+      { key: 'csv_export.title',           label: 'Title',                       editable: true,  default: true  },
+      { key: 'csv_export.quantity',        label: 'Order Qty',                   editable: false, default: true  },
+      { key: 'csv_export.unit_cost',       label: 'Unit Cost',                   editable: true,  default: true  },
+      { key: 'csv_export.extended_cost',   label: 'Extended Cost',               editable: true,  default: false },
     ],
   },
   {
     label: 'Optional Internal Fields',
     fields: [
-      { key: 'csv_export.bin_location',             label: 'Bin/Shelf Location',          editable: true, default: false },
-      { key: 'csv_export.product_tags',             label: 'Product Tags',                editable: true, default: false },
-      { key: 'csv_export.weight_value',             label: 'Weight',                      editable: true, default: false },
-      { key: 'csv_export.total_weight',             label: 'Total Weight',                editable: true, default: false },
-      { key: 'csv_export.weight_unit',              label: 'Weight Units',                editable: true, default: false },
-      { key: 'csv_export.retail_price',             label: 'Retail Price',                editable: true, default: false },
-      { key: 'csv_export.current_stock',            label: 'Current Stock',               editable: true, default: false },
-      { key: 'csv_export.total_stock_all_locations',label: 'Total Stock (All Locations)', editable: true, default: false },
+      { key: 'csv_export.bin_location',              label: 'Bin/Shelf Location',          editable: true, default: false },
+      { key: 'csv_export.product_tags',              label: 'Product Tags',                editable: true, default: false },
+      { key: 'csv_export.weight_value',              label: 'Weight',                      editable: true, default: false },
+      { key: 'csv_export.total_weight',              label: 'Total Weight',                editable: true, default: false },
+      { key: 'csv_export.weight_unit',               label: 'Weight Units',                editable: true, default: false },
+      { key: 'csv_export.retail_price',              label: 'Retail Price',                editable: true, default: false },
+      { key: 'csv_export.current_stock',             label: 'Current Stock',               editable: true, default: false },
+      { key: 'csv_export.total_stock_all_locations', label: 'Total Stock (All Locations)', editable: true, default: false },
     ],
   },
 ];
 
-const ALL_KEYS     = COLUMNS.flatMap(c => c.fields.map(f => f.key));
+const ALL_KEYS      = COLUMNS.flatMap(c => c.fields.map(f => f.key));
 const DEFAULT_STATE = Object.fromEntries(COLUMNS.flatMap(c => c.fields.map(f => [f.key, f.default])));
 
 // ── Toggle ─────────────────────────────────────────────────────────────────
