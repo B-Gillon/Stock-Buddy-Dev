@@ -362,10 +362,10 @@ function ProductDataTab({ supplier, products, router, copyToClipboard, shopDomai
         </h2>
         <div className="flex items-center gap-2">
           <ColumnToggleMenu columns={PRODUCT_COLUMNS} visibility={colVis} onChange={toggleCol} />
-          <button onClick={() => { window.location.href = `/suppliers/${supplier.supplier_number}/setup`; }}
-            className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">
-            Edit
-          </button>
+          <a href={`/suppliers/${supplier.supplier_number}/setup`}
+  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">
+  Edit
+</a>
         </div>
       </div>
 
