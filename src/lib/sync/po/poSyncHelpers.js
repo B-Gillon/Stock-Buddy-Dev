@@ -50,14 +50,7 @@ export async function getShopifyInventoryLevel(
 }
 
 /**
- * Set Shopify incoming quantity for an inventory item at a location.
- * Uses the inventory_levels/set.json endpoint.
- * NOTE: Shopify does not have a native "incoming" field on inventory_levels/set.
- * Incoming is managed via the inventory_items metafield or a custom approach.
- * Per Stock Buddy architecture: we track incoming in our own DB and push
- * available adjustments to Shopify directly. Incoming is our internal concept.
- *
- * This function adjusts the Shopify `available` quantity by a delta.
+ * Adjust the Shopify available quantity by a delta.
  * Use positive delta to increase, negative to decrease.
  */
 export async function adjustShopifyAvailable(
@@ -134,7 +127,7 @@ export async function fetchPOWithLines(poId, tenantId) {
     .from("purchase_order_lines")
     .select(`
       *,
-      variants (
+      variants!variant_id (
         id,
         shopify_variant_id,
         inventory_items (
@@ -180,15 +173,15 @@ export async function logShopifyIncoming({
   incomingQty,
   action = "push", // 'push' | 'reverse' | 'zero_out'
 }) {
-const { error } = await supabase.from("po_shopify_incoming").insert({
-  tenant_id: tenantId,
-  purchase_order_id: poId,
-  purchase_order_line_id: lineId,
-  variant_id: variantId,
-  quantity_pushed: incomingQty,  // ← was incoming_qty
-  action,
-  pushed_at: new Date().toISOString(),
-});
+  const { error } = await supabase.from("po_shopify_incoming").insert({
+    tenant_id: tenantId,
+    purchase_order_id: poId,
+    purchase_order_line_id: lineId,
+    variant_id: variantId,
+    quantity_pushed: incomingQty,
+    action,
+    pushed_at: new Date().toISOString(),
+  });
 
   if (error) {
     console.error("Failed to log po_shopify_incoming:", error.message);
