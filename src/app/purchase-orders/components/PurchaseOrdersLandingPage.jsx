@@ -7,6 +7,12 @@ import POTabsRow from './POTabsRow';
 import POFiltersRow from './POFiltersRow';
 import POTable from './POTable';
 
+function fmtDate(val) {
+  if (!val) return '';
+  const d = new Date(val);
+  return isNaN(d) ? val : d.toLocaleDateString('en-US');
+}
+
 function exportCSV(purchaseOrders) {
   if (!purchaseOrders.length) { alert('No purchase orders to export.'); return; }
   const headers = ['PO Number', 'Supplier', 'Location', 'Status', 'PO Date', 'Expected Date', 'Total Cost'];
@@ -15,11 +21,13 @@ function exportCSV(purchaseOrders) {
     po.supplier_name ?? '',
     po.location_name ?? '',
     po.status,
-    po.po_date ?? '',
-    po.expected_date ?? '',
-    po.total_cost != null ? po.total_cost.toFixed(2) : '',
+    fmtDate(po.po_date),
+    fmtDate(po.expected_date),
+    po.total_cost != null ? Number(po.total_cost).toFixed(2) : '',
   ]);
-  const csv = [headers, ...rows].map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = [headers, ...rows]
+    .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

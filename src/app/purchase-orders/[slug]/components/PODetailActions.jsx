@@ -161,11 +161,11 @@ export default function PODetailActions({ po, slug }) {
         isCancelling={isCancelling}
       />
       <div className="flex items-center gap-2">
-        {canCancel  && <Button variant="danger"     onClick={() => setShowCancelModal(true)}>Cancel PO</Button>}
-        {canEdit    && <Button variant="secondary"  onClick={() => router.push(`/purchase-orders/${slug}/edit`)}>Edit</Button>}
-        {canResend  && <Button variant="secondary"  onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}
-        {canRelease && <Button                      onClick={() => setShowReleaseModal(true)}>Release PO</Button>}
-        {canReceive && <Button                      onClick={() => router.push(`/purchase-orders/${slug}/receive`)}>Receive Items</Button>}
+        {canCancel  && <Button variant="secondary" onClick={() => setShowCancelModal(true)}>Cancel PO</Button>}
+        {canEdit    && <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}/edit`)}>Edit</Button>}
+        {canResend  && <Button variant="secondary" onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}
+        {canRelease && <Button onClick={() => setShowReleaseModal(true)}>Release PO</Button>}
+        {canReceive && <Button onClick={() => router.push(`/purchase-orders/${slug}/receive`)}>Receive Items</Button>}
       </div>
     </>
   );

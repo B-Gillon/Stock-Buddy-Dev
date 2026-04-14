@@ -56,7 +56,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && applyFilters({ search: e.target.value })}
-          placeholder="Search PO#"
+          placeholder=""
           className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
         />
       </div>
@@ -85,7 +85,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
         ))}
       </select>
 
-      {/* Date range — From and To on same row */}
+      {/* Date range */}
       <div className="flex items-center gap-1.5">
         <span className="text-xs text-gray-500 whitespace-nowrap">From</span>
         <input
