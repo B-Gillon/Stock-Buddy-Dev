@@ -1,0 +1,5 @@
+﻿PO Number,PO Date,Expected Date,Supplier Name,Ship To Name,Ship To Address1,Ship To Address2,Ship To City,Ship To Province,Ship To Zip,Ship To Country,Notes
+PO-20260414-0002,4/14/2026,4/30/2026,Test Supplier,California Warehouse!,2602 N Locust Ave,,Rialto,California,"92377",United States,If you can ship this sooner, please do!
+Line No,SKU,Supplier SKU,Supplier Barcode,Title,Order Qty Units,Unit Cost,Extended Cost
+1,bch-cooler-gr,,UPC00000000011,"Beach Cooler — Green",50,,0.00
+2,bch-umb-or,,UPC00000000009,"Orange Beach Umbrella",100,13.00,1300.00

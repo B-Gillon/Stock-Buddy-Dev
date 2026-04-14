@@ -320,64 +320,152 @@ export async function generatePOPdf(po, lines, isDraft = true) {
   return Buffer.concat(chunks);
 }
 
+// ── CSV helpers ───────────────────────────────────────────────────────────────
+
+// Wrap any value in quotes and escape internal quotes — handles commas, newlines, etc.
+function csvCell(val) {
+  if (val == null) return '""';
+  return `"${String(val).replace(/"/g, '""')}"`;
+}
+
+// Format currency with 2 decimal places
+function csvCost(val) {
+  if (val == null) return '""';
+  return `"${Number(val).toFixed(2)}"`;
+}
+
+// Format date for CSV
+function csvDate(val) {
+  if (!val) return '""';
+  const d = new Date(val.includes('T') ? val : `${val}T00:00:00`);
+  return isNaN(d) ? '""' : `"${d.toLocaleDateString('en-US')}"`;
+}
+
 // ── Generate CSV buffer ───────────────────────────────────────────────────────
-export function generatePOCsv(po, lines) {
+/**
+ * @param {object} po
+ * @param {Array}  lines
+ * @param {object} settings  — flat map of csv_export.* keys → boolean
+ *                             If null/undefined, all fields are included.
+ */
+export function generatePOCsv(po, lines, settings = null) {
   const BOM = '\uFEFF';
 
-  const fmt     = (val) => (val == null ? '' : String(val));
-  const fmtZip  = (val) => (val == null ? '' : `"${String(val)}"`);
-  const fmtNum  = (val) => {
-    if (val == null) return '';
-    const str = String(val);
-    return str.startsWith('0') ? `"${str}"` : str;
+  // Helper: is a field enabled?
+  // If settings is null (no config), default to the field's built-in default.
+  // Required fields (marked with req=true) are always included.
+  const FIELD_DEFAULTS = {
+    po_number:                 true,
+    supplier_name:             true,
+    supplier_number:           false,
+    ship_to_name:              true,
+    ship_to_address:           true,
+    po_date:                   true,
+    expected_date:             true,
+    notes_supplier:            true,
+    line_no:                   true,
+    sku:                       true,
+    title:                     true,
+    quantity:                  true,
+    unit_cost:                 true,
+    supplier_sku:              false,
+    barcode:                   true,
+    extended_cost:             false,
+    bin_location:              false,
+    product_tags:              false,
+    weight_value:              false,
+    total_weight:              false,
+    weight_unit:               false,
+    retail_price:              false,
+    current_stock:             false,
+    total_stock_all_locations: false,
   };
-  const fmtCostCsv = (val) => (val == null ? '' : Number(val).toFixed(2));
-  const fmtDateCsv = (val) => {
-    if (!val) return '';
-    const d = new Date(val.includes('T') ? val : `${val}T00:00:00`);
-    return isNaN(d) ? '' : d.toLocaleDateString('en-US');
-  };
+
+  function isEnabled(key) {
+    if (!settings) return FIELD_DEFAULTS[key] ?? false;
+    const settingKey = `csv_export.${key}`;
+    if (settingKey in settings) return !!settings[settingKey];
+    return FIELD_DEFAULTS[key] ?? false;
+  }
 
   const loc = po.location || {};
   const rows = [];
 
-  rows.push([
-    'PO Number','PO Date','Expected Date','Supplier Name',
-    'Ship To Name','Ship To Address1','Ship To Address2',
-    'Ship To City','Ship To Province','Ship To Zip','Ship To Country','Notes',
-  ].join(','));
+  // ── Header row 1 (PO-level fields) ───────────────────────────────────────
+  const headerRow1 = [];
+  const dataRow1   = [];
 
-  rows.push([
-    fmt(po.po_number),
-    fmtDateCsv(po.po_date),
-    fmtDateCsv(po.expected_date),
-    fmt(po.supplier?.supplier_name),
-    fmt(loc.name),
-    fmt(loc.address1),
-    fmt(loc.address2),
-    fmt(loc.city),
-    fmt(loc.province),
-    fmtZip(loc.zip),
-    fmt(loc.country),
-    fmt(po.notes_supplier),
-  ].join(','));
+  if (isEnabled('po_number'))       { headerRow1.push('PO Number');       dataRow1.push(csvCell(po.po_number)); }
+  if (isEnabled('supplier_name'))   { headerRow1.push('Supplier Name');   dataRow1.push(csvCell(po.supplier?.supplier_name)); }
+  if (isEnabled('supplier_number')) { headerRow1.push('Supplier Number'); dataRow1.push(csvCell(po.supplier?.supplier_number)); }
+  if (isEnabled('ship_to_name'))    { headerRow1.push('Ship To Name');    dataRow1.push(csvCell(loc.name)); }
+  if (isEnabled('ship_to_address')) {
+    headerRow1.push('Ship To Address1', 'Ship To Address2', 'Ship To City', 'Ship To State', 'Ship To Zip', 'Ship To Country');
+    dataRow1.push(
+      csvCell(loc.address1),
+      csvCell(loc.address2),
+      csvCell(loc.city),
+      csvCell(loc.province),
+      csvCell(loc.zip),
+      csvCell(loc.country),
+    );
+  }
+  if (isEnabled('po_date'))         { headerRow1.push('PO Date');         dataRow1.push(csvDate(po.po_date)); }
+  if (isEnabled('expected_date'))   { headerRow1.push('Expected Date');   dataRow1.push(csvDate(po.expected_date)); }
+  if (isEnabled('notes_supplier'))  { headerRow1.push('Notes');           dataRow1.push(csvCell(po.notes_supplier)); }
 
-  rows.push(['Line No','SKU','Supplier SKU','Supplier Barcode','Title','Order Qty Units','Unit Cost','Extended Cost'].join(','));
+  rows.push(headerRow1.join(','));
+  rows.push(dataRow1.join(','));
+  rows.push(''); // blank separator row
 
+  // ── Line item header row ──────────────────────────────────────────────────
+  const lineHeader = [];
+  if (isEnabled('line_no'))      lineHeader.push('Line No');
+  if (isEnabled('sku'))          lineHeader.push('SKU');
+  if (isEnabled('supplier_sku')) lineHeader.push('Supplier SKU');
+  if (isEnabled('barcode'))      lineHeader.push('Barcode');
+  if (isEnabled('title'))        lineHeader.push('Title');
+  if (isEnabled('quantity'))     lineHeader.push('Order Qty');
+  if (isEnabled('unit_cost'))    lineHeader.push('Unit Cost');
+  if (isEnabled('extended_cost'))lineHeader.push('Extended Cost');
+  // Optional internal fields
+  if (isEnabled('bin_location'))              lineHeader.push('Bin Location');
+  if (isEnabled('product_tags'))              lineHeader.push('Product Tags');
+  if (isEnabled('weight_value'))              lineHeader.push('Weight');
+  if (isEnabled('weight_unit'))               lineHeader.push('Weight Unit');
+  if (isEnabled('total_weight'))              lineHeader.push('Total Weight');
+  if (isEnabled('retail_price'))              lineHeader.push('Retail Price');
+  if (isEnabled('current_stock'))             lineHeader.push('Current Stock');
+  if (isEnabled('total_stock_all_locations')) lineHeader.push('Total Stock (All Locations)');
+
+  rows.push(lineHeader.join(','));
+
+  // ── Line item data rows ───────────────────────────────────────────────────
   for (const line of lines) {
     const ext = line.extended_cost != null
       ? line.extended_cost
-      : line.order_qty_units * line.unit_cost;
-    rows.push([
-      fmt(line.line_no),
-      fmtNum(line.sku),
-      fmtNum(line.supplier_sku),
-      fmtNum(line.supplier_barcode),
-      `"${(line.title || '').replace(/"/g, '""')}"`,
-      fmt(line.order_qty_units),
-      fmtCostCsv(line.unit_cost),
-      fmtCostCsv(ext),
-    ].join(','));
+      : (line.order_qty_units ?? 0) * (line.unit_cost ?? 0);
+
+    const lineData = [];
+    if (isEnabled('line_no'))      lineData.push(csvCell(line.line_no));
+    if (isEnabled('sku'))          lineData.push(csvCell(line.sku));
+    if (isEnabled('supplier_sku')) lineData.push(csvCell(line.supplier_sku));
+    if (isEnabled('barcode'))      lineData.push(csvCell(line.supplier_barcode));
+    if (isEnabled('title'))        lineData.push(csvCell(line.title));
+    if (isEnabled('quantity'))     lineData.push(csvCell(line.order_qty_units));
+    if (isEnabled('unit_cost'))    lineData.push(csvCost(line.unit_cost));
+    if (isEnabled('extended_cost'))lineData.push(csvCost(ext));
+    // Optional internal fields
+    if (isEnabled('bin_location'))              lineData.push(csvCell(line.bin_location));
+    if (isEnabled('product_tags'))              lineData.push(csvCell(line.product_tags));
+    if (isEnabled('weight_value'))              lineData.push(csvCell(line.weight_value));
+    if (isEnabled('weight_unit'))               lineData.push(csvCell(line.weight_unit));
+    if (isEnabled('total_weight'))              lineData.push(csvCell(line.total_weight));
+    if (isEnabled('retail_price'))              lineData.push(csvCell(line.retail_price));
+    if (isEnabled('current_stock'))             lineData.push(csvCell(line.current_stock));
+    if (isEnabled('total_stock_all_locations')) lineData.push(csvCell(line.total_stock_all_locations));
+
+    rows.push(lineData.join(','));
   }
 
   return Buffer.from(BOM + rows.join('\r\n'), 'utf-8');
