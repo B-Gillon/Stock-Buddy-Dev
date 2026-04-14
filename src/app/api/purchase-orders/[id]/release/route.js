@@ -6,7 +6,7 @@
  *   2. Updates status → 'released', sets released_at
  *   3. Pushes incoming quantities via pushIncomingToShopify
  *   4. Rolls back DB status if push fails
- *   5. Sends PO email to supplier (non-blocking)
+ *   5. Sends PO email to supplier
  *
  * Returns: { success, error? }
  */
@@ -65,15 +65,25 @@ export async function POST(request, { params }) {
 
     await logPOActivity({ poId, tenantId, action: "released" });
 
-    // Send email non-blocking
-    sendPOEmail({ poId, tenantId }).catch(async (emailErr) => {
-      await logError({ source: "releasePO/sendEmail", error: emailErr, tenantId, context: { poId } });
-    });
+    // Send email — must be awaited before returning or Vercel will
+    // terminate the function before the email is sent
+    const emailResult = await sendPOEmail(poId, { isResend: false });
+    if (!emailResult.success) {
+      await logError({
+        source: "releasePO/sendEmail",
+        error: new Error(emailResult.error),
+        tenantId,
+        context: { poId },
+      });
+      await logPOActivity({
+        poId, tenantId, action: "error",
+        comments: `Email send failed: ${emailResult.error}`,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    const tenantId = null;
-    await logError({ source: "releasePO", error: err, tenantId });
+    await logError({ source: "releasePO", error: err, tenantId: null });
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
