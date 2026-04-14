@@ -44,18 +44,18 @@ export default function PurchaseOrdersLandingPage({
       {/* Main card */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
 
-        {/* Tabs row */}
-        <div className="px-4 pt-3 pb-3 border-b border-gray-200">
+        {/* Tabs row — includes Export + Create PO buttons */}
+        <div className="px-4 pt-3 pb-3 border-b border-gray-200 flex items-center justify-between gap-3">
           <POTabsRow currentStatus={currentFilters.status ?? ''} />
-        </div>
-
-        {/* Filters + Export + Create PO */}
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-3">
-          <POFiltersRow suppliers={suppliers} locations={locations} currentFilters={currentFilters} />
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button variant="secondary" onClick={() => exportCSV(purchaseOrders)}>Export</Button>
             <Button onClick={() => router.push('/purchase-orders/create')}>Create PO</Button>
           </div>
+        </div>
+
+        {/* Filters row */}
+        <div className="px-4 py-3 border-b border-gray-200">
+          <POFiltersRow suppliers={suppliers} locations={locations} currentFilters={currentFilters} />
         </div>
 
         {/* Table */}

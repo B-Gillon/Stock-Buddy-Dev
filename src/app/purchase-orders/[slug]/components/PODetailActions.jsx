@@ -47,12 +47,47 @@ function ReleaseConfirmModal({ isOpen, onClose, onConfirm, po, isReleasing }) {
   );
 }
 
+function CancelConfirmModal({ isOpen, onClose, onConfirm, po, isCancelling }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
+      <div className="w-full max-w-md rounded-xl bg-white shadow-xl">
+        <div className="border-b border-gray-100 px-6 py-4">
+          <h2 className="text-base font-semibold text-gray-900">Cancel Purchase Order</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Are you sure you want to cancel{" "}
+            <span className="font-medium text-gray-800">{po.po_number}</span>?
+          </p>
+        </div>
+        <div className="px-6 py-4">
+          <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">
+            <p className="font-medium">What happens when you cancel:</p>
+            <ul className="mt-1.5 list-inside list-disc space-y-1 text-red-700">
+              <li>PO status changes to Cancelled</li>
+              <li>Any incoming quantities pushed to Shopify will be zeroed out</li>
+              <li>This action cannot be undone</li>
+            </ul>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+          <Button variant="secondary" onClick={onClose} disabled={isCancelling}>Keep PO</Button>
+          <Button variant="danger" onClick={onConfirm} disabled={isCancelling}>
+            {isCancelling ? "Cancelling…" : "Cancel PO"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PODetailActions({ po, slug }) {
   const router = useRouter();
   const { toast, showToast } = useToast();
-  const [showReleaseModal,  setShowReleaseModal]  = useState(false);
-  const [isReleasing,       setIsReleasing]       = useState(false);
-  const [isResending,       setIsResending]       = useState(false);
+  const [showReleaseModal, setShowReleaseModal] = useState(false);
+  const [showCancelModal,  setShowCancelModal]  = useState(false);
+  const [isReleasing,      setIsReleasing]      = useState(false);
+  const [isCancelling,     setIsCancelling]     = useState(false);
+  const [isResending,      setIsResending]      = useState(false);
 
   const handleRelease = async () => {
     setIsReleasing(true);
@@ -68,6 +103,23 @@ export default function PODetailActions({ po, slug }) {
       showToast(err.message, "error");
     } finally {
       setIsReleasing(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    try {
+      const res  = await fetch(`/api/purchase-orders/${po.id}/cancel`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error ?? "Cancel failed.");
+      setShowCancelModal(false);
+      showToast("PO cancelled.", "info");
+      setTimeout(() => router.refresh(), 1000);
+    } catch (err) {
+      setShowCancelModal(false);
+      showToast(err.message, "error");
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -89,7 +141,7 @@ export default function PODetailActions({ po, slug }) {
   const canReceive = ["released", "partially_received"].includes(po.status);
   const canResend  = ["released", "partially_received", "received"].includes(po.status);
   const canEdit    = po.status !== "cancelled";
-  const canCancel  = po.status !== "cancelled";
+  const canCancel  = ["draft", "released", "partially_received"].includes(po.status);
 
   return (
     <>
@@ -101,12 +153,19 @@ export default function PODetailActions({ po, slug }) {
         po={po}
         isReleasing={isReleasing}
       />
+      <CancelConfirmModal
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={handleCancel}
+        po={po}
+        isCancelling={isCancelling}
+      />
       <div className="flex items-center gap-2">
-        {canCancel  && <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}/cancel`)}>Cancel PO</Button>}
-        {canEdit    && <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}/edit`)}>Edit</Button>}
-        {canResend  && <Button variant="secondary" onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}
-        {canRelease && <Button onClick={() => setShowReleaseModal(true)}>Release PO</Button>}
-        {canReceive && <Button onClick={() => router.push(`/purchase-orders/${slug}/receive`)}>Receive Items</Button>}
+        {canCancel  && <Button variant="danger"     onClick={() => setShowCancelModal(true)}>Cancel PO</Button>}
+        {canEdit    && <Button variant="secondary"  onClick={() => router.push(`/purchase-orders/${slug}/edit`)}>Edit</Button>}
+        {canResend  && <Button variant="secondary"  onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}
+        {canRelease && <Button                      onClick={() => setShowReleaseModal(true)}>Release PO</Button>}
+        {canReceive && <Button                      onClick={() => router.push(`/purchase-orders/${slug}/receive`)}>Receive Items</Button>}
       </div>
     </>
   );

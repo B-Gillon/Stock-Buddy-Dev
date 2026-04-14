@@ -44,7 +44,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
   const hasFilters = search || supplierId || locationId || dateFrom || dateTo;
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
+    <div className="flex items-center gap-2">
 
       {/* Search */}
       <div className="relative">
@@ -56,8 +56,8 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && applyFilters({ search: e.target.value })}
-          placeholder=""
-          className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-40"
+          placeholder="Search PO#"
+          className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
         />
       </div>
 
@@ -65,7 +65,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
       <select
         value={supplierId}
         onChange={(e) => { setSupplierId(e.target.value); applyFilters({ supplier_id: e.target.value }); }}
-        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
       >
         <option value="">All Suppliers</option>
         {suppliers.map((s) => (
@@ -77,7 +77,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
       <select
         value={locationId}
         onChange={(e) => { setLocationId(e.target.value); applyFilters({ location_id: e.target.value }); }}
-        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
       >
         <option value="">All Locations</option>
         {locations.map((l) => (
@@ -85,7 +85,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
         ))}
       </select>
 
-      {/* Date From */}
+      {/* Date range — From and To on same row */}
       <div className="flex items-center gap-1.5">
         <span className="text-xs text-gray-500 whitespace-nowrap">From</span>
         <input
@@ -94,10 +94,6 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
           onChange={(e) => { setDateFrom(e.target.value); applyFilters({ date_from: e.target.value }); }}
           className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-      </div>
-
-      {/* Date To */}
-      <div className="flex items-center gap-1.5">
         <span className="text-xs text-gray-500 whitespace-nowrap">To</span>
         <input
           type="date"
@@ -112,9 +108,9 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
         <button
           type="button"
           onClick={clearFilters}
-          className="text-xs text-gray-400 hover:text-gray-700 underline transition-colors"
+          className="text-xs text-gray-400 hover:text-gray-700 underline transition-colors whitespace-nowrap"
         >
-          Clear filters
+          Clear
         </button>
       )}
 
