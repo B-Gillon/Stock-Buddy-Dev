@@ -1,32 +1,25 @@
 import { createClient } from '@supabase/supabase-js';
 
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL');
-}
-if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
-}
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseUrl     = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const serviceRoleKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl)     console.error('[supabaseClient] Missing NEXT_PUBLIC_SUPABASE_URL');
+if (!supabaseAnonKey) console.error('[supabaseClient] Missing NEXT_PUBLIC_SUPABASE_ANON_KEY');
+if (!serviceRoleKey)  console.error('[supabaseClient] Missing SUPABASE_SERVICE_ROLE_KEY');
 
 /**
  * supabase
- * Bare client — only use for pre-tenant contexts (e.g. tenant lookup itself).
- * All tenant-scoped queries must use setTenantContext(supabase, tenantId) first.
+ * Server-side client using service role key — bypasses RLS.
+ * Never use in client components or expose to the browser.
  */
-export const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY);
+export const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 /**
  * setTenantContext(client, tenantId)
- * Call this at the top of any API route or server component before querying.
- * Sets the Postgres session variable that RLS policies read.
- *
- * Usage:
- *   await setTenantContext(supabase, tenantId);
- *   const { data } = await supabase.from('products').select('*');
+ * No-op in dev — connection pooling prevents set_config from persisting.
+ * RLS will be enforced via JWT claims in production.
  */
 export async function setTenantContext(client, tenantId) {
-  // No-op in dev — connection pooling prevents set_config from persisting.
-  // RLS will be enforced via JWT claims in production.
+  // No-op
 }
