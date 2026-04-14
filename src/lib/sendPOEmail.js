@@ -38,7 +38,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
       .single();
 
     if (supplierCsvData && !supplierCsvData.use_global) {
-      // Use supplier-specific settings — map DB columns back to csv_export.* keys
       const COLUMN_MAP = {
         po_number: 'csv_export.po_number', supplier_name: 'csv_export.supplier_name',
         supplier_number: 'csv_export.supplier_number',
@@ -59,7 +58,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
         if (col in supplierCsvData) csvSettings[key] = supplierCsvData[col];
       }
     } else {
-      // Use global settings from the settings table
       const { data: globalRows } = await supabase
         .from('settings')
         .select('key, value')
@@ -102,7 +100,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
       ),
       variant:variants!purchase_order_lines_variant_id_fkey (
         barcode, weight_value, weight_unit, price,
-        inventory_quantity,
         products ( tags )
       )
     `)
@@ -113,24 +110,69 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
     return { success: false, error: 'Failed to fetch PO lines' };
   }
 
-  // ── Fetch bin locations if needed ──────────────────────────────────────────
+  const variantIds = (lineRows || []).map((l) => l.variant_id).filter(Boolean);
+
+  // ── Fetch bin locations ────────────────────────────────────────────────────
   let binLocationMap = {};
   const binEnabled = csvSettings ? !!csvSettings['csv_export.bin_location'] : false;
+  if (binEnabled && po.ship_to_location_id && variantIds.length > 0) {
+    const { data: bins } = await supabase
+      .from('variant_location_bins')
+      .select('variant_id, bin_location')
+      .eq('location_id', po.ship_to_location_id)
+      .in('variant_id', variantIds);
+    for (const b of bins ?? []) {
+      binLocationMap[b.variant_id] = b.bin_location;
+    }
+  }
 
-  if (binEnabled && po.ship_to_location_id) {
-    const variantIds = (lineRows || []).map((l) => l.variant_id).filter(Boolean);
-    if (variantIds.length > 0) {
-      const { data: bins } = await supabase
-        .from('variant_location_bins')
-        .select('variant_id, bin_location')
-        .eq('location_id', po.ship_to_location_id)
-        .in('variant_id', variantIds);
-      for (const b of bins ?? []) {
-        binLocationMap[b.variant_id] = b.bin_location;
+  // ── Fetch inventory levels for stock fields ────────────────────────────────
+  let currentStockMap = {};  // variant_id → available at ship-to location
+  let totalStockMap   = {};  // variant_id → total available all locations
+
+  const stockEnabled = csvSettings
+    ? (!!csvSettings['csv_export.current_stock'] || !!csvSettings['csv_export.total_stock_all_locations'])
+    : false;
+
+  if (stockEnabled && variantIds.length > 0) {
+    const { data: invItems } = await supabase
+      .from('inventory_items')
+      .select('id, variant_id')
+      .in('variant_id', variantIds);
+
+    const invItemIds = (invItems ?? []).map((i) => i.id);
+    const variantByInvItem = {};
+    for (const i of invItems ?? []) variantByInvItem[i.id] = i.variant_id;
+
+    if (invItemIds.length > 0) {
+      // Total stock across all locations
+      const { data: allLevels } = await supabase
+        .from('inventory_levels')
+        .select('inventory_item_id, available')
+        .in('inventory_item_id', invItemIds);
+
+      for (const level of allLevels ?? []) {
+        const vid = variantByInvItem[level.inventory_item_id];
+        if (vid) totalStockMap[vid] = (totalStockMap[vid] ?? 0) + (level.available ?? 0);
+      }
+
+      // Current stock at ship-to location only
+      if (po.ship_to_location_id) {
+        const { data: shipToLevels } = await supabase
+          .from('inventory_levels')
+          .select('inventory_item_id, available')
+          .eq('location_id', po.ship_to_location_id)
+          .in('inventory_item_id', invItemIds);
+
+        for (const level of shipToLevels ?? []) {
+          const vid = variantByInvItem[level.inventory_item_id];
+          if (vid) currentStockMap[vid] = level.available ?? 0;
+        }
       }
     }
   }
 
+  // ── Build flat lines ───────────────────────────────────────────────────────
   const lines = (lineRows || []).map((l) => {
     const sv = Array.isArray(l.supplier_variant) ? l.supplier_variant[0] : l.supplier_variant;
     const v  = Array.isArray(l.variant)          ? l.variant[0]          : l.variant;
@@ -141,16 +183,16 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
       : null;
     return {
       ...l,
-      supplier_sku:              sv?.supplier_sku       || '',
-      supplier_barcode:          v?.barcode             || '',
-      bin_location:              binLocationMap[l.variant_id] || '',
-      product_tags:              (v?.products?.tags     || []).join(', '),
+      supplier_sku:              sv?.supplier_sku                   || '',
+      supplier_barcode:          v?.barcode                         || '',
+      bin_location:              binLocationMap[l.variant_id]       || '',
+      product_tags:              (v?.products?.tags || []).join(', '),
       weight_value:              weightVal,
       weight_unit:               weightUnit,
       total_weight:              totalWeight,
-      retail_price:              v?.price               ?? null,
-      current_stock:             v?.inventory_quantity  ?? null,
-      total_stock_all_locations: v?.inventory_quantity  ?? null,
+      retail_price:              v?.price                           ?? null,
+      current_stock:             currentStockMap[l.variant_id]      ?? 0,
+      total_stock_all_locations: totalStockMap[l.variant_id]        ?? 0,
     };
   });
 
@@ -165,11 +207,11 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
   }
 
   // ── Email boilerplate ──────────────────────────────────────────────────────
-  const filename  = `PO-${po.po_number}`;
-  const subject   = isResend
+  const filename = `PO-${po.po_number}`;
+  const subject  = isResend
     ? `Purchase Order ${po.po_number} (Resent)`
     : `Purchase Order ${po.po_number}`;
-  const bodyText  = [
+  const bodyText = [
     `Dear ${po.supplier.supplier_name},`,
     '',
     isResend
@@ -208,18 +250,14 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
       });
     } else {
       for (const r of recipients) {
-        const toList = (r.to_emails ?? '')
-          .split(',').map((e) => e.trim()).filter(Boolean);
+        const toList  = (r.to_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
         if (toList.length === 0) continue;
-
         const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
         const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-
         const attachments = [
           ...(r.send_pdf ? [{ filename: `${filename}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }] : []),
           ...(r.send_csv ? [{ filename: `${filename}.csv`, content: csvBuffer, contentType: 'text/csv'        }] : []),
         ];
-
         await transporter.sendMail({
           from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
           to:      toList.join(', '),

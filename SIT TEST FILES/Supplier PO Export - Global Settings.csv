@@ -1,7 +1,7 @@
-﻿PO Number,Supplier Name,Supplier Number,Ship To Name,Ship To Address1,Ship To Address2,Ship To City,Ship To State,Ship To Zip,Ship To Country,PO Date,Expected Date,Notes
-"PO-20260414-0005","Test Supplier","CBG123","California Warehouse!","2602 N Locust Ave","","Rialto","California","92377","United States","4/14/2026","4/16/2026",""
+﻿PO Number,PO Date,Expected Date,Supplier Name,Supplier Number,Ship To Name,Ship To Address1,Ship To Address2,Ship To City,Ship To State,Ship To Zip,Ship To Country,Notes
+"PO-20260414-0005","4/14/2026","4/16/2026","Test Supplier","CBG123","California Warehouse!","2602 N Locust Ave","","Rialto","California","92377","United States",""
 
 Line No,SKU,Supplier SKU,Barcode,Title,Order Qty,Unit Cost,Extended Cost,Bin Location,Product Tags,Weight,Weight Unit,Total Weight,Retail Price,Current Stock,Total Stock (All Locations)
-"1","beachball","","UPC00000000001","Beach Balls","150","3.50","525.00","","beach ball","","","","8.99","",""
-"2","bch-flops-bl-l","","UPC00000000018","Beach Flip Flops — Blue / L","200","2.99","598.00","","Beach Flip Flops","","","","12.99","",""
-"3","bch-flops-bl-m","","UPC00000000017","Beach Flip Flops — Blue / M","300","2.99","897.00","","Beach Flip Flops","","","","12.99","",""
+"1","beachball","","UPC00000000001","Beach Balls","150","3.50","525.00","123456","beach ball","","","","8.99","",""
+"2","bch-flops-bl-l","","UPC00000000018","Beach Flip Flops — Blue / L","200","2.99","598.00","XYZ-001","Beach Flip Flops","","","","12.99","",""
+"3","bch-flops-bl-m","","UPC00000000017","Beach Flip Flops — Blue / M","300","2.99","897.00","ABC-001","Beach Flip Flops","","","","12.99","",""

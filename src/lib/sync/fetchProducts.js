@@ -1,6 +1,6 @@
 import { shopifyGraphQL } from "./shopifyHelpers";
 
-export default async function fetchProducts() {
+export default async function fetchProducts({ shopDomain, accessToken } = {}) {
   const query = `
     query FetchProducts($first: Int!, $after: String) {
       products(first: $first, after: $after) {
@@ -15,21 +15,16 @@ export default async function fetchProducts() {
             productType
             bodyHtml
             tags
-
             featuredImage { url }
-
             options { name }
-
             productCategory {
               productTaxonomyNode {
                 fullName
               }
             }
-
             collections(first: 50) {
               edges { node { id title } }
             }
-
             variants(first: 100) {
               edges {
                 node {
@@ -42,7 +37,16 @@ export default async function fetchProducts() {
                   taxable
                   inventoryPolicy
                   image { url }
-                  inventoryItem { id unitCost { amount } }
+                  inventoryItem {
+                    id
+                    unitCost { amount }
+                    measurement {
+                      weight {
+                        unit
+                        value
+                      }
+                    }
+                  }
                   selectedOptions { name value }
                 }
               }
@@ -58,11 +62,9 @@ export default async function fetchProducts() {
   let hasNext = true;
 
   while (hasNext) {
-    const data = await shopifyGraphQL(query, { first: 100, after });
+    const data = await shopifyGraphQL(query, { first: 100, after }, { shopDomain, accessToken });
     const edges = data.products.edges || [];
-
     edges.forEach((e) => all.push(e.node));
-
     hasNext = data.products.pageInfo.hasNextPage;
     after = data.products.pageInfo.endCursor;
   }

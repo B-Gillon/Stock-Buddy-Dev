@@ -15,7 +15,6 @@ export default function processVariants(gqlProducts, productIdMap) {
 
   for (const p of gqlProducts) {
     const shopifyProductId = gidToId(p.id);
-
     const supabaseProductId = productIdMap[shopifyProductId];
     if (!supabaseProductId) continue;
 
@@ -23,7 +22,6 @@ export default function processVariants(gqlProducts, productIdMap) {
 
     for (const v of variantList) {
       const shopifyVariantId = gidToId(v.id);
-
       const optionValues = [
         normalizeOptionValue(v, 0),
         normalizeOptionValue(v, 1),
@@ -31,42 +29,40 @@ export default function processVariants(gqlProducts, productIdMap) {
       ].filter(Boolean);
 
       const productTitle = p.title || "Untitled Product";
-
       const displayTitle =
         optionValues.length === 0
           ? productTitle
           : `${productTitle} — ${optionValues.join(" / ")}`;
 
+      // Weight comes from inventoryItem.measurement.weight
+      const weightData = v.inventoryItem?.measurement?.weight;
+      const weightValue = weightData?.value != null ? parseFloat(weightData.value) : null;
+      const weightUnit  = weightData?.unit  ?? null;
+
       variants.push({
-        product_id: supabaseProductId,
-
-        shopify_product_id: shopifyProductId,
-        shopify_variant_id: shopifyVariantId,
-
-        title: v.title || null,
-        display_title: displayTitle,
-
-        sku: v.sku || null,
-        barcode: v.barcode || null,
-
-        option1: optionValues[0] || null,
-        option2: optionValues[1] || null,
-        option3: optionValues[2] || null,
-
-        price: v.price || null,
-        compare_at_price: v.compareAtPrice || null,
-        cost: v.inventoryItem?.unitCost?.amount != null
-          ? parseFloat(parseFloat(v.inventoryItem.unitCost.amount).toFixed(2))
-          : null,
-        taxable: typeof v.taxable === "boolean" ? v.taxable : null,
-        inventory_policy: v.inventoryPolicy || null,
-
-        inventory_quantity: null,
-
-        image_src: v.image?.url || p.featuredImage?.url || null,
-
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        product_id:          supabaseProductId,
+        shopify_product_id:  shopifyProductId,
+        shopify_variant_id:  shopifyVariantId,
+        title:               v.title || null,
+        display_title:       displayTitle,
+        sku:                 v.sku || null,
+        barcode:             v.barcode || null,
+        option1:             optionValues[0] || null,
+        option2:             optionValues[1] || null,
+        option3:             optionValues[2] || null,
+        price:               v.price || null,
+        compare_at_price:    v.compareAtPrice || null,
+        cost:                v.inventoryItem?.unitCost?.amount != null
+                               ? parseFloat(parseFloat(v.inventoryItem.unitCost.amount).toFixed(2))
+                               : null,
+        taxable:             typeof v.taxable === "boolean" ? v.taxable : null,
+        inventory_policy:    v.inventoryPolicy || null,
+        inventory_quantity:  null, // populated separately via inventory sync
+        weight_value:        weightValue,
+        weight_unit:         weightUnit,
+        image_src:           v.image?.url || p.featuredImage?.url || null,
+        created_at:          new Date().toISOString(),
+        updated_at:          new Date().toISOString(),
       });
     }
   }
