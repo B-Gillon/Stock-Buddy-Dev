@@ -396,6 +396,8 @@ export function generatePOCsv(po, lines, settings = null) {
   const dataRow1   = [];
 
   if (isEnabled('po_number'))       { headerRow1.push('PO Number');       dataRow1.push(csvCell(po.po_number)); }
+  if (isEnabled('po_date'))         { headerRow1.push('PO Date');         dataRow1.push(csvDate(po.po_date)); }
+  if (isEnabled('expected_date'))   { headerRow1.push('Expected Date');   dataRow1.push(csvDate(po.expected_date)); }
   if (isEnabled('supplier_name'))   { headerRow1.push('Supplier Name');   dataRow1.push(csvCell(po.supplier?.supplier_name)); }
   if (isEnabled('supplier_number')) { headerRow1.push('Supplier Number'); dataRow1.push(csvCell(po.supplier?.supplier_number)); }
   if (isEnabled('ship_to_name'))    { headerRow1.push('Ship To Name');    dataRow1.push(csvCell(loc.name)); }
@@ -410,8 +412,6 @@ export function generatePOCsv(po, lines, settings = null) {
       csvCell(loc.country),
     );
   }
-  if (isEnabled('po_date'))         { headerRow1.push('PO Date');         dataRow1.push(csvDate(po.po_date)); }
-  if (isEnabled('expected_date'))   { headerRow1.push('Expected Date');   dataRow1.push(csvDate(po.expected_date)); }
   if (isEnabled('notes_supplier'))  { headerRow1.push('Notes');           dataRow1.push(csvCell(po.notes_supplier)); }
 
   rows.push(headerRow1.join(','));

@@ -103,7 +103,7 @@ export default function PODetailActions({ po, slug }) {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? "Release failed.");
       setShowReleaseModal(false);
-      showToast("PO released and synced to Shopify.", "info");
+      showToast("PO Released.", "info");
       setTimeout(() => router.refresh(), 1000);
     } catch (err) {
       setShowReleaseModal(false);

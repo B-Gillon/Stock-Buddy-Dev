@@ -29,7 +29,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
   }
 
   // ── Fetch CSV settings for this supplier ───────────────────────────────────
-  // First check for supplier-specific settings; fall back to global settings.
   let csvSettings = null;
   try {
     const { data: supplierCsvData } = await supabase
@@ -96,7 +95,8 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
   const { data: lineRows, error: linesError } = await supabase
     .from('purchase_order_lines')
     .select(`
-      line_no, sku, title, order_qty_units, unit_cost, extended_cost,
+      id, line_no, sku, title, order_qty_units, unit_cost, extended_cost,
+      variant_id, supplier_variant_id,
       supplier_variant:supplier_variants!purchase_order_lines_supplier_variant_id_fkey (
         supplier_sku
       ),
@@ -115,9 +115,7 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
 
   // ── Fetch bin locations if needed ──────────────────────────────────────────
   let binLocationMap = {};
-  const binEnabled = csvSettings
-    ? !!csvSettings['csv_export.bin_location']
-    : false;
+  const binEnabled = csvSettings ? !!csvSettings['csv_export.bin_location'] : false;
 
   if (binEnabled && po.ship_to_location_id) {
     const variantIds = (lineRows || []).map((l) => l.variant_id).filter(Boolean);
@@ -143,16 +141,16 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
       : null;
     return {
       ...l,
-      supplier_sku:              sv?.supplier_sku    || '',
-      supplier_barcode:          v?.barcode          || '',
+      supplier_sku:              sv?.supplier_sku       || '',
+      supplier_barcode:          v?.barcode             || '',
       bin_location:              binLocationMap[l.variant_id] || '',
-      product_tags:              (v?.products?.tags  || []).join(', '),
+      product_tags:              (v?.products?.tags     || []).join(', '),
       weight_value:              weightVal,
       weight_unit:               weightUnit,
       total_weight:              totalWeight,
-      retail_price:              v?.price            ?? null,
-      current_stock:             v?.inventory_quantity ?? null,
-      total_stock_all_locations: v?.inventory_quantity ?? null,
+      retail_price:              v?.price               ?? null,
+      current_stock:             v?.inventory_quantity  ?? null,
+      total_stock_all_locations: v?.inventory_quantity  ?? null,
     };
   });
 
@@ -198,7 +196,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
   // ── Send emails ────────────────────────────────────────────────────────────
   try {
     if (!hasRecipients) {
-      // Fallback — single email to supplier po_email with both attachments
       await transporter.sendMail({
         from:        `"Stock Buddy" <${process.env.SMTP_USER}>`,
         to:          fallbackEmail,
@@ -210,24 +207,13 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
         ],
       });
     } else {
-      // One email per record
       for (const r of recipients) {
         const toList = (r.to_emails ?? '')
-          .split(',')
-          .map((e) => e.trim())
-          .filter(Boolean);
-
+          .split(',').map((e) => e.trim()).filter(Boolean);
         if (toList.length === 0) continue;
 
-        const ccList = (r.cc_emails ?? '')
-          .split(',')
-          .map((e) => e.trim())
-          .filter(Boolean);
-
-        const bccList = (r.bcc_emails ?? '')
-          .split(',')
-          .map((e) => e.trim())
-          .filter(Boolean);
+        const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+        const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
 
         const attachments = [
           ...(r.send_pdf ? [{ filename: `${filename}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }] : []),
