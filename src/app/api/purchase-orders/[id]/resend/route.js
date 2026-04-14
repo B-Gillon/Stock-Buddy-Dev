@@ -26,19 +26,34 @@ export async function POST(request, { params }) {
 
     let toComment = '';
     if (recipients && recipients.length > 0) {
-      toComment = recipients.flatMap((r) => (r.to_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean)).join(', ');
+      toComment = recipients
+        .flatMap((r) => (r.to_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean))
+        .join(', ');
     } else if (po?.supplier?.po_email) {
       toComment = po.supplier.po_email;
     }
 
-    await logPOActivity({ poId: id, tenantId, action: 'resent', comments: toComment || null });
+    // Send the email — must be awaited before returning or Vercel will
+    // terminate the function before the email is sent
+    const result = await sendPOEmail(id, { isResend: true });
 
-    Promise.resolve().then(async () => {
-      const result = await sendPOEmail(id, { isResend: true });
-      if (!result.success) {
-        await logError({ source: 'api/purchase-orders/[id]/resend/email', error: new Error(result.error), tenantId, context: { poId: id } });
-        await logPOActivity({ poId: id, tenantId, action: 'error', comments: `Email send failed: ${result.error}` });
-      }
+    if (!result.success) {
+      await logError({
+        source: 'api/purchase-orders/[id]/resend/email',
+        error: new Error(result.error),
+        tenantId,
+        context: { poId: id },
+      });
+      await logPOActivity({
+        poId: id, tenantId, action: 'error',
+        comments: `Email send failed: ${result.error}`,
+      });
+      return NextResponse.json({ success: false, error: result.error }, { status: 500 });
+    }
+
+    await logPOActivity({
+      poId: id, tenantId, action: 'resent',
+      comments: toComment || null,
     });
 
     return NextResponse.json({ success: true });
