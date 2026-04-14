@@ -143,7 +143,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
                 <span className="font-medium text-gray-800">{fmtDate(flatPO.po_date)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Expected Arrival Date</span>
+                <span className="text-gray-500">Expected Date</span>
                 <span className="font-medium text-gray-800">{fmtDate(flatPO.expected_date)}</span>
               </div>
               <div className="flex justify-between">
