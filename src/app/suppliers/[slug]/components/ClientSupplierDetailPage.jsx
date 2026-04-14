@@ -1,6 +1,6 @@
 "use client";
 
-// /src/app/suppliers/[id]/components/ClientSupplierDetailPage.jsx
+// /src/app/suppliers/[slug]/components/ClientSupplierDetailPage.jsx
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -34,7 +34,7 @@ function saveColVis(vis) {
   try { localStorage.setItem(COL_VIS_KEY, JSON.stringify(vis)); } catch {}
 }
 
-// ─── CSV field definitions (mirrors CSVTab.jsx) ───────────────────────────────
+// ─── CSV field definitions ────────────────────────────────────────────────────
 
 const CSV_COLUMNS = [
   {
@@ -77,7 +77,7 @@ const CSV_COLUMNS = [
   },
 ];
 
-const CSV_ALL_KEYS    = CSV_COLUMNS.flatMap(c => c.fields.map(f => f.key));
+const CSV_ALL_KEYS     = CSV_COLUMNS.flatMap(c => c.fields.map(f => f.key));
 const CSV_DEFAULT_STATE = Object.fromEntries(CSV_COLUMNS.flatMap(c => c.fields.map(f => [f.key, f.default])));
 
 // ─── Shared small components ──────────────────────────────────────────────────
@@ -362,7 +362,8 @@ function ProductDataTab({ supplier, products, router, copyToClipboard, shopDomai
         </h2>
         <div className="flex items-center gap-2">
           <ColumnToggleMenu columns={PRODUCT_COLUMNS} visibility={colVis} onChange={toggleCol} />
-          <button onClick={() => router.push(`/suppliers/${supplier.supplier_number}/setup`)}
+          <button
+            onClick={() => router.push(`/suppliers/${supplier.supplier_number}/setup`)}
             className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">
             Edit
           </button>
@@ -440,14 +441,12 @@ function CsvOverridesTab({ supplierId }) {
   const [globalValues, setGlobalValues] = useState(CSV_DEFAULT_STATE);
   const [localValues,  setLocalValues]  = useState(CSV_DEFAULT_STATE);
   const [loading,      setLoading]      = useState(true);
-  const [saving,       setSaving]       = useState(null); // field key being saved, or 'mode'
+  const [saving,       setSaving]       = useState(null);
   const [toast,        setToast]        = useState(null);
 
-  // Load global settings + supplier-specific settings
   useEffect(() => {
     async function load() {
       try {
-        // Load global CSV settings
         const globalRes  = await fetch(`/api/settings?keys=${CSV_ALL_KEYS.join(',')}`);
         const globalData = await globalRes.json();
         const merged = { ...CSV_DEFAULT_STATE };
@@ -458,16 +457,13 @@ function CsvOverridesTab({ supplierId }) {
         }
         setGlobalValues(merged);
 
-        // Load supplier-specific settings
         const supplierRes  = await fetch(`/api/suppliers/${supplierId}/csv-settings`);
         const supplierData = await supplierRes.json();
 
         if (supplierData.settings) {
-          // Supplier has saved settings — use them
           setLocalValues({ ...CSV_DEFAULT_STATE, ...supplierData.settings });
           setUseGlobal(supplierData.use_global);
         } else {
-          // No saved settings yet — initialize local values from global
           setLocalValues({ ...merged });
           setUseGlobal(true);
         }
@@ -507,14 +503,11 @@ function CsvOverridesTab({ supplierId }) {
   }
 
   async function handleToggle(key, newValue) {
-    // Switch to supplier-specific mode automatically
-    const wasGlobal = useGlobal;
+    const wasGlobal  = useGlobal;
     const nextValues = { ...localValues, [key]: newValue };
-
     setLocalValues(nextValues);
     if (wasGlobal) setUseGlobal(false);
     setSaving(key);
-
     try {
       await saveToApi(false, nextValues);
       showToast('saved');
@@ -558,8 +551,6 @@ function CsvOverridesTab({ supplierId }) {
   return (
     <Card>
       <div className="space-y-4">
-
-        {/* Mode toggle */}
         <div className="flex items-center justify-between pb-4 border-b border-gray-100">
           <div>
             <p className="text-sm font-semibold text-gray-800">
@@ -573,11 +564,7 @@ function CsvOverridesTab({ supplierId }) {
           </div>
           <div className="flex items-center gap-2 ml-6 shrink-0">
             <span className={`text-xs font-medium ${useGlobal ? 'text-blue-600' : 'text-gray-400'}`}>Global</span>
-            <CsvToggle
-              checked={!useGlobal}
-              onChange={handleModeToggle}
-              disabled={saving === 'mode'}
-            />
+            <CsvToggle checked={!useGlobal} onChange={handleModeToggle} disabled={saving === 'mode'} />
             <span className={`text-xs font-medium ${!useGlobal ? 'text-blue-600' : 'text-gray-400'}`}>Supplier-Specific</span>
             {saving === 'mode' && (
               <svg className="animate-spin h-3.5 w-3.5 text-blue-400" fill="none" viewBox="0 0 24 24">
@@ -588,7 +575,6 @@ function CsvOverridesTab({ supplierId }) {
           </div>
         </div>
 
-        {/* Toast */}
         <div className="flex justify-end h-4">
           {toast === 'saved' && (
             <span className="inline-flex items-center gap-1.5 text-xs text-green-600 font-medium">
@@ -608,7 +594,6 @@ function CsvOverridesTab({ supplierId }) {
           )}
         </div>
 
-        {/* Three-column grid */}
         <div className="grid grid-cols-3 gap-4 items-start">
           {CSV_COLUMNS.map((col) => (
             <div key={col.label}>
@@ -647,17 +632,12 @@ function CsvOverridesTab({ supplierId }) {
 
         {!useGlobal && (
           <div className="pt-2">
-            <button
-              type="button"
-              onClick={handleResetToGlobal}
-              disabled={saving === 'mode'}
-              className="text-xs text-gray-500 hover:text-gray-700 underline disabled:opacity-50"
-            >
+            <button type="button" onClick={handleResetToGlobal} disabled={saving === 'mode'}
+              className="text-xs text-gray-500 hover:text-gray-700 underline disabled:opacity-50">
               Reset to global settings
             </button>
           </div>
         )}
-
       </div>
     </Card>
   );
@@ -665,46 +645,40 @@ function CsvOverridesTab({ supplierId }) {
 
 // ─── Tab: Transmission ────────────────────────────────────────────────────────
 
-// ─── Empty record factory ─────────────────────────────────────────────────────
 const newRecord = () => ({
-  _key:      crypto.randomUUID(),
-  label:     "",
-  to_emails: "",
-  cc_emails: "",
-  bcc_emails:"",
-  send_pdf:  true,
-  send_csv:  true,
-  showCc:    false,
-  showBcc:   false,
+  _key:       crypto.randomUUID(),
+  label:      "",
+  to_emails:  "",
+  cc_emails:  "",
+  bcc_emails: "",
+  send_pdf:   true,
+  send_csv:   true,
+  showCc:     false,
+  showBcc:    false,
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function snapshot(records) {
   return records.map((r) => ({
-    label:     r.label,
-    to_emails: r.to_emails,
-    cc_emails: r.cc_emails,
-    bcc_emails:r.bcc_emails,
-    send_pdf:  r.send_pdf,
-    send_csv:  r.send_csv,
+    label:      r.label,
+    to_emails:  r.to_emails,
+    cc_emails:  r.cc_emails,
+    bcc_emails: r.bcc_emails,
+    send_pdf:   r.send_pdf,
+    send_csv:   r.send_csv,
   }));
 }
 
 function isDirtyCheck(current, saved) {
-  const a = JSON.stringify(snapshot(current));
-  const b = JSON.stringify(snapshot(saved));
-  return a !== b;
+  return JSON.stringify(snapshot(current)) !== JSON.stringify(snapshot(saved));
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
 function TransmissionTab({ supplierId }) {
   const { showToast } = useToast();
-  const [records, setRecords]   = useState([]);
-  const [saved,   setSaved]     = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [saving,  setSaving]    = useState(false);
+  const [records, setRecords] = useState([]);
+  const [saved,   setSaved]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
 
-  // ── Load ──────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -733,25 +707,14 @@ function TransmissionTab({ supplierId }) {
 
   const dirty = isDirtyCheck(records, saved);
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
-  const addRecord = () => setRecords((prev) => [...prev, newRecord()]);
+  const addRecord    = () => setRecords((prev) => [...prev, newRecord()]);
+  const removeRecord = (key) => setRecords((prev) => prev.filter((r) => r._key !== key));
+  const update       = (key, field, value) =>
+    setRecords((prev) => prev.map((r) => (r._key === key ? { ...r, [field]: value } : r)));
 
-  const removeRecord = (key) =>
-    setRecords((prev) => prev.filter((r) => r._key !== key));
-
-  const update = (key, field, value) =>
-    setRecords((prev) =>
-      prev.map((r) => (r._key === key ? { ...r, [field]: value } : r))
-    );
-
-  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     const hasPrimary = records.some((r) => r.to_emails.trim() !== "");
-    if (!hasPrimary) {
-      showToast("At least one record must have a To email address.", "error");
-      return;
-    }
-
+    if (!hasPrimary) { showToast("At least one record must have a To email address.", "error"); return; }
     setSaving(true);
     try {
       const payload = records.map((r) => ({
@@ -762,7 +725,6 @@ function TransmissionTab({ supplierId }) {
         send_pdf:   r.send_pdf,
         send_csv:   r.send_csv,
       }));
-
       const res  = await fetch(`/api/suppliers/${supplierId}/transmission`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
@@ -779,51 +741,29 @@ function TransmissionTab({ supplierId }) {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="py-12 text-center text-sm text-gray-400">Loading…</div>
-    );
-  }
+  if (loading) return <div className="py-12 text-center text-sm text-gray-400">Loading…</div>;
 
   return (
     <div className="space-y-4">
-
-      {/* Header */}
       <div className="flex items-start justify-between">
         <p className="text-sm text-gray-500 max-w-lg">
-          Each record below represents one separate email send. Add multiple
-          addresses per field using commas.
+          Each record below represents one separate email send. Add multiple addresses per field using commas.
         </p>
         <div className="flex items-center gap-2 ml-4 shrink-0">
-          <Button variant="secondary" size="sm" onClick={addRecord}>
-            + Add Recipient
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={!dirty || saving}
-          >
+          <Button variant="secondary" size="sm" onClick={addRecord}>+ Add Recipient</Button>
+          <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
       </div>
 
-      {/* Empty state */}
       {records.length === 0 && (
         <div className="rounded-lg border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
           No recipients yet.{" "}
-          <button
-            className="text-blue-600 underline hover:text-blue-700"
-            onClick={addRecord}
-          >
-            Add one
-          </button>
-          .
+          <button className="text-blue-600 underline hover:text-blue-700" onClick={addRecord}>Add one</button>.
         </div>
       )}
 
-      {/* Recipient cards */}
       <div className="space-y-3">
         {records.map((r) => (
           <RecipientCard
@@ -835,156 +775,86 @@ function TransmissionTab({ supplierId }) {
         ))}
       </div>
 
-      {/* Validation hint */}
-      {records.length > 0 &&
-        !records.some((r) => r.to_emails.trim() !== "") && (
-          <p className="text-xs text-amber-600">
-            ⚠ At least one record needs a To email address before saving.
-          </p>
-        )}
+      {records.length > 0 && !records.some((r) => r.to_emails.trim() !== "") && (
+        <p className="text-xs text-amber-600">⚠ At least one record needs a To email address before saving.</p>
+      )}
     </div>
   );
 }
 
-// ─── Recipient card ───────────────────────────────────────────────────────────
 function RecipientCard({ record, onUpdate, onRemove }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-
-      {/* Row 1 — Label, PDF, CSV, remove */}
       <div className="flex items-center gap-3 px-4 pt-3 pb-2">
         <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500 mb-1">
-            Name / Label
-          </label>
-          <input
-            type="text"
-            value={record.label}
-            onChange={(e) => onUpdate("label", e.target.value)}
+          <label className="block text-xs font-medium text-gray-500 mb-1">Name / Label</label>
+          <input type="text" value={record.label} onChange={(e) => onUpdate("label", e.target.value)}
             placeholder="e.g. Purchasing Team"
-            className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
-          />
+            className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300" />
         </div>
-
-        {/* PDF toggle */}
         <div className="flex flex-col items-center gap-1 shrink-0">
           <span className="text-xs font-medium text-gray-500">PDF</span>
-          <input
-            type="checkbox"
-            checked={record.send_pdf}
-            onChange={(e) => onUpdate("send_pdf", e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-          />
+          <input type="checkbox" checked={record.send_pdf} onChange={(e) => onUpdate("send_pdf", e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
         </div>
-
-        {/* CSV toggle */}
         <div className="flex flex-col items-center gap-1 shrink-0">
           <span className="text-xs font-medium text-gray-500">CSV</span>
-          <input
-            type="checkbox"
-            checked={record.send_csv}
-            onChange={(e) => onUpdate("send_csv", e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-          />
+          <input type="checkbox" checked={record.send_csv} onChange={(e) => onUpdate("send_csv", e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
         </div>
-
-        {/* Remove */}
-        <button
-          onClick={onRemove}
-          className="shrink-0 text-gray-300 hover:text-red-500 transition-colors mt-4"
-          title="Remove"
-        >
+        <button onClick={onRemove} className="shrink-0 text-gray-300 hover:text-red-500 transition-colors mt-4" title="Remove">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
           </svg>
         </button>
       </div>
 
-      {/* Row 2 — To addresses */}
       <div className="px-4 pb-2">
         <label className="block text-xs font-medium text-gray-500 mb-1">
-          Email Addresses{" "}
-          <span className="font-normal text-gray-400">(add multiples with comma separator)</span>
+          Email Addresses <span className="font-normal text-gray-400">(add multiples with comma separator)</span>
         </label>
-        <input
-          type="text"
-          value={record.to_emails}
-          onChange={(e) => onUpdate("to_emails", e.target.value)}
+        <input type="text" value={record.to_emails} onChange={(e) => onUpdate("to_emails", e.target.value)}
           placeholder="orders@supplier.com, purchasing@supplier.com"
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
-        />
+          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300" />
       </div>
 
-      {/* CC row — collapsible */}
       {record.showCc && (
         <div className="px-4 pb-2">
           <label className="block text-xs font-medium text-gray-500 mb-1">
-            CC Addresses{" "}
-            <span className="font-normal text-gray-400">(comma separated)</span>
+            CC Addresses <span className="font-normal text-gray-400">(comma separated)</span>
           </label>
-          <input
-            type="text"
-            value={record.cc_emails}
-            onChange={(e) => onUpdate("cc_emails", e.target.value)}
+          <input type="text" value={record.cc_emails} onChange={(e) => onUpdate("cc_emails", e.target.value)}
             placeholder="manager@supplier.com"
-            className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
-          />
+            className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300" />
         </div>
       )}
 
-      {/* BCC row — collapsible */}
       {record.showBcc && (
         <div className="px-4 pb-2">
           <label className="block text-xs font-medium text-gray-500 mb-1">
-            BCC Addresses{" "}
-            <span className="font-normal text-gray-400">(comma separated)</span>
+            BCC Addresses <span className="font-normal text-gray-400">(comma separated)</span>
           </label>
-          <input
-            type="text"
-            value={record.bcc_emails}
-            onChange={(e) => onUpdate("bcc_emails", e.target.value)}
+          <input type="text" value={record.bcc_emails} onChange={(e) => onUpdate("bcc_emails", e.target.value)}
             placeholder="archive@mycompany.com"
-            className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
-          />
+            className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300" />
         </div>
       )}
 
-      {/* Row — CC / BCC toggles */}
       <div className="flex items-center gap-3 px-4 pb-3 pt-1">
-        <button
-          type="button"
-          onClick={() => {
-            onUpdate("showCc", !record.showCc);
-            if (record.showCc) onUpdate("cc_emails", "");
-          }}
-          className={`inline-flex items-center gap-1 text-xs font-medium transition ${
-            record.showCc
-              ? "text-blue-600 hover:text-blue-800"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          <span>{record.showCc ? "− Remove CC" : "+ Add CC"}</span>
+        <button type="button"
+          onClick={() => { onUpdate("showCc", !record.showCc); if (record.showCc) onUpdate("cc_emails", ""); }}
+          className={`inline-flex items-center gap-1 text-xs font-medium transition ${record.showCc ? "text-blue-600 hover:text-blue-800" : "text-gray-400 hover:text-gray-600"}`}>
+          {record.showCc ? "− Remove CC" : "+ Add CC"}
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            onUpdate("showBcc", !record.showBcc);
-            if (record.showBcc) onUpdate("bcc_emails", "");
-          }}
-          className={`inline-flex items-center gap-1 text-xs font-medium transition ${
-            record.showBcc
-              ? "text-blue-600 hover:text-blue-800"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
-        >
-          <span>{record.showBcc ? "− Remove BCC" : "+ Add BCC"}</span>
+        <button type="button"
+          onClick={() => { onUpdate("showBcc", !record.showBcc); if (record.showBcc) onUpdate("bcc_emails", ""); }}
+          className={`inline-flex items-center gap-1 text-xs font-medium transition ${record.showBcc ? "text-blue-600 hover:text-blue-800" : "text-gray-400 hover:text-gray-600"}`}>
+          {record.showBcc ? "− Remove BCC" : "+ Add BCC"}
         </button>
       </div>
-
     </div>
   );
 }
-
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -992,8 +862,25 @@ const DETAIL_TABS = ['General Info', 'Product Data', 'CSV Overrides', 'Transmiss
 
 export default function ClientSupplierDetailPage({ supplier, products, shopDomain = "" }) {
   const router = useRouter();
-  const [toast,      setToast]      = useState(null);
-  const [activeTab,  setActiveTab]  = useState('General Info');
+  const [toast, setToast] = useState(null);
+
+  // Read active tab from URL param so it persists across navigation
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      return DETAIL_TABS.includes(tab) ? tab : "General Info";
+    }
+    return "General Info";
+  });
+
+  function handleTabClick(tab) {
+    setActiveTab(tab);
+    // Update URL so the active tab is preserved on back navigation
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState({}, "", url.toString());
+  }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2000); }
 
@@ -1006,13 +893,10 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
   return (
     <AppLayout title={supplier.supplier_name} showActionBar={false}>
 
-      {/* ── Back + Title + Tabs ── */}
       <div className="mb-4">
         <div className="flex items-center gap-3 mb-3">
-          <button
-            onClick={() => router.push("/suppliers")}
-            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1 px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 transition shrink-0"
-          >
+          <button onClick={() => router.push("/suppliers")}
+            className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1 px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 transition shrink-0">
             ←
           </button>
           <h1 className="text-lg font-semibold leading-tight">{supplier.supplier_name}</h1>
@@ -1021,20 +905,14 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
               #{supplier.supplier_number}
             </span>
           )}
-
-          {/* Tabs inline with title row */}
           <div className="ml-4 flex border-b-0 gap-0">
             {DETAIL_TABS.map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActiveTab(tab)}
+              <button key={tab} type="button" onClick={() => handleTabClick(tab)}
                 className={`px-4 py-1.5 text-sm font-medium rounded-t border transition-colors whitespace-nowrap ${
                   activeTab === tab
                     ? 'bg-white border-gray-200 border-b-white text-blue-600 shadow-sm'
                     : 'bg-transparent border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
+                }`}>
                 {tab}
               </button>
             ))}
@@ -1042,12 +920,17 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
         </div>
       </div>
 
-      {/* ── Tab Content ── */}
       {activeTab === 'General Info' && (
         <GeneralInfoTab supplier={supplier} router={router} copyToClipboard={copyToClipboard} />
       )}
       {activeTab === 'Product Data' && (
-        <ProductDataTab supplier={supplier} products={products} router={router} copyToClipboard={copyToClipboard} />
+        <ProductDataTab
+          supplier={supplier}
+          products={products}
+          router={router}
+          copyToClipboard={copyToClipboard}
+          shopDomain={shopDomain}
+        />
       )}
       {activeTab === 'CSV Overrides' && (
         <CsvOverridesTab supplierId={supplier.id} />
@@ -1060,7 +943,3 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
     </AppLayout>
   );
 }
-
-
-
-
