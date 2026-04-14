@@ -17,7 +17,7 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
   const { data: po, error: poError } = await supabase
     .from('purchase_orders')
     .select(`
-      id, po_number, po_date, expected_date, status, notes_supplier,
+      id, po_number, po_date, expected_date, status, notes_supplier, ship_to_location_id,
       supplier:suppliers ( id, supplier_name, supplier_number, po_email ),
       location:locations ( name, address1, address2, city, province, zip, country )
     `)
@@ -103,7 +103,7 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
       variant:variants!purchase_order_lines_variant_id_fkey (
         barcode, weight_value, weight_unit, price,
         inventory_quantity,
-        products!inner ( tags )
+        products ( tags )
       )
     `)
     .eq('purchase_order_id', poId)
