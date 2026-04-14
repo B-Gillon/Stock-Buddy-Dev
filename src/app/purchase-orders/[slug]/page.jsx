@@ -12,6 +12,14 @@ import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import PODetailActions from "./components/PODetailActions";
 
+// Parse date as local time to avoid UTC shift (e.g. "2026-04-29" → Apr 29, not Apr 28)
+function fmtDate(val) {
+  if (!val) return "—";
+  const str = String(val).substring(0, 10);
+  const [yyyy, mm, dd] = str.split("-");
+  return `${mm}/${dd}/${yyyy}`;
+}
+
 export default async function PurchaseOrderDetailPage({ params }) {
   const { slug } = await params;
   const poNumber = decodeURIComponent(slug);
@@ -132,15 +140,11 @@ export default async function PurchaseOrderDetailPage({ params }) {
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">PO Date</span>
-                <span className="font-medium text-gray-800">
-                  {flatPO.po_date ? new Date(flatPO.po_date).toLocaleDateString() : "—"}
-                </span>
+                <span className="font-medium text-gray-800">{fmtDate(flatPO.po_date)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Expected</span>
-                <span className="font-medium text-gray-800">
-                  {flatPO.expected_date ? new Date(flatPO.expected_date).toLocaleDateString() : "—"}
-                </span>
+                <span className="text-gray-500">Expected Arrival Date</span>
+                <span className="font-medium text-gray-800">{fmtDate(flatPO.expected_date)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Currency</span>
@@ -149,9 +153,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
               {flatPO.released_at && (
                 <div className="flex justify-between">
                   <span className="text-gray-500">Released</span>
-                  <span className="font-medium text-gray-800">
-                    {new Date(flatPO.released_at).toLocaleDateString()}
-                  </span>
+                  <span className="font-medium text-gray-800">{fmtDate(flatPO.released_at)}</span>
                 </div>
               )}
             </div>

@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import Button from "@/shared/components/ui/Button";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 
+// Parse date as local time to avoid UTC shift
+function fmtDate(val) {
+  if (!val) return null;
+  const str = String(val).substring(0, 10);
+  const [yyyy, mm, dd] = str.split('-');
+  return `${mm}/${dd}/${yyyy}`;
+}
+
 function ReleaseConfirmModal({ isOpen, onClose, onConfirm, po, isReleasing }) {
   if (!isOpen) return null;
   return (
@@ -23,15 +31,14 @@ function ReleaseConfirmModal({ isOpen, onClose, onConfirm, po, isReleasing }) {
             <ul className="mt-1.5 list-inside list-disc space-y-1 text-blue-700">
               <li>PO status changes from Draft → Released</li>
               <li>Incoming quantities are sent to Shopify for each line item</li>
-              <li>Expected arrival date is synced to Shopify (if set)</li>
-              <li>PO metadata is written to Shopify inventory items</li>
+              <li>PO email is sent to the supplier</li>
             </ul>
           </div>
           {po.expected_date && (
             <p className="mt-3 text-sm text-gray-500">
               Expected arrival:{" "}
               <span className="font-medium text-gray-800">
-                {new Date(po.expected_date).toLocaleDateString()}
+                {fmtDate(po.expected_date)}
               </span>
             </p>
           )}
