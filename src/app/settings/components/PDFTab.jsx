@@ -56,12 +56,12 @@ function LogoDropzone({ preview, onFile, onRemove }) {
             ? 'border-gray-200 bg-white'
             : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100 cursor-pointer'
       }`}
-      style={{ minHeight: '160px' }}
+      style={{ minHeight: '140px' }}
       onClick={() => !preview && inputRef.current?.click()}
     >
       {preview ? (
         <div className="p-4 flex flex-col items-center gap-3 w-full">
-          <img src={preview} alt="Logo preview" className="max-h-24 max-w-full object-contain" />
+          <img src={preview} alt="Logo preview" className="max-h-20 max-w-full object-contain" />
           <div className="flex gap-2">
             <button type="button"
               onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
@@ -76,20 +76,11 @@ function LogoDropzone({ preview, onFile, onRemove }) {
           </div>
         </div>
       ) : (
-        <div className="p-6 space-y-2">
-          <svg className="mx-auto h-8 w-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="p-5 space-y-2">
+          <svg className="mx-auto h-7 w-7 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
-          <p className="text-xs text-gray-500">Drag and drop your logo here, or</p>
-          {/* Format guidance */}
-          <p className="text-xs text-gray-400">
-            PNG or SVG · Max 1 MB · Recommended: 300 × 100 px (horizontal)
-          </p>
-          <button type="button"
-            onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-            className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors">
-            Upload Logo
-          </button>
+          <p className="text-xs text-gray-400">Drag & drop or click to browse</p>
         </div>
       )}
       <input ref={inputRef} type="file" accept="image/png,image/svg+xml" className="hidden"
@@ -100,15 +91,20 @@ function LogoDropzone({ preview, onFile, onRemove }) {
 
 // ── PDF Tab ───────────────────────────────────────────────────────────────────
 export default function PDFTab() {
-  const [logoFile,      setLogoFile]      = useState(null);
-  const [logoPreview,   setLogoPreview]   = useState(null);
-  const [contactName,   setContactName]   = useState('');
-  const [contactEmail,  setContactEmail]  = useState('');
-  const [contactPhone,  setContactPhone]  = useState('');
-  const [savingLogo,    setSavingLogo]    = useState(false);
-  const [savingContact, setSavingContact] = useState(false);
-  const [logoStatus,    setLogoStatus]    = useState(null);
-  const [contactStatus, setContactStatus] = useState(null);
+  const [logoFile,       setLogoFile]       = useState(null);
+  const [logoPreview,    setLogoPreview]    = useState(null);
+  const [contactName,    setContactName]    = useState('');
+  const [contactEmail,   setContactEmail]   = useState('');
+  const [contactPhone,   setContactPhone]   = useState('');
+  const [savingLogo,     setSavingLogo]     = useState(false);
+  const [savingContact,  setSavingContact]  = useState(false);
+  const [logoStatus,     setLogoStatus]     = useState(null);
+  const [contactStatus,  setContactStatus]  = useState(null);
+  const [previewKey,     setPreviewKey]     = useState(0);
+  const [previewLoading, setPreviewLoading] = useState(true);
+
+  // Set initial preview key on client only (avoids hydration mismatch with Date.now())
+  useEffect(() => { setPreviewKey(Date.now()); }, []);
 
   // Load existing settings and check for logo on mount
   useEffect(() => {
@@ -150,6 +146,7 @@ export default function PDFTab() {
       if (!res.ok) throw new Error('Upload failed');
       setLogoStatus('saved');
       setLogoFile(null);
+      setPreviewKey(Date.now());
     } catch {
       setLogoStatus('error');
     } finally {
@@ -172,15 +169,12 @@ export default function PDFTab() {
       });
       if (!res.ok) throw new Error('Save failed');
       setContactStatus('saved');
+      setPreviewKey(Date.now());
     } catch {
       setContactStatus('error');
     } finally {
       setSavingContact(false);
     }
-  }
-
-  function handleOpenPreview() {
-    window.open('/api/settings/pdf-preview', '_blank', 'noopener,noreferrer');
   }
 
   return (
@@ -193,6 +187,12 @@ export default function PDFTab() {
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex flex-col">
           <h3 className="text-sm font-semibold text-gray-800 mb-3">Logo</h3>
           <LogoDropzone preview={logoPreview} onFile={handleLogoFile} onRemove={handleLogoRemove} />
+
+          {/* Format guidance — always visible regardless of upload state */}
+          <p className="text-xs text-gray-400 mt-2 text-center leading-snug">
+            PNG or SVG · Max 1 MB<br />Recommended: 300 × 100 px (horizontal)
+          </p>
+
           {logoStatus === 'saved' && <p className="text-xs text-green-600 mt-2 text-center">Logo saved.</p>}
           {logoStatus === 'error' && <p className="text-xs text-red-600 mt-2 text-center">Upload failed.</p>}
           <button
@@ -234,34 +234,38 @@ export default function PDFTab() {
       <div className="flex-1 bg-white rounded-lg border border-gray-200 shadow-sm p-4 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-gray-800">PDF Preview</h3>
-        </div>
-
-        {/* Replace broken iframe with a simple open-in-new-tab prompt.
-            Iframes are blocked by the app's security headers when the page
-            tries to embed itself — opening in a new tab bypasses this cleanly. */}
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-gray-200 bg-gray-50">
-          <svg className="h-10 w-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <div className="text-center space-y-1">
-            <p className="text-sm font-medium text-gray-700">Preview your PO PDF</p>
-            <p className="text-xs text-gray-400">Opens a sample PDF in a new tab using your current logo and contact info.</p>
-          </div>
           <button
             type="button"
-            onClick={handleOpenPreview}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            onClick={() => { setPreviewLoading(true); setPreviewKey(Date.now()); }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-xs font-medium text-gray-600 rounded-md hover:bg-gray-50 transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Open Preview
+            Refresh Preview
           </button>
-          <p className="text-xs text-gray-400">
-            Save your logo and contact info first, then click Open Preview to see the latest version.
-          </p>
+        </div>
+
+        <div className="flex-1 relative rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+          {previewLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50 z-10">
+              <div className="flex flex-col items-center gap-2">
+                <svg className="animate-spin h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <p className="text-xs text-gray-500">Generating preview…</p>
+              </div>
+            </div>
+          )}
+          <iframe
+            key={previewKey}
+            src={`/api/settings/pdf-preview?t=${previewKey}`}
+            className="w-full h-full"
+            style={{ minHeight: '520px' }}
+            onLoad={() => setPreviewLoading(false)}
+            title="PDF Preview"
+          />
         </div>
       </div>
 
