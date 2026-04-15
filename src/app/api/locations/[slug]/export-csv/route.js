@@ -80,7 +80,9 @@ export async function GET(request, { params }) {
     escapeCSV(binMap.get(v.id) ?? ""),
   ].join(","));
 
-  const csv = [headers.join(","), ...rows].join("\r\n");
+  // Prepend UTF-8 BOM (\uFEFF) so Excel on Windows correctly reads
+  // special characters like em dashes instead of showing â€" garbage
+  const csv = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
 
   const locationSlug = (location?.name ?? "location")
     .toLowerCase()
