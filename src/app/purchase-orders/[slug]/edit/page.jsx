@@ -39,7 +39,7 @@ export default async function Page({ params }) {
     { data: supplierVariants },
     { data: inventoryLevels },
   ] = await Promise.all([
-    supabase.from('suppliers').select('id, supplier_name, supplier_number').eq('tenant_id', tenantId).order('supplier_name'),
+    supabase.from('suppliers').select('id, supplier_name, supplier_number, lead_days').eq('tenant_id', tenantId).order('supplier_name'),
     supabase.from('locations').select('id, name').eq('tenant_id', tenantId).eq('active', true).order('name'),
     supabase.from('variants').select(`
       id, sku, barcode, display_title, image_src, inventory_quantity, cost,

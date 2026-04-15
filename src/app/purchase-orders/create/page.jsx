@@ -23,7 +23,7 @@ export default async function Page() {
       .eq('key', 'po_next_number'),
     supabase
       .from('suppliers')
-      .select('id, supplier_name, supplier_number')
+      .select('id, supplier_name, supplier_number, lead_days')
       .eq('tenant_id', tenantId)
       .order('supplier_name'),
     supabase

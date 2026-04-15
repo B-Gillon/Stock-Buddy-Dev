@@ -52,20 +52,40 @@ function VariantSearch({ value, variants, supplierVariants, supplierId, onSelect
         className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 bg-white hover:border-gray-300 placeholder-gray-300"
       />
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 left-0 mt-0.5 w-80 bg-white border border-gray-200 rounded-md shadow-xl max-h-96 overflow-y-auto">
+        <div className="absolute z-50 left-0 mt-0.5 w-96 bg-white border border-gray-200 rounded-md shadow-xl max-h-96 overflow-y-auto">
           {filtered.map((v) => {
+            const sv = supplierVariants.find((sv) => sv.variant_id === v.id && sv.supplier_id === supplierId);
             return (
               <button
                 key={v.id}
                 type="button"
-                onMouseDown={() => { onSelect(v, supplierVariants.find((sv) => sv.variant_id === v.id && sv.supplier_id === supplierId)); setOpen(false); }}
+                onMouseDown={() => { onSelect(v, sv); setOpen(false); }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0"
               >
                 <div className="flex items-center gap-3">
-                  {v.image_src && (
-                    <img src={v.image_src} alt="" className="h-7 w-7 rounded object-cover flex-shrink-0" />
+                  {v.image_src ? (
+                    <img src={v.image_src} alt="" className="h-8 w-8 rounded object-cover flex-shrink-0 border border-gray-100" />
+                  ) : (
+                    <div className="h-8 w-8 rounded bg-gray-100 flex-shrink-0 flex items-center justify-center">
+                      <svg className="h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
                   )}
-                  <span className="text-xs font-medium text-gray-900 truncate">{v.display_title || v.product_title}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-900 truncate">{v.display_title || v.product_title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {v.sku && (
+                        <span className="text-xs text-gray-400 truncate">SKU: {v.sku}</span>
+                      )}
+                      {v.sku && v.barcode && (
+                        <span className="text-gray-200 text-xs">·</span>
+                      )}
+                      {v.barcode && (
+                        <span className="text-xs text-gray-400 truncate">UPC: {v.barcode}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </button>
             );
@@ -90,7 +110,6 @@ function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, cu
 
   const handleSelect = useCallback((variant, sv) => {
     const { available, incoming } = getInventoryLevel(variant.id);
-    // Use supplier cost if present and non-zero, otherwise fall back to variant cost
     const supplierCost = sv?.cost != null && parseFloat(sv.cost) !== 0 ? sv.cost : null;
     const resolvedCost = supplierCost ?? (variant.cost != null ? variant.cost : null);
     onUpdate(row._rowId, {
@@ -222,7 +241,6 @@ export default function PurchaseOrderCreatePage({
   const { toast, showToast } = useToast();
   const [isDirty, setIsDirty] = useState(false);
 
-  // Warn before leaving with unsaved changes — covers both browser nav and internal link clicks
   const isDirtyRef = useRef(false);
   useEffect(() => {
     isDirtyRef.current = isDirty;
@@ -251,7 +269,6 @@ export default function PurchaseOrderCreatePage({
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Supplier dropdown
   const [supplierSearch, setSupplierSearch] = useState("");
   const [supplierOpen,   setSupplierOpen]   = useState(false);
   const supplierRef = useRef(null);
@@ -259,7 +276,6 @@ export default function PurchaseOrderCreatePage({
   const { header, setHeader, rows, activeRows, updateRow, blurRow, clearRow, addRows, headerErrors, validateAll } =
     usePurchaseOrderFormState(initialHeader, initialRows);
 
-  // Supplier and location lock: always in edit mode, or once first line item added in create mode
   const fieldsLocked = editMode || activeRows.length > 0;
 
   const selectedSupplier  = suppliers.find((s) => s.id === header.supplier_id);
@@ -268,8 +284,7 @@ export default function PurchaseOrderCreatePage({
     return s.supplier_name.toLowerCase().includes(q) || s.supplier_number.toLowerCase().includes(q);
   });
 
-  // Variants that are associated with the selected supplier (for line item filtering).
-  // When no supplier is selected, show no variants (line items table is grayed out anyway).
+  // Only show variants associated with the selected supplier
   const supplierVariantIds = header.supplier_id
     ? new Set(supplierVariants.filter((sv) => sv.supplier_id === header.supplier_id).map((sv) => sv.variant_id))
     : new Set();
@@ -292,11 +307,9 @@ export default function PurchaseOrderCreatePage({
 
   function markDirty(field, value) {
     setIsDirty(true);
-    // Pass suppliers data so the hook can calculate expected_date from lead_days
     setHeader(field, value, { suppliersData: suppliers });
   }
 
-  // Handle expected_date change with lead-days warning
   function handleExpectedDateChange(e) {
     const value = e.target.value;
     markDirty("expected_date", value);
@@ -305,7 +318,6 @@ export default function PurchaseOrderCreatePage({
       const chosen = new Date(value);
       const minDate = new Date();
       minDate.setDate(minDate.getDate() + selectedSupplier.lead_days);
-      // Normalize both to midnight for comparison
       chosen.setHours(0, 0, 0, 0);
       minDate.setHours(0, 0, 0, 0);
       if (chosen < minDate) {
@@ -364,12 +376,11 @@ export default function PurchaseOrderCreatePage({
         slug = data.slug;
       }
 
-      // If editing a released PO, automatically resend to supplier
       if (editMode && existingPO && header.status === 'released') {
         try {
           await fetch(`/api/purchase-orders/${existingPO.id}/resend`, { method: 'POST' });
         } catch {
-          // Non-fatal — PO saved successfully even if resend fails
+          // Non-fatal
         }
       }
 
@@ -387,12 +398,9 @@ export default function PurchaseOrderCreatePage({
   const totalExtended = activeRows.reduce((sum, r) => sum + (r.extended_cost ?? 0), 0);
   const totalUnits    = activeRows.reduce((sum, r) => sum + (parseInt(r.order_qty, 10) || 0), 0);
 
-  // Line items are active when:
-  //   - In edit mode: always (supplier already set on the existing PO)
-  //   - In create mode: only once a supplier has been selected
+  // Line items unlocked in edit mode (supplier already set), or once supplier chosen in create mode
   const lineItemsActive = editMode ? true : !!header.supplier_id;
 
-  // Block PO creation if po_next_number not configured (create mode only)
   if (!editMode && !poNextNumber) {
     return (
       <AppLayout title="New Purchase Order" showActionBar={false} bareLayout={true}>
@@ -432,7 +440,7 @@ export default function PurchaseOrderCreatePage({
             {/* Col 1 — fields (~25%) */}
             <div className="flex flex-col gap-4" style={{ width: "25%" }}>
 
-              {/* Supplier — locked once lines added or in edit mode */}
+              {/* Supplier */}
               {fieldsLocked ? (
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Supplier</p>
@@ -492,7 +500,7 @@ export default function PurchaseOrderCreatePage({
                 </div>
               )}
 
-              {/* Ship-To Location — locked once lines added or in edit mode */}
+              {/* Ship-To Location */}
               {fieldsLocked ? (
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ship-To Location</p>
@@ -583,8 +591,6 @@ export default function PurchaseOrderCreatePage({
         </div>
 
         {/* ── LINE ITEMS CARD ──────────────────────────────────────── */}
-        {/* Gray out and block interaction until a supplier is selected (create mode).
-            In edit mode, lineItemsActive is always true so this never grays out. */}
         <div className={`bg-white rounded-lg border border-gray-200 shadow-sm ${!lineItemsActive ? "opacity-50 pointer-events-none select-none" : ""}`}>
 
           <div className="px-6 py-3 border-b border-gray-200">
@@ -622,12 +628,10 @@ export default function PurchaseOrderCreatePage({
                     getInventoryLevel={getInventoryLevel}
                   />
                 ))}
-              
               </tbody>
             </table>
           </div>
 
-          {/* Footer — validation errors + total */}
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
             <div>
               {activeRows.some((r) => r.error) && (
@@ -646,7 +650,6 @@ export default function PurchaseOrderCreatePage({
             )}
           </div>
 
-          {/* Spacer — room below last record */}
           <div style={{ height: "144px" }} />
 
         </div>

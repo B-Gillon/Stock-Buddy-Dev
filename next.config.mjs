@@ -13,8 +13,8 @@ const nextConfig = {
   // Prevent Next.js from bundling pdfkit — it must run as a native Node module
   serverExternalPackages: ['pdfkit'],
 
-  // Allow Shopify to embed this app in an iframe.
-  // Content-Security-Policy frame-ancestors replaces the legacy X-Frame-Options header.
+  // Allow Shopify to embed this app in an iframe, AND allow the app to embed
+  // its own routes (e.g. the PDF preview iframe in Settings) via 'self'.
   // ngrok-skip-browser-warning bypasses the ngrok interstitial page in dev.
   // BEFORE GOING TO PRODUCTION:
   // - Remove ngrok-skip-browser-warning header
@@ -28,6 +28,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "frame-ancestors",
+              "'self'",
               "https://*.myshopify.com",
               "https://admin.shopify.com",
             ].join(" "),
