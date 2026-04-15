@@ -26,13 +26,13 @@ const INVENTORY_LEVELS_QUERY = `
   }
 `;
 
-export default async function fetchInventoryLevels() {
+export default async function fetchInventoryLevels(credentials = {}) {
   const allLevels = [];
   let cursor = null;
   let hasNextPage = true;
 
   while (hasNextPage) {
-    const data = await shopifyGraphQL(INVENTORY_LEVELS_QUERY, { cursor });
+    const data = await shopifyGraphQL(INVENTORY_LEVELS_QUERY, { cursor }, credentials);
     const { nodes, pageInfo } = data.inventoryItems;
 
     for (const item of nodes) {

@@ -25,13 +25,13 @@ const INVENTORY_ITEMS_QUERY = `
   }
 `;
 
-export default async function fetchInventoryItems() {
+export default async function fetchInventoryItems(credentials = {}) {
   const allItems = [];
   let cursor = null;
   let hasNextPage = true;
 
   while (hasNextPage) {
-    const data = await shopifyGraphQL(INVENTORY_ITEMS_QUERY, { cursor });
+    const data = await shopifyGraphQL(INVENTORY_ITEMS_QUERY, { cursor }, credentials);
     const { nodes, pageInfo } = data.inventoryItems;
 
     allItems.push(...nodes);
