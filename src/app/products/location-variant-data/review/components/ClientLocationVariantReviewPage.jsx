@@ -7,18 +7,39 @@ import { useRouter } from "next/navigation";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import { getImportData, clearImportData } from "../../import/importLocationStore";
 import { validateLocationImportRows, canSubmit } from "../../import/validateLocationImportRows";
-import { DELETE_MARKER, SUPPORTED_FIELDS, REQUIRED_FIELD } from "../../import/parseLocationImportCSV";
+import { DELETE_MARKER, SUPPORTED_FIELDS, REQUIRED_FIELD, FIELD_MAP } from "../../import/parseLocationImportCSV";
 
 // ─── Cell display ─────────────────────────────────────────────────────────────
 
-function CellValue({ value }) {
-  if (value === undefined) return <span className="text-gray-300 text-xs">—</span>;
-  if (value === DELETE_MARKER) return (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
-      Will Delete
+/**
+ * Renders a cell with colour coding:
+ *   - undefined       → grey dash, no change
+ *   - DELETE_MARKER   → red "Will Delete" badge
+ *   - value === existing → plain black, no change
+ *   - value !== existing → green badge, this field is changing
+ */
+function CellValue({ value, existingValue }) {
+  if (value === undefined) {
+    return <span className="text-gray-300 text-xs">—</span>;
+  }
+  if (value === DELETE_MARKER) {
+    return (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+        Will Delete
+      </span>
+    );
+  }
+
+  const normalize = (v) => (v == null ? "" : String(v).trim());
+  const isChanged = normalize(value) !== normalize(existingValue);
+
+  return isChanged ? (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+      {value}
     </span>
+  ) : (
+    <span className="text-gray-800 text-xs">{value}</span>
   );
-  return <span className="text-gray-800 text-xs">{value}</span>;
 }
 
 function RowStatusBadge({ status }) {
@@ -46,15 +67,17 @@ const COLUMN_LABELS = {
 
 export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
   const router = useRouter();
-  const [rows,            setRows]            = useState([]);
-  const [unknownHandling, setUnknownHandling] = useState("error");
-  const [dataColumns,     setDataColumns]     = useState([]);
-  const [locationId,      setLocationId]      = useState(null);
-  const [locationName,    setLocationName]    = useState("");
-  const [submitting,      setSubmitting]      = useState(false);
-  const [submitError,     setSubmitError]     = useState(null);
-  const [toast,           setToast]           = useState(null);
-  const [ready,           setReady]           = useState(false);
+  const [rows,                setRows]                = useState([]);
+  const [unknownHandling,     setUnknownHandling]     = useState("error");
+  const [dataColumns,         setDataColumns]         = useState([]);
+  const [locationId,          setLocationId]          = useState(null);
+  const [locationName,        setLocationName]        = useState("");
+  const [submitting,          setSubmitting]          = useState(false);
+  const [submitError,         setSubmitError]         = useState(null);
+  const [toast,               setToast]               = useState(null);
+  const [ready,               setReady]               = useState(false);
+  // Existing DB values keyed by shopify_variant_id string → { bin_location: string|null }
+  const [existingByVariantId, setExistingByVariantId] = useState({});
 
   useEffect(() => {
     const { parsedData, unknownHandling: uh, locationId: lid, locationName: lname } = getImportData();
@@ -64,8 +87,8 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
       return;
     }
 
-    const knownSet    = new Set(knownVariantIds.map(String));
-    const validated   = validateLocationImportRows(parsedData.rows, knownSet, uh);
+    const knownSet      = new Set(knownVariantIds.map(String));
+    const validated     = validateLocationImportRows(parsedData.rows, knownSet, uh);
     const presentFields = SUPPORTED_FIELDS.filter(
       (f) => f !== REQUIRED_FIELD && parsedData.headers.includes(f)
     );
@@ -76,7 +99,49 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
     setLocationName(lname ?? "");
     setDataColumns(presentFields);
     setReady(true);
+
+    // Fetch existing bin location data for diff comparison
+    if (lid) {
+      fetch(`/api/locations/${lid}/export-csv`)
+        .then((r) => r.text())
+        .then((csvText) => {
+          // Parse the CSV response into a lookup map
+          const lines = csvText.split(/\r?\n/).filter(Boolean);
+          if (lines.length < 2) return;
+          // headers: Variant ID, SKU, Bin Location
+          const byId = {};
+          for (let i = 1; i < lines.length; i++) {
+            const cols = parseSimpleCSVLine(lines[i]);
+            const variantId  = cols[0]?.replace(/^"|"$/g, "").trim();
+            const binLocation = cols[2] ?? null;
+            if (variantId) byId[variantId] = { bin_location: binLocation || null };
+          }
+          setExistingByVariantId(byId);
+        })
+        .catch(() => {});
+    }
   }, []);
+
+  // Minimal CSV line parser for reading back the export CSV
+  function parseSimpleCSVLine(line) {
+    const result = [];
+    let current  = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if (ch === "," && !inQuotes) {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
 
   function showToast(msg) {
     setToast(msg);
@@ -91,8 +156,8 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
         const isKnown  = knownSet.has(newValue.trim());
         return {
           ...r,
-          variant_id: newValue,
-          status: !newValue.trim() ? "error" : isKnown ? "valid" : unknownHandling === "ignore" ? "skipped" : "unknown",
+          variant_id:   newValue,
+          status:       !newValue.trim() ? "error" : isKnown ? "valid" : unknownHandling === "ignore" ? "skipped" : "unknown",
           errorMessage: !newValue.trim()
             ? "Missing required variant_id."
             : isKnown ? null
@@ -110,9 +175,9 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
     const rowsToImport = rows.filter((r) => r.status === "valid");
     try {
       const res = await fetch("/api/products/location-variant-data/import", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: rowsToImport, location_id: locationId }),
+        body:    JSON.stringify({ rows: rowsToImport, location_id: locationId }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -127,10 +192,10 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
     }
   }
 
-  const validCount   = rows.filter((r) => r.status === "valid").length;
-  const unknownCount = rows.filter((r) => r.status === "unknown").length;
-  const skippedCount = rows.filter((r) => r.status === "skipped").length;
-  const errorCount   = rows.filter((r) => r.status === "error").length;
+  const validCount    = rows.filter((r) => r.status === "valid").length;
+  const unknownCount  = rows.filter((r) => r.status === "unknown").length;
+  const skippedCount  = rows.filter((r) => r.status === "skipped").length;
+  const errorCount    = rows.filter((r) => r.status === "error").length;
   const blockingCount = unknownCount + errorCount;
 
   if (!ready) {
@@ -221,6 +286,8 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
             <tbody>
               {rows.map((row) => {
                 const isProblematic = row.status === "unknown" || row.status === "error";
+                const existing      = existingByVariantId[String(row.variant_id)] ?? null;
+
                 return (
                   <tr
                     key={row.rowIndex}
@@ -238,18 +305,22 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
                           type="text"
                           value={row.variant_id}
                           onChange={(e) => handleVariantIdChange(row.rowIndex, e.target.value)}
-                          className="w-full border border-red-300 rounded px-2 py-0.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                          className="w-full border border-red-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
                           title="Edit variant ID to fix this row"
                         />
                       ) : (
-                        <span className="font-mono text-xs text-gray-700">{row.variant_id}</span>
+                        <span className="text-xs text-gray-700">{row.variant_id}</span>
                       )}
                     </td>
-                    {dataColumns.map((col) => (
-                      <td key={col} className="px-2 py-2 whitespace-nowrap">
-                        <CellValue value={row.fields[col]} />
-                      </td>
-                    ))}
+                    {dataColumns.map((col) => {
+                      const dbCol      = FIELD_MAP[col]; // "Bin Location" → "bin_location"
+                      const existingVal = existing ? existing[dbCol] ?? null : null;
+                      return (
+                        <td key={col} className="px-2 py-2 whitespace-nowrap">
+                          <CellValue value={row.fields[col]} existingValue={existingVal} />
+                        </td>
+                      );
+                    })}
                     <td className="px-2 py-2 text-xs text-red-600">{row.errorMessage || ""}</td>
                   </tr>
                 );

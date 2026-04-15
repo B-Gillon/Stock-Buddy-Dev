@@ -135,6 +135,8 @@ export default function ClientLocationVariantImportPage({ locations }) {
   const [unknownHandling, setUnknownHandling] = useState("error");
   const [error,           setError]           = useState(null);
   const [processing,      setProcessing]      = useState(false);
+  const [downloading,     setDownloading]     = useState(false);
+  const [banner,          setBanner]          = useState(null);
 
   const selectedLocation = locations.find((l) => l.id === locationId) ?? null;
 
@@ -155,11 +157,43 @@ export default function ClientLocationVariantImportPage({ locations }) {
     }
   }
 
+  async function handleDownloadCSV() {
+    if (!locationId) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/locations/${locationId}/export-csv`);
+      if (!res.ok) throw new Error("Download failed.");
+      const blob        = await res.blob();
+      const url         = URL.createObjectURL(blob);
+      const link        = document.createElement("a");
+      link.href         = url;
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match       = disposition.match(/filename="([^"]+)"/);
+      link.setAttribute("download", match?.[1] ?? "location-bin-locations.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setBanner({ type: "error", message: err.message });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
-    <AppLayout
-      title="Import Location Variant Data"
-      showActionBar={false}
-    >
+    <AppLayout title="Import Location Variant Data" showActionBar={false}>
+
+      {banner && (
+        <div className={`mb-4 px-4 py-3 rounded-md text-sm font-medium ${
+          banner.type === "success"
+            ? "bg-green-50 text-green-700 border border-green-200"
+            : "bg-red-50 text-red-700 border border-red-200"
+        }`}>
+          {banner.message}
+        </div>
+      )}
+
       {/* ── TOP ROW ── */}
       <div className="flex gap-4 mb-6 items-stretch">
 
@@ -182,8 +216,8 @@ export default function ClientLocationVariantImportPage({ locations }) {
           </ul>
         </div>
 
-        {/* MIDDLE — Location + Unknown Items */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm px-5 py-4 flex flex-col gap-4" style={{ flex: "1" }}>
+        {/* MIDDLE — Location + Unknown Items, wider to prevent clipping */}
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm px-5 py-4 flex flex-col gap-4" style={{ flex: "1.4" }}>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Location</label>
             <select
@@ -212,6 +246,23 @@ export default function ClientLocationVariantImportPage({ locations }) {
                 ? "Unrecognized variant IDs will block the import."
                 : "Unrecognized variant IDs will be silently skipped."}
             </p>
+          </div>
+
+          {/* Download CSV button — only active when a location is selected */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs text-gray-500 mb-2">
+              Download a CSV of all bin locations for the selected location, pre-filled with existing data.
+            </p>
+            <button
+              onClick={handleDownloadCSV}
+              disabled={!locationId || downloading}
+              className="w-full px-3 py-2 border border-gray-300 text-gray-700 text-xs font-medium rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-1.5"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {downloading ? "Downloading…" : "Download Location CSV"}
+            </button>
           </div>
         </div>
 
