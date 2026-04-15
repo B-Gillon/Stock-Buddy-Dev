@@ -146,13 +146,11 @@ export default function ClientInventoryPage({
     const params  = new URLSearchParams(searchParams.toString());
     const merged  = { ...currentFilters, ...overrides };
 
-    // String params
     ["search", "sort", "dir", "page", "availability", "incoming", "total_value", "inventory_policy"].forEach((k) => {
       if (merged[k]) params.set(k, merged[k]);
       else params.delete(k);
     });
 
-    // Array params — comma-separated
     ["vendors", "categories", "collections", "status", "tags", "locations"].forEach((k) => {
       const val = merged[k];
       if (Array.isArray(val) && val.length > 0) params.set(k, val.join(","));
@@ -210,7 +208,6 @@ export default function ClientInventoryPage({
 
   function goToPage(p) { navigate({ page: String(p) }); }
 
-  // Active filters for the modal
   const activeFilters = {
     vendors:          currentFilters.vendors     ?? [],
     categories:       currentFilters.categories  ?? [],
@@ -291,10 +288,13 @@ export default function ClientInventoryPage({
       : (row.location_rows ?? []);
 
     const displayAvailable = visibleLocations.reduce((s, l) => s + l.available, 0);
-    const displayIncoming  = visibleLocations.reduce((s, l) => s + l.incoming,  0);
     const displayValue     = visibleLocations.length > 0 && visibleLocations.every((l) => l.total_value != null)
       ? visibleLocations.reduce((s, l) => s + (l.total_value ?? 0), 0)
       : row.total_value;
+
+    // Incoming comes from Stock Buddy PO data (inventory_summary.incoming_total),
+    // not from inventory_levels.incoming which reflects Shopify's value (always 0).
+    const displayIncoming = row.incoming_total ?? 0;
 
     switch (col.key) {
       case "display_title":   return <span className="font-medium text-gray-900">{row.display_title}</span>;
@@ -314,7 +314,8 @@ export default function ClientInventoryPage({
     switch (col.key) {
       case "location":        return <span className="text-xs text-gray-600 font-medium">{loc.location_name}</span>;
       case "available_total": return <span className="tabular-nums text-xs text-gray-600">{loc.available.toLocaleString()}</span>;
-      case "incoming_total":  return <span className="tabular-nums text-xs text-gray-600">{loc.incoming.toLocaleString()}</span>;
+      // Incoming is tracked at the PO level, not per location — show dash on sub-rows
+      case "incoming_total":  return <span className="text-gray-300 text-xs">—</span>;
       case "total_value":     return <span className="tabular-nums text-xs text-gray-600">{formatCurrency(loc.total_value)}</span>;
       default:                return null;
     }
