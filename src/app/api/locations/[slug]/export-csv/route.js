@@ -5,13 +5,12 @@ import { NextResponse } from "next/server";
 
 /**
  * GET /api/locations/[slug]/export-csv
- * Exports ALL variants stocked at a location as a CSV in the import format.
- * Uses inventory_levels to find every variant at this location, then
- * joins variant_location_bins to include any existing bin location values.
+ * Exports ALL variants for this tenant as a CSV in the import format,
+ * pre-filled with any existing bin location values for this location.
  * Variants with no bin location set will have an empty Bin Location column.
  *
  * CSV columns (matching the import format exactly):
- * Variant ID, SKU, Bin Location
+ * Variant ID, SKU, Barcode, Display Title, Bin Location
  */
 export async function GET(request, { params }) {
   let tenantId;
@@ -31,45 +30,21 @@ export async function GET(request, { params }) {
     .eq("tenant_id", tenantId)
     .single();
 
-  // Step 1: Get all inventory_items that have a level at this location,
-  // joined to their variant for shopify_variant_id and sku.
-  const { data: levels, error: levelsError } = await supabase
-    .from("inventory_levels")
-    .select(`
-      inventory_items (
-        variant_id,
-        variants (
-          id,
-          shopify_variant_id,
-          sku
-        )
-      )
-    `)
-    .eq("location_id", locationId)
-    .eq("tenant_id", tenantId);
+  // Step 1: Fetch ALL variants for this tenant
+  const { data: variants, error: variantsError } = await supabase
+    .from("variants")
+    .select("id, shopify_variant_id, sku, barcode, display_title")
+    .eq("tenant_id", tenantId)
+    .order("display_title", { ascending: true });
 
-  if (levelsError) {
-    console.error("export-csv levels error:", levelsError);
-    return NextResponse.json({ error: levelsError.message }, { status: 500 });
+  if (variantsError) {
+    console.error("export-csv variants error:", variantsError);
+    return NextResponse.json({ error: variantsError.message }, { status: 500 });
   }
 
-  // Flatten to unique variants (dedupe by variant id in case of multiple levels)
-  const variantMap = new Map();
-  for (const level of levels ?? []) {
-    const v = level.inventory_items?.variants;
-    if (!v) continue;
-    if (!variantMap.has(v.id)) {
-      variantMap.set(v.id, {
-        id:                 v.id,
-        shopify_variant_id: v.shopify_variant_id,
-        sku:                v.sku,
-      });
-    }
-  }
+  const variantIds = (variants ?? []).map((v) => v.id);
 
-  const variantIds = Array.from(variantMap.keys());
-
-  // Step 2: Fetch existing bin locations for these variants at this location
+  // Step 2: Fetch existing bin locations for this location
   const binMap = new Map(); // variant_id → bin_location
   if (variantIds.length > 0) {
     const { data: bins } = await supabase
@@ -94,17 +69,14 @@ export async function GET(request, { params }) {
     return str;
   }
 
-  const headers = ["Variant ID", "SKU", "Bin Location"];
+  const headers = ["Variant ID", "SKU", "Barcode", "Display Title", "Bin Location"];
 
-  // Sort by SKU for a predictable, user-friendly order
-  const variants = Array.from(variantMap.values()).sort((a, b) =>
-    (a.sku ?? "").localeCompare(b.sku ?? "")
-  );
-
-  const rows = variants.map((v) => [
+  const rows = (variants ?? []).map((v) => [
     // Quote Variant ID to prevent scientific notation in Excel
     v.shopify_variant_id ? `"${v.shopify_variant_id}"` : "",
     escapeCSV(v.sku),
+    escapeCSV(v.barcode),
+    escapeCSV(v.display_title),
     escapeCSV(binMap.get(v.id) ?? ""),
   ].join(","));
 

@@ -8,7 +8,18 @@ export const FIELD_MAP = {
   "Bin Location": "bin_location",
 };
 
-export const SUPPORTED_FIELDS = [REQUIRED_FIELD, ...Object.keys(FIELD_MAP)];
+// All headers the importer recognises — unknown headers outside this list
+// will be flagged as warnings. Display-only fields (SKU, Barcode, Display Title)
+// are listed here so they don't trigger unknown-header warnings when present
+// in a downloaded/re-uploaded CSV, but they are NOT in FIELD_MAP so they
+// are never written to the database.
+export const SUPPORTED_FIELDS = [
+  REQUIRED_FIELD,
+  "SKU",
+  "Barcode",
+  "Display Title",
+  ...Object.keys(FIELD_MAP),
+];
 
 export const NUMERIC_FIELDS = new Set([
   // none currently — bin_location is text

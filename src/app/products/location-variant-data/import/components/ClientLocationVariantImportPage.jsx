@@ -26,6 +26,20 @@ const FIELD_DEFINITIONS = [
     notes:       "",
   },
   {
+    field:       "Barcode",
+    status:      "display",
+    description: "Variant's barcode / UPC",
+    purpose:     "Include in your CSV to help identify the correct variant — not imported",
+    notes:       "",
+  },
+  {
+    field:       "Display Title",
+    status:      "display",
+    description: "Variant's display title",
+    purpose:     "Include in your CSV to help identify the correct variant — not imported",
+    notes:       "",
+  },
+  {
     field:       "Bin Location",
     status:      "optional",
     description: "Physical bin or shelf location for this variant at the selected location",
@@ -37,8 +51,8 @@ const FIELD_DEFINITIONS = [
 // ─── Example CSV ──────────────────────────────────────────────────────────────
 
 const EXAMPLE_CSV = [
-  "Variant ID,SKU,Bin Location",
-  '"46417160601818",SUP-SKU-001,Aisle 3 / Bay 2',
+  "Variant ID,SKU,Barcode,Display Title,Bin Location",
+  '"46417160601818",SUP-SKU-001,1234567890123,Blue Widget - Large,Aisle 3 / Bay 2',
 ].join("\n");
 
 function downloadExampleCSV() {
@@ -251,7 +265,7 @@ export default function ClientLocationVariantImportPage({ locations }) {
           {/* Download CSV button — only active when a location is selected */}
           <div className="border-t border-gray-100 pt-3">
             <p className="text-xs text-gray-500 mb-2">
-              Download a CSV of all bin locations for the selected location, pre-filled with existing data.
+              Download a CSV of all products, pre-filled with any existing bin locations for the selected location.
             </p>
             <button
               onClick={handleDownloadCSV}
