@@ -164,8 +164,8 @@ function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, cu
         {isEmpty ? <span className="text-gray-200">—</span> : row.current_available ?? 0}
       </td>
 
-      {/* On Order */}
-      <td className={`${cellClass} text-xs text-gray-600`} style={{ width: "70px" }}>
+      {/* On Order — wider to prevent wrapping */}
+      <td className={`${cellClass} text-xs text-gray-600 whitespace-nowrap`} style={{ width: "90px" }}>
         {isEmpty ? <span className="text-gray-200">—</span> : (row.on_order ?? 0)}
       </td>
 
@@ -188,9 +188,6 @@ function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, cu
 }
 
 // ---------------------------------------------------------------------------
-// Toast — imported from @/shared/components/ui/Toast
-
-// ---------------------------------------------------------------------------
 // Column definitions
 // ---------------------------------------------------------------------------
 const LINE_ITEMS_COLUMNS = [
@@ -200,7 +197,7 @@ const LINE_ITEMS_COLUMNS = [
   { key: "barcode",           label: "Barcode",           width: "160px" },
   { key: "order_qty",         label: "Quantity",          width: "80px"  },
   { key: "current_available", label: "Available",         width: "70px"  },
-  { key: "on_order",          label: "On Order",          width: "70px"  },
+  { key: "on_order",          label: "On Order",          width: "90px"  },
   { key: "unit_cost",         label: "Unit Cost",         width: "90px"  },
   { key: "extended_cost",     label: "Ext. Cost",         width: "90px"  },
 ];
@@ -208,7 +205,18 @@ const LINE_ITEMS_COLUMNS = [
 // ---------------------------------------------------------------------------
 // Main page component
 // ---------------------------------------------------------------------------
-export default function PurchaseOrderCreatePage({ suppliers, locations, variants, supplierVariants, inventoryLevels, editMode = false, existingPO = null, initialHeader = null, initialRows = null, poNextNumber = null }) {
+export default function PurchaseOrderCreatePage({
+  suppliers,
+  locations,
+  variants,
+  supplierVariants,
+  inventoryLevels,
+  editMode = false,
+  existingPO = null,
+  initialHeader = null,
+  initialRows = null,
+  poNextNumber = null,
+}) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const { toast, showToast } = useToast();
@@ -260,6 +268,15 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
     return s.supplier_name.toLowerCase().includes(q) || s.supplier_number.toLowerCase().includes(q);
   });
 
+  // Variants that are associated with the selected supplier (for line item filtering).
+  // When no supplier is selected, show no variants (line items table is grayed out anyway).
+  const supplierVariantIds = header.supplier_id
+    ? new Set(supplierVariants.filter((sv) => sv.supplier_id === header.supplier_id).map((sv) => sv.variant_id))
+    : new Set();
+  const supplierFilteredVariants = header.supplier_id
+    ? variants.filter((v) => supplierVariantIds.has(v.id))
+    : [];
+
   useEffect(() => {
     function handler(e) {
       if (supplierRef.current && !supplierRef.current.contains(e.target)) setSupplierOpen(false);
@@ -268,8 +285,6 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-
-
   function handleCancel() {
     if (isDirty && !window.confirm("Please save your Purchase Order before leaving the page. Any unsaved changes will be lost.\n\nLeave without saving?")) return;
     router.back();
@@ -277,7 +292,30 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
 
   function markDirty(field, value) {
     setIsDirty(true);
-    setHeader(field, value);
+    // Pass suppliers data so the hook can calculate expected_date from lead_days
+    setHeader(field, value, { suppliersData: suppliers });
+  }
+
+  // Handle expected_date change with lead-days warning
+  function handleExpectedDateChange(e) {
+    const value = e.target.value;
+    markDirty("expected_date", value);
+
+    if (value && selectedSupplier?.lead_days) {
+      const chosen = new Date(value);
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() + selectedSupplier.lead_days);
+      // Normalize both to midnight for comparison
+      chosen.setHours(0, 0, 0, 0);
+      minDate.setHours(0, 0, 0, 0);
+      if (chosen < minDate) {
+        showToast(
+          `Warning: based on this supplier's ${selectedSupplier.lead_days}-day lead time, a PO released today would arrive around ${minDate.toLocaleDateString()}. Your selected date is earlier than that.`,
+          "warning",
+          6000
+        );
+      }
+    }
   }
 
   function getInventoryLevel(variantId) {
@@ -348,7 +386,11 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
 
   const totalExtended = activeRows.reduce((sum, r) => sum + (r.extended_cost ?? 0), 0);
   const totalUnits    = activeRows.reduce((sum, r) => sum + (parseInt(r.order_qty, 10) || 0), 0);
-  const headerComplete = !!(header.supplier_id && header.ship_to_location_id && header.po_date);
+
+  // Line items are active when:
+  //   - In edit mode: always (supplier already set on the existing PO)
+  //   - In create mode: only once a supplier has been selected
+  const lineItemsActive = editMode ? true : !!header.supplier_id;
 
   // Block PO creation if po_next_number not configured (create mode only)
   if (!editMode && !poNextNumber) {
@@ -495,13 +537,20 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
                 {headerErrors.po_date && <p className="mt-1 text-xs text-red-500">{headerErrors.po_date}</p>}
               </div>
 
-              {/* Expected Date */}
+              {/* Expected Date — auto-populated from supplier lead days */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Expected Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Expected Date
+                  {selectedSupplier?.lead_days && (
+                    <span className="ml-1.5 text-xs text-gray-400 font-normal">
+                      ({selectedSupplier.lead_days}-day lead)
+                    </span>
+                  )}
+                </label>
                 <input
                   type="date"
                   value={header.expected_date}
-                  onChange={(e) => markDirty("expected_date", e.target.value)}
+                  onChange={handleExpectedDateChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 />
               </div>
@@ -534,7 +583,9 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
         </div>
 
         {/* ── LINE ITEMS CARD ──────────────────────────────────────── */}
-        <div className={`bg-white rounded-lg border border-gray-200 shadow-sm ${!headerComplete ? "opacity-50 pointer-events-none select-none" : ""}`}>
+        {/* Gray out and block interaction until a supplier is selected (create mode).
+            In edit mode, lineItemsActive is always true so this never grays out. */}
+        <div className={`bg-white rounded-lg border border-gray-200 shadow-sm ${!lineItemsActive ? "opacity-50 pointer-events-none select-none" : ""}`}>
 
           <div className="px-6 py-3 border-b border-gray-200">
             <h2 className="text-base font-semibold text-gray-800">Line Items</h2>
@@ -547,7 +598,7 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
                   {LINE_ITEMS_COLUMNS.map((col) => (
                     <th
                       key={col.key}
-                      className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500 border-r border-gray-300 last:border-r-0"
+                      className="px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-500 border-r border-gray-300 last:border-r-0 whitespace-nowrap"
                       style={{ width: col.width }}
                     >
                       {col.label}
@@ -561,7 +612,7 @@ export default function PurchaseOrderCreatePage({ suppliers, locations, variants
                     key={row._rowId}
                     row={row}
                     rowIndex={idx}
-                    variants={variants}
+                    variants={supplierFilteredVariants}
                     supplierVariants={supplierVariants}
                     supplierId={header.supplier_id || null}
                     currencyCode={selectedSupplier?.currency ?? 'USD'}

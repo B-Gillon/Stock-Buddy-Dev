@@ -8,10 +8,10 @@ import { supabase } from '@/lib/supabaseClient';
  * Falls back to supplier.po_email (with both attachments) if no records exist.
  *
  * @param {string} poId
- * @param {{ isResend?: boolean }} options
+ * @param {{ isResend?: boolean, isCancellation?: boolean }} options
  * @returns {{ success: boolean, error?: string }}
  */
-export async function sendPOEmail(poId, { isResend = false } = {}) {
+export async function sendPOEmail(poId, { isResend = false, isCancellation = false } = {}) {
 
   // ── Fetch PO ───────────────────────────────────────────────────────────────
   const { data: po, error: poError } = await supabase
@@ -89,7 +89,62 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
     return { success: false, error: 'No recipient email configured for this supplier' };
   }
 
-  // ── Fetch lines ────────────────────────────────────────────────────────────
+  // ── For cancellation emails, send a plain text notice (no attachments) ─────
+  if (isCancellation) {
+    const subject  = `CANCELLED: Purchase Order ${po.po_number}`;
+    const bodyText = [
+      `Dear ${po.supplier.supplier_name},`,
+      '',
+      `Please be advised that Purchase Order ${po.po_number} has been cancelled.`,
+      '',
+      `PO Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`,
+      '',
+      'If you have any questions, please contact us.',
+      '',
+      'Thank you,',
+      'Stock Buddy',
+    ].join('\n');
+
+    const transporter = nodemailer.createTransport({
+      host:   process.env.SMTP_HOST,
+      port:   Number(process.env.SMTP_PORT),
+      secure: true,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    try {
+      if (!hasRecipients) {
+        await transporter.sendMail({
+          from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
+          to:      fallbackEmail,
+          subject,
+          text:    bodyText,
+        });
+      } else {
+        for (const r of recipients) {
+          const toList  = (r.to_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+          if (toList.length === 0) continue;
+          const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+          const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+          await transporter.sendMail({
+            from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
+            to:      toList.join(', '),
+            cc:      ccList.length  > 0 ? ccList.join(', ')  : undefined,
+            bcc:     bccList.length > 0 ? bccList.join(', ') : undefined,
+            subject,
+            text:    bodyText,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Cancellation email send error:', err);
+      return { success: false, error: `Email failed: ${err.message}` };
+    }
+
+    return { success: true };
+  }
+
+  // ── Fetch lines (for normal / resend emails) ───────────────────────────────
   const { data: lineRows, error: linesError } = await supabase
     .from('purchase_order_lines')
     .select(`
@@ -127,8 +182,8 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
   }
 
   // ── Fetch inventory levels for stock fields ────────────────────────────────
-  let currentStockMap = {};  // variant_id → available at ship-to location
-  let totalStockMap   = {};  // variant_id → total available all locations
+  let currentStockMap = {};
+  let totalStockMap   = {};
 
   const stockEnabled = csvSettings
     ? (!!csvSettings['csv_export.current_stock'] || !!csvSettings['csv_export.total_stock_all_locations'])
@@ -145,7 +200,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
     for (const i of invItems ?? []) variantByInvItem[i.id] = i.variant_id;
 
     if (invItemIds.length > 0) {
-      // Total stock across all locations
       const { data: allLevels } = await supabase
         .from('inventory_levels')
         .select('inventory_item_id, available')
@@ -156,7 +210,6 @@ export async function sendPOEmail(poId, { isResend = false } = {}) {
         if (vid) totalStockMap[vid] = (totalStockMap[vid] ?? 0) + (level.available ?? 0);
       }
 
-      // Current stock at ship-to location only
       if (po.ship_to_location_id) {
         const { data: shipToLevels } = await supabase
           .from('inventory_levels')

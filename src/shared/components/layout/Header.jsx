@@ -105,10 +105,10 @@ export default function Header({
 
   return (
     <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
-      <div className="flex items-center justify-between gap-4 min-w-0">
+      <div className="flex items-end justify-between gap-4 min-w-0">
 
-        {/* Left: Mascot + Brand */}
-        <Link href="/dashboard" className="shrink-0 flex items-center gap-3 hover:opacity-90 transition-opacity">
+        {/* Left: Mascot + Brand — align to end so it sits at the same baseline as the nav */}
+        <Link href="/dashboard" className="shrink-0 flex items-center gap-3 hover:opacity-90 transition-opacity self-end pb-0.5">
           <Image
             src="/STOCK_BUDDY_LOGO__1_.png"
             alt="Stock Buddy logo"
@@ -127,10 +127,10 @@ export default function Header({
           </div>
         </Link>
 
-        {/* Right: sync row + nav */}
-        <div className="flex flex-col items-end justify-center gap-1.5 min-w-0">
+        {/* Right: sync row (optional) + nav always at bottom */}
+        <div className="flex flex-col items-end justify-end gap-1.5 min-w-0">
 
-          {/* Sync row */}
+          {/* Sync row — only rendered when onSync is provided */}
           {onSync && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400 whitespace-nowrap">
@@ -150,7 +150,7 @@ export default function Header({
             </div>
           )}
 
-          {/* Nav */}
+          {/* Nav — always hugs the bottom of the header */}
           <nav className="flex items-center gap-0.5">
             <ProductsDropdown />
 

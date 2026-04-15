@@ -31,7 +31,7 @@ function buildEmptyRow(id) {
   };
 }
 
-function addBusinessDays(dateStr, days) {
+export function addBusinessDays(dateStr, days) {
   if (!dateStr || !days) return null;
   const date = new Date(dateStr);
   let added = 0;
@@ -72,11 +72,30 @@ export function usePurchaseOrderFormState(initialHeader = null, initialRows = nu
   });
   const [headerErrors, setHeaderErrors] = useState({});
 
-  const setHeader = useCallback((field, value) => {
+  // suppliers ref so setHeader can read it for lead days calculation
+  const [suppliers, setSuppliers] = useState([]);
+
+  const setHeader = useCallback((field, value, { suppliersData } = {}) => {
     setHeaderRaw((prev) => {
       const next = { ...prev, [field]: value };
+
+      // When supplier changes, auto-calculate expected_date from lead days
+      if (field === 'supplier_id') {
+        const list = suppliersData ?? [];
+        const supplier = list.find((s) => s.id === value);
+        if (supplier?.lead_days) {
+          const minDate = new Date();
+          minDate.setDate(minDate.getDate() + supplier.lead_days);
+          next.expected_date = minDate.toISOString().split('T')[0];
+        } else {
+          // Reset expected_date when supplier with no lead_days is selected
+          next.expected_date = '';
+        }
+      }
+
       return next;
     });
+
     // Recalculate ESDs when po_date changes
     if (field === 'po_date') {
       setRows((prev) =>
@@ -197,5 +216,3 @@ export function usePurchaseOrderFormState(initialHeader = null, initialRows = nu
     validateAll,
   };
 }
-
-export { addBusinessDays };

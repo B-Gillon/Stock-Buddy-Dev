@@ -206,11 +206,17 @@ function EmailTab() {
 
       <SaveButton onClick={handleSave} saving={saving} />
 
+      {/* ── Email Preview Modal ─────────────────────────────────────────────
+          Uses max-h-[90vh] + overflow-y-auto so it never clips off screen.
+          The Close button is sticky at the bottom so it's always reachable. */}
       {previewOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setPreviewOpen(false)} />
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto flex flex-col"
+               style={{ maxHeight: '90vh' }}>
+
+            {/* Header — always visible */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 flex-shrink-0">
               <h3 className="text-base font-semibold text-gray-900">Email Preview</h3>
               <button type="button" onClick={() => setPreviewOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -218,7 +224,9 @@ function EmailTab() {
                 </svg>
               </button>
             </div>
-            <div className="px-6 py-5 space-y-4">
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
               <div className="bg-gray-50 rounded-md px-4 py-3 border border-gray-200">
                 <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Subject</p>
                 <p className="text-sm text-gray-900 font-medium">{renderedSubject}</p>
@@ -231,12 +239,15 @@ function EmailTab() {
                 <p className="text-xs text-gray-500">Reply-To: <span className="text-gray-700">{replyTo}</span></p>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
+
+            {/* Footer — sticky at bottom, always visible */}
+            <div className="flex-shrink-0 px-6 py-4 border-t border-gray-100 flex justify-end bg-white rounded-b-xl">
               <button type="button" onClick={() => setPreviewOpen(false)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-200 transition-colors">
                 Close
               </button>
             </div>
+
           </div>
         </div>
       )}
