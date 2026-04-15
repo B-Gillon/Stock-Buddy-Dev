@@ -11,16 +11,6 @@ import { DELETE_MARKER, SUPPORTED_FIELDS, REQUIRED_FIELD, FIELD_MAP } from "../.
 
 // ─── Cell display ─────────────────────────────────────────────────────────────
 
-/**
- * Renders a table cell with colour coding:
- *   - undefined (blank in CSV)      → grey dash, no change
- *   - DELETE_MARKER "/"             → red "Will Delete" badge (unchanged styling)
- *   - value same as existing DB val → plain black, no change
- *   - value differs from existing   → green, this field is being changed
- *
- * existingValue: current DB string value for this field, or null/undefined if
- * the row is new or the field has never been set.
- */
 function CellValue({ value, existingValue }) {
   if (value === undefined) {
     return <span className="text-gray-300 text-xs">—</span>;
@@ -33,13 +23,16 @@ function CellValue({ value, existingValue }) {
     );
   }
 
-  // Normalize for comparison: null, undefined, and "" are all "no value"
   const normalize = (v) => (v == null ? "" : String(v).trim());
   const isChanged = normalize(value) !== normalize(existingValue);
 
-  return isChanged
-    ? <span className="text-green-700 text-xs font-medium">{value}</span>
-    : <span className="text-gray-800 text-xs">{value}</span>;
+  return isChanged ? (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+      {value}
+    </span>
+  ) : (
+    <span className="text-gray-800 text-xs">{value}</span>
+  );
 }
 
 function RowStatusBadge({ status }) {
@@ -114,7 +107,6 @@ export default function ClientReviewPage({ knownVariantIds }) {
   const [submitError,         setSubmitError]         = useState(null);
   const [toast,               setToast]               = useState(null);
   const [ready,               setReady]               = useState(false);
-  // Existing DB values keyed by shopify_variant_id string → { db_col: string|null }
   const [existingByVariantId, setExistingByVariantId] = useState({});
 
   useEffect(() => {
@@ -139,13 +131,11 @@ export default function ClientReviewPage({ knownVariantIds }) {
     setReady(true);
 
     if (sid) {
-      // Fetch supplier currency for display formatting
       fetch(`/api/suppliers/${sid}/currency`)
         .then((r) => r.json())
         .then((d) => { if (d.currency) setSupplierCurrency(d.currency); })
         .catch(() => {});
 
-      // Fetch existing supplier variant data so we can diff per cell
       fetch(`/api/suppliers/${sid}/variants`)
         .then((r) => r.json())
         .then((d) => { if (d.byVariantId) setExistingByVariantId(d.byVariantId); })
@@ -298,8 +288,7 @@ export default function ClientReviewPage({ knownVariantIds }) {
             <tbody>
               {rows.map((row) => {
                 const isProblematic = row.status === "unknown" || row.status === "error";
-                // Look up the existing DB record for this variant
-                const existing = existingByVariantId[String(row.variant_id)] ?? null;
+                const existing      = existingByVariantId[String(row.variant_id)] ?? null;
 
                 return (
                   <tr key={row.rowIndex}
@@ -330,10 +319,8 @@ export default function ClientReviewPage({ knownVariantIds }) {
                         ? formatCurrency(rawVal, currencySymbol)
                         : rawVal;
 
-                      // Get the corresponding existing DB value for this column
-                      const dbCol       = FIELD_MAP[col]; // e.g. "Supplier Cost" → "cost"
-                      const existingVal = existing ? existing[dbCol] ?? null : null;
-                      // For currency fields, format the existing value the same way for fair comparison
+                      const dbCol          = FIELD_MAP[col];
+                      const existingVal    = existing ? existing[dbCol] ?? null : null;
                       const existingDisplay = CURRENCY_FIELDS.has(col)
                         ? formatCurrency(existingVal, currencySymbol)
                         : existingVal;
