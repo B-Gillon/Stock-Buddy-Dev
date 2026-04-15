@@ -37,7 +37,7 @@ export default async function InventoryPage({ searchParams }) {
   const sortDir = params.dir  ?? "asc";
   const page    = Math.max(1, parseInt(params.page ?? "1", 10));
 
-  // ── Build inventory_summary query ─────────────────────────────────────────
+  // ── Build inventory_summary query ──────────────────────────────────────────
   let query = supabase
     .from("inventory_summary")
     .select("*", { count: "exact" })
@@ -73,13 +73,13 @@ export default async function InventoryPage({ searchParams }) {
   let locationRowsByVariant = {};
 
   if (variantIds.length > 0) {
+    // Fetch available qty per variant per location from inventory_levels
     const { data: levels } = await supabase
       .from("inventory_levels")
       .select(`
         inventory_item_id,
         location_id,
         available,
-        incoming,
         inventory_items!inner( variant_id, cost ),
         locations!inner( name )
       `)
@@ -95,28 +95,59 @@ export default async function InventoryPage({ searchParams }) {
         location_id:   level.location_id,
         location_name: level.locations?.name ?? "Unknown",
         available:     level.available ?? 0,
-        incoming:      level.incoming  ?? 0,
+        incoming:      0, // will be filled in from PO data below
         total_value:   cost != null ? (level.available ?? 0) * cost : null,
       });
+    }
+
+    // Fetch incoming per variant per location from active PO lines
+    // (released or partially_received POs only, incoming_remaining > 0)
+    const { data: poLines } = await supabase
+      .from("purchase_order_lines")
+      .select(`
+        variant_id,
+        incoming_remaining,
+        purchase_orders!inner ( ship_to_location_id, status )
+      `)
+      .eq("tenant_id", tenantId)
+      .in("variant_id", variantIds)
+      .in("purchase_orders.status", ["released", "partially_received"])
+      .gt("incoming_remaining", 0);
+
+    // Build a map of variant_id + location_id → total incoming_remaining
+    const incomingMap = new Map(); // key: `${variant_id}:${location_id}`
+    for (const line of poLines ?? []) {
+      const locationId = line.purchase_orders?.ship_to_location_id;
+      if (!locationId) continue;
+      const key = `${line.variant_id}:${locationId}`;
+      incomingMap.set(key, (incomingMap.get(key) ?? 0) + (line.incoming_remaining ?? 0));
+    }
+
+    // Merge incoming into location_rows
+    for (const vid of Object.keys(locationRowsByVariant)) {
+      locationRowsByVariant[vid] = locationRowsByVariant[vid].map((locRow) => ({
+        ...locRow,
+        incoming: incomingMap.get(`${vid}:${locRow.location_id}`) ?? 0,
+      }));
     }
   }
 
   const inventory = (summaryRows ?? []).map((row) => ({
-    id:              row.variant_id,
-    display_title:   row.display_title ?? "—",
-    sku:             row.sku           ?? "—",
-    barcode:         row.barcode       ?? "—",
-    status:          row.status        ?? "—",
-    vendor_name:     row.vendor_name   ?? "—",
-    category:        row.category      ?? null,
-    collection:      row.collection    ?? null,
-    tags:            row.tags          ?? [],
+    id:               row.variant_id,
+    display_title:    row.display_title    ?? "—",
+    sku:              row.sku              ?? "—",
+    barcode:          row.barcode          ?? "—",
+    status:           row.status           ?? "—",
+    vendor_name:      row.vendor_name      ?? "—",
+    category:         row.category         ?? null,
+    collection:       row.collection       ?? null,
+    tags:             row.tags             ?? [],
     inventory_policy: row.inventory_policy ?? null,
-    available_total: row.available_total ?? 0,
-    incoming_total:  row.incoming_total  ?? 0,
-    total_value:     row.total_value     ?? null,
-    unit_cost:       row.unit_cost       ?? null,
-    location_rows:   locationRowsByVariant[row.variant_id] ?? [],
+    available_total:  row.available_total  ?? 0,
+    incoming_total:   row.incoming_total   ?? 0,
+    total_value:      row.total_value      ?? null,
+    unit_cost:        row.unit_cost        ?? null,
+    location_rows:    locationRowsByVariant[row.variant_id] ?? [],
   }));
 
   const filteredInventory = locations.length > 0

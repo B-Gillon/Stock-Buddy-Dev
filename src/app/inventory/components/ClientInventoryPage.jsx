@@ -314,8 +314,7 @@ export default function ClientInventoryPage({
     switch (col.key) {
       case "location":        return <span className="text-xs text-gray-600 font-medium">{loc.location_name}</span>;
       case "available_total": return <span className="tabular-nums text-xs text-gray-600">{loc.available.toLocaleString()}</span>;
-      // Incoming is tracked at the PO level, not per location — show dash on sub-rows
-      case "incoming_total":  return <span className="text-gray-300 text-xs">—</span>;
+      case "incoming_total":  return <span className="tabular-nums text-xs text-gray-600">{loc.incoming.toLocaleString()}</span>;
       case "total_value":     return <span className="tabular-nums text-xs text-gray-600">{formatCurrency(loc.total_value)}</span>;
       default:                return null;
     }
