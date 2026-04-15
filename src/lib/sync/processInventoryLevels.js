@@ -19,7 +19,7 @@ export default function processInventoryLevels(
 
     // Resolve internal UUIDs
     const inventoryItemUuid = inventoryItemMap.get(shopifyInventoryItemId) ?? null;
-    const locationUuid = locationMap.get(shopifyLocationId) ?? null;
+    const locationUuid      = locationMap.get(shopifyLocationId)           ?? null;
 
     if (!locationUuid) {
       console.warn(
@@ -35,9 +35,10 @@ export default function processInventoryLevels(
     }
 
     processed.push({
-      inventory_item_id: inventoryItemUuid,
-      location_id: locationUuid,
-      available: level.available ?? null,
+      inventory_item_id:  inventoryItemUuid,
+      location_id:        locationUuid,
+      available:          level.available          ?? null,
+      incoming:           level.incoming           ?? null,
       updated_at_shopify: level.updated_at_shopify ?? null,
     });
   }

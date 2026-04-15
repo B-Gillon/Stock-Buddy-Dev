@@ -15,7 +15,7 @@ const INVENTORY_LEVELS_QUERY = `
             location {
               id
             }
-            quantities(names: ["available"]) {
+            quantities(names: ["available", "incoming"]) {
               name
               quantity
             }
@@ -37,15 +37,15 @@ export default async function fetchInventoryLevels() {
 
     for (const item of nodes) {
       for (const level of item.inventoryLevels.nodes) {
-        const availableEntry = level.quantities.find(
-          (q) => q.name === "available"
-        );
+        const availableEntry = level.quantities.find((q) => q.name === "available");
+        const incomingEntry  = level.quantities.find((q) => q.name === "incoming");
 
         allLevels.push({
           shopify_inventory_item_id: item.id,
-          shopify_location_id: level.location.id,
-          available: availableEntry?.quantity ?? null,
-          updated_at_shopify: level.updatedAt,
+          shopify_location_id:       level.location.id,
+          available:                 availableEntry?.quantity ?? null,
+          incoming:                  incomingEntry?.quantity  ?? null,
+          updated_at_shopify:        level.updatedAt,
         });
       }
     }
