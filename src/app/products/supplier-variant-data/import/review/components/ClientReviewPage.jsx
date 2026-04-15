@@ -18,7 +18,8 @@ function CellValue({ value }) {
       Will Delete
     </span>
   );
-  return <span className="text-gray-800 text-xs">{value}</span>;
+  // Any real value being added or edited renders in green
+  return <span className="text-green-700 text-xs font-medium">{value}</span>;
 }
 
 function RowStatusBadge({ status }) {
@@ -282,10 +283,10 @@ export default function ClientReviewPage({ knownVariantIds }) {
                       {isProblematic ? (
                         <input type="text" value={row.variant_id}
                           onChange={(e) => handleVariantIdChange(row.rowIndex, e.target.value)}
-                          className="w-full border border-red-300 rounded px-2 py-0.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                          className="w-full border border-red-300 rounded px-2 py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
                           title="Edit variant ID to fix this row" />
                       ) : (
-                        <span className="font-mono text-xs text-gray-700">{row.variant_id}</span>
+                        <span className="text-xs text-gray-700">{row.variant_id}</span>
                       )}
                     </td>
                     {dataColumns.map((col) => {
