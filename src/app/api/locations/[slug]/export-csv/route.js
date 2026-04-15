@@ -1,13 +1,13 @@
-// /src/app/api/locations/[id]/export-csv/route.js
+// /src/app/api/locations/[slug]/export-csv/route.js
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
 import { NextResponse } from "next/server";
 
 /**
- * GET /api/locations/[id]/export-csv
- * Exports all variants associated with a location as a CSV in the import format.
- * Includes every variant that has a variant_location_bins row for this location,
- * even if bin_location is null/empty. This lets users download, edit, and re-upload.
+ * GET /api/locations/[slug]/export-csv
+ * Exports all variants with bin location data for a given location as a CSV
+ * in the import format. Includes every variant_location_bins row for this
+ * location, even those with no bin_location filled in yet.
  *
  * CSV columns (matching the import format exactly):
  * Variant ID, SKU, Bin Location
@@ -20,7 +20,7 @@ export async function GET(request, { params }) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id: locationId } = await params;
+  const { slug: locationId } = await params;
 
   // Fetch location name for the filename
   const { data: location } = await supabase
@@ -45,6 +45,7 @@ export async function GET(request, { params }) {
     .order("created_at", { ascending: true });
 
   if (error) {
+    console.error("export-csv error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
