@@ -483,7 +483,6 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
 
                 <ModalSection title="Tester Record">
                   <Row label="Email"     value={tester.contact_email ?? '—'} />
-                  <Row label="Phone"     value={tester.contact_phone ?? '—'} />
                   {accessRequest && <Row label="Submitted" value={formatDate(accessRequest.created_at)} />}
                   <Row label="Invited"   value={tester.invited_at ? formatDate(tester.invited_at) : '—'} />
                   <Row label="Installed" value={tester.installed_at ? formatDate(tester.installed_at) : '—'} />
