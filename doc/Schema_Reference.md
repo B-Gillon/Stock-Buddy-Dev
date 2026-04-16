@@ -11,7 +11,88 @@ Columns:
 • 	created_at — timestamptz — nullable — default: now()
 • 	updated_at — timestamptz — nullable — default: now()
 Relationships:
-• 	Referenced by: products.tenant_id, variants.tenant_id, vendors.tenant_id, suppliers.tenant_id, supplier_addresses.tenant_id, supplier_variants.tenant_id, locations.tenant_id, inventory_items.tenant_id, inventory_levels.tenant_id, purchase_orders.tenant_id, purchase_order_lines.tenant_id, sync_status.tenant_id, settings.tenant_id, supplier_csv_settings.tenant_id, supplier_transmission_recipients.tenant_id, supplier_location_receiving_defaults.tenant_id, po_shopify_incoming.tenant_id, po_activity_log.tenant_id, variant_location_bins.tenant_id, location_contacts.tenant_id, third_party_logistics.tenant_id, error_log.tenant_id
+• 	Referenced by: products.tenant_id, variants.tenant_id, vendors.tenant_id, suppliers.tenant_id, supplier_addresses.tenant_id, supplier_variants.tenant_id, locations.tenant_id, inventory_items.tenant_id, inventory_levels.tenant_id, purchase_orders.tenant_id, purchase_order_lines.tenant_id, sync_status.tenant_id, settings.tenant_id, supplier_csv_settings.tenant_id, supplier_transmission_recipients.tenant_id, supplier_location_receiving_defaults.tenant_id, po_shopify_incoming.tenant_id, po_activity_log.tenant_id, variant_location_bins.tenant_id, location_contacts.tenant_id, third_party_logistics.tenant_id, error_log.tenant_id, beta_testers.tenant_id
+
+============================================================
+TABLE: beta_testers
+============================================================
+Columns:
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — nullable — references tenants(id)
+• 	contact_name — text — not null
+• 	contact_email — text — nullable
+• 	contact_phone — text — nullable
+• 	shopify_domain — text — nullable
+• 	notes — text — nullable
+• 	invited_at — timestamptz — nullable — default: now()
+• 	installed_at — timestamptz — nullable
+• 	connected_at — timestamptz — nullable
+• 	is_active — boolean — not null — default: true
+• 	created_at — timestamptz — nullable — default: now()
+• 	updated_at — timestamptz — nullable — default: now()
+Relationships:
+• 	tenant_id → tenants(id)
+• 	Referenced by: beta_tester_sessions.tenant_id (via tenant_id join)
+Notes:
+• 	shopify_domain must be stored as bare domain (e.g. store.myshopify.com), not a full URL.
+• 	tenant_id may be null if the tester has not yet completed OAuth. The admin page resolves
+  tenant_id at render time by matching shopify_domain against tenants.shop_domain.
+
+============================================================
+TABLE: beta_tester_sessions
+============================================================
+Columns:
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — not null — references tenants(id)
+• 	accessed_at — timestamptz — not null — default: now()
+• 	user_agent — text — nullable
+• 	path — text — nullable
+Relationships:
+• 	tenant_id → tenants(id)
+Notes:
+• 	Written by SessionTracker client component on each page load.
+• 	Used by admin activity page to compute "Last Accessed" per tester.
+
+============================================================
+TABLE: access_requests
+============================================================
+Columns:
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	created_at — timestamptz — not null — default: now()
+• 	store_url — text — not null
+• 	contact_name — text — not null
+• 	contact_email — text — not null
+• 	company_size — text — nullable
+• 	monthly_order_volume — text — nullable
+• 	num_skus_variants — text — nullable
+• 	current_inventory_methods — text[] — nullable
+• 	has_supplier_requirements — boolean — nullable
+• 	how_create_pos_today — text — nullable
+• 	biggest_challenge — text — nullable
+• 	why_interested — text — nullable
+• 	willing_to_provide_feedback — boolean — nullable
+• 	open_to_onboarding_calls — boolean — nullable
+• 	how_soon_to_start — text — nullable
+• 	anything_else — text — nullable
+• 	understands_private_beta — boolean — not null — default: false
+• 	agrees_no_share_link — boolean — not null — default: false
+• 	status — text — not null — default: 'pending'
+• 	reviewed_at — timestamptz — nullable
+• 	reviewer_notes — text — nullable
+Constraints:
+• 	status ∈ ('pending','approved','rejected')
+Indexes:
+• 	index on (created_at DESC)
+• 	index on (status)
+• 	index on (contact_email)
+RLS:
+• 	Anon and authenticated roles may INSERT (public form)
+• 	Service role has full access
+Relationships:
+• 	none — not linked to tenants (pre-install table)
+Notes:
+• 	Populated by the /request-access/form page via POST /api/request-access.
+• 	Approved applicants should be manually added to beta_testers and given an install link.
 
 ============================================================
 TABLE: inventory_items
@@ -281,7 +362,6 @@ Columns:
 • 	cancelled_at — timestamptz — nullable
 • 	created_at — timestamptz — nullable — default: now()
 • 	updated_at — timestamptz — nullable — default: now()
-New Columns:
 • 	receiving_source — text — not null — default: 'stock_buddy'
 • 	auto_switched_to_external — boolean — not null — default: false
 Constraints:
@@ -328,11 +408,14 @@ Columns:
 • 	supplier_id — uuid — not null — references suppliers(id)
 • 	location_id — uuid — not null — references locations(id)
 • 	default_receiving_source — text — not null
-CHECK (default_receiving_source IN ('stock_buddy','external'))
 • 	created_at — timestamptz — not null — default: now()
 • 	updated_at — timestamptz — not null — default: now()
 Constraints:
+• 	default_receiving_source ∈ ('stock_buddy','external')
 • 	UNIQUE (supplier_id, location_id)
+Relationships:
+• 	supplier_id → suppliers.id
+• 	location_id → locations.id
 
 ============================================================
 TABLE: settings
@@ -389,21 +472,21 @@ Relationships:
 TABLE: supplier_transmission_recipients
 ============================================================
 Columns:
-- 	id — uuid — not null — default: gen_random_uuid()
-- 	tenant_id — uuid — nullable — references tenants(id)
-- 	supplier_id — uuid — not null — references suppliers(id)
-- 	label — text — not null
-- 	to_emails — text — not null
-- 	cc_emails — text — nullable
-- 	bcc_emails — text — nullable
-- 	send_pdf — boolean — not null — default: true
-- 	send_csv — boolean — not null — default: true
-- 	sort_order — integer — not null — default: 0
-- 	created_at — timestamptz — nullable — default: now()
-- 	updated_at — timestamptz — nullable — default: now()
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — nullable — references tenants(id)
+• 	supplier_id — uuid — not null — references suppliers(id)
+• 	label — text — not null
+• 	to_emails — text — not null
+• 	cc_emails — text — nullable
+• 	bcc_emails — text — nullable
+• 	send_pdf — boolean — not null — default: true
+• 	send_csv — boolean — not null — default: true
+• 	sort_order — integer — not null — default: 0
+• 	created_at — timestamptz — nullable — default: now()
+• 	updated_at — timestamptz — nullable — default: now()
 Relationships:
-- 	supplier_id → suppliers.id
-- 	tenant_id → tenants(id)
+• 	supplier_id → suppliers.id
+• 	tenant_id → tenants(id)
 
 ============================================================
 TABLE: po_shopify_incoming
@@ -414,7 +497,7 @@ Columns:
 • 	purchase_order_id — uuid — not null
 • 	purchase_order_line_id — uuid — nullable
 • 	variant_id — uuid — nullable
-• 	shopify_inventory_item_id — bigint — not null — default: gen_random_uuid()
+• 	shopify_inventory_item_id — bigint — not null
 • 	shopify_location_id — bigint — nullable
 • 	quantity_pushed — integer — nullable
 • 	incoming_qty — integer — nullable
@@ -431,72 +514,72 @@ Relationships:
 TABLE: po_activity_log
 ============================================================
 Columns:
--   id — uuid — not null — default: gen_random_uuid()
--   tenant_id — uuid — nullable — references tenants(id)
--   po_id — uuid — not null — references purchase_orders(id)
--   action — text — not null
--   comments — text — nullable
--   created_at — timestamptz — not null — default: now()
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — nullable — references tenants(id)
+• 	po_id — uuid — not null — references purchase_orders(id)
+• 	action — text — not null
+• 	comments — text — nullable
+• 	created_at — timestamptz — not null — default: now()
 Constraints:
--   action ∈ ('created','edited','released','resent','cancelled','closed','error')
+• 	action ∈ ('created','edited','released','resent','cancelled','closed','error')
 Relationships:
--   po_id → purchase_orders.id
--   tenant_id → tenants(id)
+• 	po_id → purchase_orders.id
+• 	tenant_id → tenants(id)
 
 ============================================================
 TABLE: variant_location_bins
 ============================================================
 Columns:
-• id — uuid — not null — default: gen_random_uuid()
-• tenant_id — uuid — nullable — references tenants(id)
-• variant_id — uuid — not null — references variants(id)
-• location_id — uuid — not null — references locations(id)
-• bin_location — text — nullable — e.g., "Aisle 3 / Bay 2" or "44‑C"
-• created_at — timestamptz — not null — default: now()
-• updated_at — timestamptz — not null — default: now()
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — nullable — references tenants(id)
+• 	variant_id — uuid — not null — references variants(id)
+• 	location_id — uuid — not null — references locations(id)
+• 	bin_location — text — nullable — e.g., "Aisle 3 / Bay 2" or "44-C"
+• 	created_at — timestamptz — not null — default: now()
+• 	updated_at — timestamptz — not null — default: now()
 Constraints:
-• unique (variant_id, location_id)
+• 	unique (variant_id, location_id)
 Indexes:
-• index on (variant_id, location_id)
+• 	index on (variant_id, location_id)
 Relationships:
-• variant_id → variants.id
-• location_id → locations.id
-• tenant_id → tenants.id
+• 	variant_id → variants.id
+• 	location_id → locations.id
+• 	tenant_id → tenants.id
 
 ============================================================
 TABLE: location_contacts
 ============================================================
 Columns:
--   id — uuid — not null — default: gen_random_uuid()
--   tenant_id — uuid — nullable — references tenants(id)
--   location_id — uuid — not null — references locations(id)
--   name — text — not null
--   phone — text — nullable
--   email — text — nullable
--   role — text — nullable
--   is_primary — boolean — not null — default: false
--   created_at — timestamptz — nullable — default: now()
--   updated_at — timestamptz — nullable — default: now()
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — nullable — references tenants(id)
+• 	location_id — uuid — not null — references locations(id)
+• 	name — text — not null
+• 	phone — text — nullable
+• 	email — text — nullable
+• 	role — text — nullable
+• 	is_primary — boolean — not null — default: false
+• 	created_at — timestamptz — nullable — default: now()
+• 	updated_at — timestamptz — nullable — default: now()
 Relationships:
--   location_id → locations.id
--   tenant_id → tenants(id)
--   Referenced by: nothing currently
+• 	location_id → locations.id
+• 	tenant_id → tenants(id)
+• 	Referenced by: nothing currently
 
 ============================================================
 TABLE: error_log
 ============================================================
 Columns:
--   id — uuid — not null — default: gen_random_uuid()
--   tenant_id — uuid — null — references tenants(id)
--   source — text — not null
--   message — text — not null
--   stack — text — null
--   context — jsonb — null
--   created_at — timestamptz — not null — default: now()
+• 	id — uuid — not null — default: gen_random_uuid()
+• 	tenant_id — uuid — nullable — references tenants(id)
+• 	source — text — not null
+• 	message — text — not null
+• 	stack — text — nullable
+• 	context — jsonb — nullable
+• 	created_at — timestamptz — not null — default: now()
 Indexes:
--   index on (tenant_id)
--   index on (created_at DESC)
--   index on (source)
+• 	index on (tenant_id)
+• 	index on (created_at DESC)
+• 	index on (source)
 Relationships:
--   tenant_id → tenants(id)
--   Referenced by: nothing currently
+• 	tenant_id → tenants(id)
+• 	Referenced by: nothing currently

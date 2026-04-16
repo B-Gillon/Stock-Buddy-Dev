@@ -1,10 +1,10 @@
-// src/app/request-access/page.jsx
-import RequestAccessIntro from './components/RequestAccessIntro';
+// src/app/request-access/form/page.jsx
+import RequestAccessForm from './components/RequestAccessForm';
 
 export const metadata = {
   title: 'Request Access — Stock Buddy',
 };
 
-export default function RequestAccessPage() {
-  return <RequestAccessIntro />;
+export default function RequestAccessFormPage() {
+  return <RequestAccessForm />;
 }
