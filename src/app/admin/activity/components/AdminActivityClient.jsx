@@ -243,10 +243,10 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
           {loading ? (
             <p className="text-sm text-gray-400 italic">Loading form responses…</p>
           ) : (
-            <div className="flex gap-0 divide-x divide-gray-200">
+            <div className="flex divide-x divide-gray-200">
 
-              {/* ── Left column ─────────────────────────────────── */}
-              <div className="flex-1 pr-6 space-y-5">
+              {/* ── Column 1: Tester Record + Submission ─────────── */}
+              <div className="flex-1 px-4 first:pl-0 space-y-5">
 
                 <ModalSection title="Tester Record">
                   <Row label="Email"     value={tester.contact_email ?? '—'} />
@@ -266,8 +266,8 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
                     </ModalSection>
 
                     <ModalSection title="Submission">
-                      <Row label="Submitted"      value={formatDate(accessRequest.created_at)} />
-                      <Row label="Status"         value={accessRequest.status} />
+                      <Row label="Submitted" value={formatDate(accessRequest.created_at)} />
+                      <Row label="Status"    value={accessRequest.status} />
                       {accessRequest.reviewed_at && <Row label="Reviewed" value={formatDate(accessRequest.reviewed_at)} />}
                     </ModalSection>
                   </>
@@ -279,15 +279,22 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
 
               </div>
 
-              {/* ── Right column ─────────────────────────────────── */}
+              {/* ── Column 2: Current Process ────────────────────── */}
               {accessRequest && (
-                <div className="flex-1 pl-6 space-y-5">
-
+                <div className="flex-1 px-4 space-y-5">
                   <ModalSection title="Current Process">
-                    <LongRow label="How they create POs today"      value={accessRequest.how_create_pos_today} />
-                    <LongRow label="How they send POs to suppliers"  value={accessRequest.how_send_pos_to_suppliers} />
-                    <LongRow label="Biggest challenge"               value={accessRequest.biggest_challenge} />
-                    <LongRow label="Why interested in Stock Buddy"   value={accessRequest.why_interested} />
+                    <LongRow label="How they create POs today"     value={accessRequest.how_create_pos_today} />
+                    <LongRow label="How they send POs to suppliers" value={accessRequest.how_send_pos_to_suppliers} />
+                    <LongRow label="Biggest challenge"              value={accessRequest.biggest_challenge} />
+                  </ModalSection>
+                </div>
+              )}
+
+              {/* ── Column 3: Why interested + Beta Participation ── */}
+              {accessRequest && (
+                <div className="flex-1 px-4 last:pr-0 space-y-5">
+                  <ModalSection title="Why Stock Buddy?">
+                    <LongRow label="Why interested" value={accessRequest.why_interested} />
                   </ModalSection>
 
                   <ModalSection title="Beta Participation">
@@ -301,7 +308,6 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
                       <LongRow label="Reviewer Notes" value={accessRequest.reviewer_notes} />
                     )}
                   </ModalSection>
-
                 </div>
               )}
 
