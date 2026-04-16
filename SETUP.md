@@ -46,7 +46,7 @@ git log --oneline # shows commit history
 **Dashboard:** https://supabase.com/dashboard/project/hodcgkltyymkiktfqekk
 
 ### Security Status (as of 2026-04-11)
-- RLS is enabled on all 22 tables
+- RLS is enabled on all tables
 - Service role bypass policy applied to all tables — allows server-side queries to work normally
 - All queries are manually scoped by tenant_id as an additional safety layer
 - Full RLS/JWT enforcement is deferred to pre-launch (see TECH_DEBT.md #1)
@@ -140,6 +140,37 @@ Key files:
 - src/app/api/shopify/install/route.js — OAuth install entry point
 - src/app/api/shopify/callback/route.js — OAuth callback, token exchange
 
+### Approved Tester Install URL
+There is no public install form. Approved beta testers receive a direct OAuth URL:
+  https://stock-buddy.brandongillon.com/api/shopify/install?shop=their-store.myshopify.com
+This URL only works for the exact shop domain in the query param.
+
+---
+
+## Public-Facing Flow (Request Access)
+
+The root URL (stock-buddy.brandongillon.com) redirects to /request-access.
+This is the public entry point for potential beta testers.
+
+### Entry points
+- **/request-access** — intro page: app description, private beta notice, feature list
+- **/request-access/form** — application form: collects store/contact/business info
+- **/** — redirects to /request-access (or /dashboard if inside Shopify iframe)
+
+### Contact form
+"Have Questions?" on the intro page opens an inline modal (no OS email client).
+Submissions are sent to hello@brandongillon.com via SMTP using the same
+nodemailer transporter as PO emails. The submitter's email is set as replyTo.
+
+### Beta tester approval workflow (manual)
+1. Review submissions in Supabase: access_requests table (status = 'pending')
+2. Update status to 'approved' or 'rejected', set reviewed_at
+3. Manually add approved applicant to beta_testers table
+4. Send them the direct OAuth install URL for their shop domain
+5. After install, their tenant record is created automatically
+
+See Engineering_Specs.txt Section 24 for full public flow documentation.
+
 ---
 
 ## Hosting — Vercel
@@ -208,7 +239,7 @@ Each Buddy System app gets its own subdomain under brandongillon.com:
 
 ## Email (SMTP)
 
-**Purpose:** Sending PO emails to suppliers
+**Purpose:** Sending PO emails to suppliers; contact form submissions to hello@brandongillon.com
 **Provider:** Hostinger
 **Sender address:** brandon@brandongillon.com
 **Status:** Configured in .env.local and Vercel environment variables
@@ -221,6 +252,10 @@ SMTP_PORT=465
 SMTP_USER=brandon@brandongillon.com
 SMTP_PASS                        ← rotated 2026-04-11
 ```
+
+### Usage
+- PO emails to suppliers: src/lib/sendPOEmail.js
+- Contact form submissions: src/app/api/contact/route.js → hello@brandongillon.com
 
 ---
 
@@ -264,6 +299,14 @@ Then update SHOPIFY_APP_URL in .env.local and the Dev Dashboard with the ngrok U
 | src/app/api/shopify/install/route.js | Shopify OAuth install entry point |
 | src/app/api/shopify/callback/route.js | Shopify OAuth callback and token exchange |
 | src/app/components/AppBridgeProvider.jsx | App Bridge v4 initializer |
+| src/app/components/InstallPage.jsx | Install form — retained but not currently used at root |
+| src/app/page.jsx | Root route — redirects to /request-access or /dashboard |
+| src/app/request-access/page.jsx | Public landing page (intro) |
+| src/app/request-access/components/RequestAccessIntro.jsx | Intro client component |
+| src/app/request-access/form/page.jsx | Request access form page |
+| src/app/request-access/form/components/RequestAccessForm.jsx | Form client component |
+| src/app/api/request-access/route.js | Form submission → access_requests table |
+| src/app/api/contact/route.js | Contact modal submission → SMTP email |
 | src/proxy.js | Next.js proxy (formerly middleware) |
 | .env.local | Local environment variables — never commit |
 | .gitignore | Files excluded from Git |
@@ -279,7 +322,7 @@ Then update SHOPIFY_APP_URL in .env.local and the Dev Dashboard with the ngrok U
 |------|--------|
 | 2026-04-11 | Git initialized, connected to GitHub |
 | 2026-04-11 | Supabase project renamed from PO-Builder to Stock-Buddy |
-| 2026-04-11 | RLS enabled on all 22 tables with service role bypass policy |
+| 2026-04-11 | RLS enabled on all tables with service role bypass policy |
 | 2026-04-11 | Shopify Admin API token rotated after accidental exposure |
 | 2026-04-11 | Hostinger email password rotated after accidental exposure |
 | 2026-04-11 | Vercel account created, app deployed to stock-buddy-delta.vercel.app |
@@ -289,7 +332,13 @@ Then update SHOPIFY_APP_URL in .env.local and the Dev Dashboard with the ngrok U
 | 2026-04-12 | Stock Buddy successfully loading inside Shopify Admin iframe |
 | 2026-04-12 | ngrok installed for local OAuth testing |
 | 2026-04-12 | New Shopify API credentials added to .env.local and Vercel |
+| 2026-04-16 | Public-facing request-access flow built and deployed |
+| 2026-04-16 | Root route redirects to /request-access (no public install form) |
+| 2026-04-16 | Contact form modal added — SMTP via /api/contact |
+| 2026-04-16 | access_requests table created in Supabase |
+| 2026-04-16 | Admin activity page: standard header, bulk error delete, combined stats table |
+| 2026-04-16 | Schema_Reference.md updated: added beta_testers, beta_tester_sessions, access_requests |
 
 ---
 
-*Last updated: 2026-04-12*
+*Last updated: 2026-04-16*

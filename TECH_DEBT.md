@@ -125,9 +125,35 @@ it may serve stale cached data after a sync.
 
 ---
 
+### 8. beta_testers.tenant_id Not Written at Install Time
+**Status:** Deferred — resolved at render time via domain match
+**Risk:** If a beta tester's shopify_domain doesn't exactly match their tenants.shop_domain,
+the admin page will show them as "not connected" even after a successful install.
+**What was done for beta:**
+- The admin activity page (page.jsx) resolves tenant_id at render time by matching
+  beta_testers.shopify_domain against tenants.shop_domain
+- This is fragile — domain format mismatches (e.g. with https:// prefix or trailing slash)
+  will break the match silently
+- AddTesterModal now normalizes shopify_domain on save (strips protocol and trailing slash)
+
+**What needs to happen before launch:**
+- On successful OAuth install (callback route), look up the beta_testers row by
+  shop_domain and write the resolved tenant_id back to beta_testers.tenant_id
+- This makes the relationship explicit in the database rather than inferred at render time
+- Location: `src/app/api/shopify/callback/route.js` — after the tenant upsert, add:
+  ```js
+  await supabase
+    .from('beta_testers')
+    .update({ tenant_id: tenant.id, installed_at: new Date().toISOString() })
+    .eq('shopify_domain', shop)
+    .is('tenant_id', null);
+  ```
+
+---
+
 ## MODERATE — Should Fix Before or Shortly After Launch
 
-### 8. App Handle is Hardcoded
+### 9. App Handle is Hardcoded
 **Status:** Deferred
 **Location:** src/app/api/shopify/callback/route.js — `const APP_HANDLE = "stock-buddy-1"`
 **Risk:** If the app handle changes in the Dev Dashboard, the post-OAuth redirect breaks
@@ -138,7 +164,7 @@ SHOPIFY_APP_HANDLE=stock-buddy-1
 
 ---
 
-### 9. Debug Console Logs in OAuth and Sync Routes
+### 10. Debug Console Logs in OAuth and Sync Routes
 **Status:** Active — added during debugging on 2026-04-13
 **Locations:**
 - `src/app/api/shopify/install/route.js`
@@ -151,7 +177,7 @@ credentials) to server logs.
 
 ---
 
-### 10. ngrok-skip-browser-warning Header in next.config.mjs
+### 11. ngrok-skip-browser-warning Header in next.config.mjs
 **Status:** Active — required for local dev with ngrok
 **Risk:** Should not be sent in production responses
 **Location:** next.config.mjs headers() function
@@ -159,14 +185,14 @@ credentials) to server logs.
 
 ---
 
-### 11. PO Number Format is Hardcoded
+### 12. PO Number Format is Hardcoded
 **Status:** Deferred
 **What to do:** Make PO number format config-driven via the Settings page (Purchase Orders tab)
 **Reference:** Engineering_Specs.txt Section 20
 
 ---
 
-### 12. Signed Cookie CSRF — Test in Production
+### 13. Signed Cookie CSRF — Test in Production
 **Status:** Implemented but untested in production
 **Location:** src/lib/shopify/stateCookie.js
 **Note:** SameSite=None cookies require HTTPS and behave differently across browsers.
@@ -174,7 +200,7 @@ Verify the state cookie is set and read correctly in the production OAuth flow.
 
 ---
 
-### 13. Shopify App Icon
+### 14. Shopify App Icon
 **Status:** Using default Shopify app icon
 **What to do:** Upload the SB logo as the app icon in the Shopify Dev Dashboard:
 dev.shopify.com → Stock Buddy → Configuration → App icon
@@ -184,7 +210,7 @@ This icon appears in the Shopify Admin title bar, sidebar, and app listing.
 
 ## LOW — Nice to Have Before Launch
 
-### 14. Git Branch Cleanup
+### 15. Git Branch Cleanup
 **Status:** A `sandbox` branch exists locally but is now identical to `main`
 **What to do:** Delete the sandbox branch when convenient
 ```powershell
@@ -216,7 +242,13 @@ git branch -d sandbox
 | force-dynamic added to all server pages | 2026-04-13 | Prevents stale cache after sync operations |
 | Legacy install flow enabled | 2026-04-13 | App URL set to /api/shopify/install in Dev Dashboard |
 | Token exchange route built | 2026-04-13 | src/app/api/shopify/token-exchange/route.js — not yet functional |
+| Public request-access flow built | 2026-04-16 | Two-page flow: intro + form; access_requests table |
+| Root route changed to redirect to /request-access | 2026-04-16 | No public install form |
+| Contact form modal added | 2026-04-16 | Replaces mailto link; sends via SMTP to hello@brandongillon.com |
+| Admin activity page overhauled | 2026-04-16 | Standard header, combined stats table, bulk error delete |
+| Schema_Reference.md updated | 2026-04-16 | Added beta_testers, beta_tester_sessions, access_requests |
+| shopify_domain normalization on beta tester add | 2026-04-16 | Strips protocol and trailing slash in AddTesterModal |
 
 ---
 
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-16*

@@ -1,748 +1,81 @@
-# STOCK BUDDY — ENGINEERING SPEC FOR CLAUDE
-# Strict, deterministic instructions for generating code, pages, components, and backend logic.
-
-=====================================================================
-SECTION 1 — PROJECT OVERVIEW
-=====================================================================
-
-Stock Buddy is a Next.js 16.2 application using the App Router (Turbopack). It provides:
-- A dashboard
-- A Products page
-- An Inventory page
-- Supplier, Vendor, and Location management
-- Purchase Order management (create, detail, receive, cancel)
-- A Supabase-backed database
-- A Shopify sync pipeline
-
-The project uses:
-- React Server Components for data loading
-- Client Components for UI interactivity
-- Tailwind CSS for styling
-- Supabase JS client for database access
-- Shopify Admin API for sync
-
-All new code must follow the patterns defined in this document.
 
 
 =====================================================================
-SECTION 2 — FILE STRUCTURE RULES
+SECTION 24 — PUBLIC-FACING FLOW (REQUEST ACCESS)
 =====================================================================
 
-All files must be placed in the correct folder:
+Stock Buddy has a public-facing entry point at stock-buddy.brandongillon.com
+that is separate from the Shopify-embedded app flow.
 
-/src/app
-    - Route folders
-    - page.jsx files
-    - layout.js
-    - globals.css
-    - API routes under /api
+### Root route behavior (src/app/page.jsx)
+- If Shopify params (host + shop) are present → redirect to /dashboard
+  (merchant is inside the Shopify Admin iframe)
+- Otherwise → redirect to /request-access
+  (public visitor landing on the site)
+- InstallPage.jsx is no longer rendered at the root. It exists in
+  src/app/components/ but is not currently used. Do not delete it —
+  it may be repurposed later.
 
-/src/app/components
-    - App-level components shared across the root layout
-    - AppBridgeProvider.jsx lives here — do not move it to /shared/components/
-      because it is tightly coupled to layout.js and Next.js app shell concerns
+### Approved tester install flow
+There is no public install form. When a beta tester is approved, they
+are sent a direct OAuth URL:
+  https://stock-buddy.brandongillon.com/api/shopify/install?shop=their-store.myshopify.com
+This URL only works for the exact shop domain in the query param.
+Shopify enforces this during the OAuth flow.
 
-/src/app/<route>/components
-    - Components used exclusively by that route
-    - Co-located with the page they belong to
-    - Must still follow PascalCase .jsx naming conventions
+### Request-access flow (two pages)
 
-/src/shared/components/
-    - Shared components used by MORE THAN ONE page
-    - MUST be organized into subfolders — nothing lives directly in /shared/components/
-    - Subfolders:
-        ui/      — primitive UI components (Button, Badge, Toast, Card, PageHeader)
-        layout/  — structural wrappers (AppLayout, Header)
-        modals/  — shared modal shells (SearchModal)
-        icons/   — shared icon components (SortIcon)
+Page 1 — Intro (src/app/request-access/page.jsx)
+- Rendered by: src/app/request-access/components/RequestAccessIntro.jsx
+- Shows: app description, private beta notice, feature list (2x2 mini cards)
+- Actions: "Request Access" → navigates to /request-access/form
+           "Have Questions?" → opens ContactModal (inline, no page nav)
 
-/src/shared/utils
-    - Shared helper functions (formatters.js, getStoreSettings.js, usePagination.js)
+Page 2 — Form (src/app/request-access/form/page.jsx)
+- Rendered by: src/app/request-access/form/components/RequestAccessForm.jsx
+- Collects: store URL, contact info, business profile, current process,
+  beta participation intent, and two required acknowledgement checkboxes
+- Submits to: POST /api/request-access
+- On success: shows confirmation with submitter's email address
+- Back button returns to /request-access
 
-/src/lib
-    - supabaseClient.js
-    - supabaseAdmin.js
-    - tenants.js
-    - sync/ folder containing all Shopify sync logic
-
-Root-level files:
-    - next.config.mjs
-    - eslint.config.mjs
-    - jsconfig.json
-    - postcss.config.mjs
-    - package.json
-    - public/
-
-
-=====================================================================
-SECTION 3 — NAMING CONVENTIONS
-=====================================================================
-
-### Pages
-- Always named: page.jsx
-- Always placed inside a route folder: /src/app/<route>/page.jsx
-
-### Components
-- Always PascalCase
-- Always .jsx
-- If shared across multiple pages: place in /src/shared/components/<subfolder>/
-- If used by a single page only: place in /src/app/<route>/components/
-
-### Modals
-- Named: <Entity>DetailModal.jsx or <Entity>FilterModal.jsx
-- Must be client components
-
-### Server files
-- Must be .js or .jsx
-- Must not include "use client"
+### Contact modal (RequestAccessIntro.jsx)
+- Inline modal, not a separate page or route
+- Fields: Name, Email, Message
+- Submits to: POST /api/contact
+- On success: shows confirmation, then closes
+- Does NOT use mailto — avoids OS email client dialogs
 
 ### API routes
-- Must be placed under /src/app/api/<name>/route.js
 
-
-=====================================================================
-SECTION 4 — SERVER VS CLIENT RULES
-=====================================================================
-
-### Server Components (default)
-- Used for data fetching
-- Used for page-level rendering
-- Can import database helpers
-- Cannot use state, effects, or event handlers
-
-### Client Components
-- Must include: "use client"
-- Used for:
-    - Modals
-    - Tables
-    - Filters
-    - Buttons
-    - Interactive UI
-- Can use hooks, state, effects, event handlers
-
-
-=====================================================================
-SECTION 5 — DATA MODEL
-=====================================================================
-
-See Schema_Reference.md for the authoritative, up-to-date schema.
-Do not invent columns or tables not present in Schema_Reference.md.
-
-Key tables:
-- tenants
-- products, variants
-- suppliers, supplier_addresses, supplier_variants
-- supplier_csv_settings, supplier_transmission_recipients
-- vendors
-- locations, inventory_items, inventory_levels
-- purchase_orders, purchase_order_lines
-- po_shopify_incoming
-- sync_status, settings
-
-### Rules
-- No nested joins in UI components.
-- All joins must be done server-side.
-- Always flatten joined data before passing to client components.
-
-
-=====================================================================
-SECTION 6 — PAGE TEMPLATES
-=====================================================================
-
-All pages follow the server/client split pattern:
-
-### Server page (page.jsx)
-- Fetches data from Supabase
-- Resolves tenant via getTenantIdFromHeaders()
-- Flattens all joined data
-- Passes flat props to a client component
-- Wraps output in <AppLayout>
-
-### Client page (Client<Name>Page.jsx)
-- "use client"
-- Receives flat data as props
-- Handles all interactivity
-
-
-=====================================================================
-SECTION 7 — SHARED UI COMPONENTS
-=====================================================================
-
-Always import shared components from their correct subfolder.
-Never import from @/components — use @/shared/components/<subfolder>/.
-
-### Button — @/shared/components/ui/Button
-Props: variant ("primary" | "secondary" | "danger"), size ("sm" | "md"),
-       onClick, href, disabled, children, type
-Default variant: "primary" (blue)
-All buttons across the app must use this component.
-
-### Badge — @/shared/components/ui/Badge
-Props: status (string key), statusMap (optional override)
-Default status map covers PO statuses: draft, released, held,
-partially_received, received, cancelled, active, inactive.
-
-### Toast + useToast — @/shared/components/ui/Toast
-Named exports: Toast (component), useToast (hook)
-useToast returns { toast, showToast }
-showToast(message, type?, durationMs?)
-Never define inline Toast components in page files — always import.
-
-### Card — @/shared/components/ui/Card
-Props: title (optional), children, className, padding ("sm" | "md")
-Use for all white rounded bordered content boxes.
-
-### PageHeader — @/shared/components/ui/PageHeader
-Props: backHref, backLabel, title, badge, actions
-Use for all detail page headers (back button + title + badge + action buttons).
-
-### AppLayout — @/shared/components/layout/AppLayout
-Main page wrapper. Used on every page.
-Props: title, actions, paginationControls, showActionBar, bareLayout, children
-
-### Header — @/shared/components/layout/Header
-Global nav header. Imported by AppLayout only — never import directly.
-
-### SearchModal — @/shared/components/modals/SearchModal
-Shared search modal used by list pages.
-
-### SortIcon — @/shared/components/icons/SortIcon
-Used in sortable table column headers.
-
-
-=====================================================================
-SECTION 8 — MODAL TEMPLATES
-=====================================================================
-
-### Detail Modals
-- Must accept: isOpen, onClose, item
-- Must render all fields cleanly
-- Must not fetch data inside the modal
-
-### Filter Modals
-- Must accept: isOpen, onClose, onApplyFilters
-- Must return a filter object to the parent page
-
-
-=====================================================================
-SECTION 9 — TABLE TEMPLATES
-=====================================================================
-
-Tables must:
-- Be client components
-- Accept data as props
-- Use consistent left-aligned columns unless right-alignment is semantically required
-- Use standard text-sm font throughout — never override with font-mono or text-xs on data cells
-- Never fetch data internally
-- Never perform joins internally
-- Never mutate data
-
-
-=====================================================================
-SECTION 10 — SUPABASE RULES
-=====================================================================
-
-### supabaseClient.js
-- Must be imported from @/lib/supabaseClient
-- Must not be recreated inside components
-- Must not be used inside client components
-
-### Server data fetching
-- Always done in server components
-- Always use async/await
-- Always handle null results gracefully
-
-### Dynamic route params
-- Must be awaited: const { id } = await params
-
-
-=====================================================================
-SECTION 11 — SHOPIFY SYNC PIPELINE
-=====================================================================
-
-Located in /src/lib/sync/
-
-### Product sync files:
-- fetchProducts.js
-- processProducts.js
-- processVariants.js
-- shopifyHelpers.js
-- supabaseHelpers.js
-- syncProducts.js
-
-### PO sync files (located in /src/lib/sync/po/):
-- releasePO.js       — orchestrates PO release: DB update + Shopify incoming push
-- receivePO.js       — orchestrates receiving: DB update + Shopify incoming/available adjust
-- cancelPO.js        — orchestrates cancellation: DB update + Shopify incoming zero-out
-- pushIncoming.js    — pushes incoming qty to Shopify on release (idempotent)
-- poSyncHelpers.js   — shared utilities: Shopify API calls, DB logging, credential resolution
-
-### PO sync rules:
-- Stock Buddy is the canonical PO system
-- Shopify is the canonical inventory system
-- Never create or edit Shopify POs — only sync effects (incoming, available, metafields)
-- All Shopify calls are scoped by tenant credentials
-- po_shopify_incoming table tracks every push for idempotency and reversal
-- releasePO rolls back DB status if Shopify push fails
-- receivePO does NOT roll back DB on Shopify failure (received qty is ground truth)
-
-
-=====================================================================
-SECTION 12 — PO LIFECYCLE
-=====================================================================
-
-Status values (always lowercase):
-  draft → released → partially_received → received
-                   ↘ cancelled (from released or partially_received)
-
-Timestamps:
-- released_at     — set on release
-- received_at     — set when fully received
-- cancelled_at    — set on cancel
-- shopify_synced_at   — set after successful Shopify sync
-- shopify_sync_error  — last error message if sync failed
-
-### On Release:
-1. Validate status === "draft"
-2. Update status → "released", set released_at
-3. Push incoming quantities to Shopify via pushIncoming.js
-4. Write PO metafields to Shopify inventory items
-5. Log to po_shopify_incoming
-6. Stamp shopify_synced_at
-
-### On Receive:
-1. Validate status in ["released", "partially_received"]
-2. Update purchase_order_lines.received_qty_units
-3. Recalculate PO status (partially_received or received)
-4. Adjust Shopify: decrease incoming, increase available
-5. Mark po_shopify_incoming rows as reversed
-
-### On Cancel:
-1. Update status → "cancelled", set cancelled_at
-2. Zero out remaining incoming in Shopify
-3. Mark po_shopify_incoming rows as reversed
-
-
-=====================================================================
-SECTION 13 — WHEN GENERATING NEW CODE
-=====================================================================
-
-Claude must:
-1. Place files in the correct folder per Section 2
-2. Use correct naming conventions per Section 3
-3. Use server components for data fetching
-4. Use client components for UI
-5. Use Supabase client only in server components
-6. Never perform joins in client components
-7. Always import shared UI from @/shared/components/<subfolder>/
-8. Always use Button, Badge, Toast, Card, PageHeader from shared/components/ui/
-9. Never define inline Toast or button style classes — use shared components
-10. Follow modal and table templates exactly
-11. Follow data model in Schema_Reference.md exactly
-12. Follow sync pipeline architecture exactly
-
-If the user asks for a new page:
-- Create a server page in /src/app/<route>/page.jsx
-- Create a client page in /src/app/<route>/components/<ClientPage>.jsx
-- Use AppLayout from @/shared/components/layout/AppLayout
-- Use PageHeader from @/shared/components/ui/PageHeader
-- Use Button, Badge, Toast, Card from @/shared/components/ui/
-
-If the user asks for a new modal:
-- Place it in /src/shared/components/modals/ if shared
-- Place it in /src/app/<route>/components/ if single-use
-- Follow modal template rules
-
-If the user asks for a new API route:
-- Place it in /src/app/api/<name>/route.js
-- Use Next.js App Router conventions
-- Use getTenantId(request) from @/lib/tenants
-
-
-=====================================================================
-SECTION 14 — ABSOLUTE RULES
-=====================================================================
-
-- Never invent new folders.
-- Never invent new naming patterns.
-- Never fetch data inside client components.
-- Never use Supabase inside client components.
-- Never perform joins in client components.
-- Never create nested data structures for UI.
-- Always flatten data server-side.
-- Always follow the patterns in this document.
-- Co-locate single-use components with their route in /src/app/<route>/components/.
-- Never place anything directly in /src/shared/components/ — always use a subfolder.
-- Never import from @/components — the correct path is @/shared/components/<subfolder>/.
-- Never define inline Toast components, button class strings, or badge logic in page files.
-
-
-=====================================================================
-SECTION 15 — TENANT CONTEXT (DEV FALLBACK — REMOVE BEFORE PRODUCTION)
-=====================================================================
-
-All API routes use a getTenantId(request) helper defined in
-/src/lib/tenants.js that reads the x-shop-domain header and resolves
-the tenant from the tenants table.
-
-During local development, getTenantId() falls back to the dev shop
-domain defined in NEXT_PUBLIC_DEV_SHOP_DOMAIN in .env.local if the
-header is missing.
-
-BEFORE GOING TO PRODUCTION:
-- Remove the fallback from getTenantId() in /src/lib/tenants.js
-- Ensure NEXT_PUBLIC_DEV_SHOP_DOMAIN is not set in production env
-- Ensure proxy.js is enforcing the x-shop-domain header on all requests
-- Verify RLS is blocking cross-tenant queries in Supabase
-
-
-=====================================================================
-SECTION 16 — TENANT RESOLUTION ARCHITECTURE
-=====================================================================
-
-Two helpers in /src/lib/tenants.js handle tenant resolution:
-
-getTenantId(request)
-- For use in API routes
-- Reads x-shop-domain from a Request object
-- Falls back to NEXT_PUBLIC_DEV_SHOP_DOMAIN and DEV_SHOP_DOMAIN env vars in dev
-- REMOVE fallbacks before going to production
-
-getTenantIdFromHeaders(headersList)
-- For use in server components
-- Reads from Next.js headers() result (import { headers } from 'next/headers')
-- Falls back to NEXT_PUBLIC_DEV_SHOP_DOMAIN and DEV_SHOP_DOMAIN env vars in dev
-- REMOVE fallbacks before going to production
-
-supabaseAdmin in /src/lib/supabaseAdmin.js
-- Uses SUPABASE_SERVICE_ROLE_KEY
-- Bypasses RLS — used only for tenant lookups and infrastructure code
-- Never use for tenant-scoped data queries
-
-Usage pattern in server components:
-  const headersList = await headers();
-  const tenantId = await getTenantIdFromHeaders(headersList);
-
-Usage pattern in API routes:
-  const tenantId = await getTenantId(request);
-
-
-=====================================================================
-SECTION 17 — SUPABASE DEV CONFIGURATION
-=====================================================================
-
-Current dev configuration (revert before production):
-
-- supabase in supabaseClient.js uses SUPABASE_SERVICE_ROLE_KEY (bypasses RLS)
-- setTenantContext() is a no-op — RLS enforcement deferred to production auth
-- RLS is disabled on all tables in dev
-- set_tenant_id() Postgres function exists but not currently called
-- All existing data backfilled with tenant_id from brandongtest.myshopify.com
-
-.env.local required keys:
-  NEXT_PUBLIC_SUPABASE_URL
-  NEXT_PUBLIC_SUPABASE_ANON_KEY
-  SUPABASE_SERVICE_ROLE_KEY
-  NEXT_PUBLIC_DEV_SHOP_DOMAIN=brandongtest.myshopify.com
-  DEV_SHOP_DOMAIN=brandongtest.myshopify.com
-  SHOPIFY_STORE_DOMAIN
-  SHOPIFY_ADMIN_API_TOKEN
-  SHOPIFY_API_VERSION
-  SHOPIFY_API_KEY               ← Client ID from Shopify Dev Dashboard
-  NEXT_PUBLIC_SHOPIFY_API_KEY   ← Same value as SHOPIFY_API_KEY — needs NEXT_PUBLIC_ prefix for App Bridge (browser)
-  SHOPIFY_API_SECRET            ← Client secret from Shopify Dev Dashboard
-  SHOPIFY_APP_URL               ← ngrok tunnel URL in dev, production URL in prod
-  SMTP_HOST
-  SMTP_PORT
-  SMTP_USER
-  SMTP_PASS
-
-BEFORE GOING TO PRODUCTION:
-- Switch supabase client back to NEXT_PUBLIC_SUPABASE_ANON_KEY
-- Re-enable RLS on all tables
-- Make setTenantContext() call set_tenant_id() RPC again
-- Remove DEV_SHOP_DOMAIN fallbacks from tenants.js
-- Grant execute on set_tenant_id() to anon and authenticated roles
-
-
-=====================================================================
-SECTION 18 — PROXY (FORMERLY MIDDLEWARE)
-=====================================================================
-
-Next.js 16 renamed middleware to proxy. File lives at src/proxy.js.
-The exported function must be named "proxy" not "middleware".
-
-The proxy:
-- Reads shop domain from x-shop-domain header, ?shop query param,
-  or NEXT_PUBLIC_DEV_SHOP_DOMAIN env var (dev fallback)
-- Reads host param from x-shopify-host header or ?host query param
-- Sets x-shop-domain header on every request for downstream use
-- Sets x-shopify-host header on every request for App Bridge use
-- Passes through /_next/static, /_next/image, /favicon.ico
-
-BEFORE GOING TO PRODUCTION:
-- Remove NEXT_PUBLIC_DEV_SHOP_DOMAIN fallback from proxy.js
-- Enforce rejection of requests with no shop domain instead of passing through
-
-
-=====================================================================
-SECTION 19 — SUPPLIER DETAIL PAGE PATTERNS
-=====================================================================
-
-The supplier detail page uses an inline tab pattern where tabs appear
-on the same row as the back button and supplier name/number.
-
-Current tabs:
-1. General Info   — top row of info cards (read-only)
-2. Product Data   — associated products table
-3. CSV Overrides  — per-supplier CSV field toggles
-4. Transmission   — PO email recipient table
-
-CSV Overrides tab behavior:
-- Loads global CSV settings from /api/settings
-- Loads supplier-specific settings from /api/suppliers/[id]/csv-settings
-- Auto-saves on every toggle change (no Save button)
-- Auto-switches to Supplier-Specific mode when any toggle is changed
-- use_global flag stored in supplier_csv_settings.use_global column
-- Settings stored in supplier_csv_settings table (one row per supplier,
-  one boolean column per CSV field)
-
-Transmission tab behavior:
-- Loads recipients from /api/suppliers/[id]/transmission
-- Explicit Save button (batch save — delete + re-insert all rows)
-- Save button disabled until a change is made
-- Validates at least one Primary recipient with email before saving
-- Each recipient has: label, email, role (Primary/CC/BCC), send_pdf, send_csv
-
-
-=====================================================================
-SECTION 20 — SETTINGS PAGE TABS
-=====================================================================
-
-Settings page tabs (src/app/settings/):
-- PDF      — contact info and logo for PO PDFs (PDFTab.jsx)
-- CSV      — global CSV export field toggles (CSVTab.jsx)
-- Email    — PO email subject/body templates (in SettingsClient.jsx)
-- Purchase Orders — PO number format and defaults (in SettingsClient.jsx)
-
-Suppliers tab was removed from Settings — supplier-specific settings
-now live on the Supplier detail page under the CSV Overrides and
-Transmission tabs.
-
-CSV toggle pattern (used in both CSVTab and supplier CSV Overrides):
-- Toggle built with inline styles (not Tailwind dynamic classes)
-  to avoid thumb positioning issues
-- Three-column layout: Header Fields | Line Item Fields | Optional Internal Fields
-- Required fields show "Req" badge and cannot be toggled
-
-=====================================================================
-SECTION 21 — SHOPIFY OAUTH FLOW
-=====================================================================
-
-Stock Buddy uses Shopify's OAuth 2.0 flow for app installation.
-All OAuth-related files live in /src/lib/shopify/ and /src/app/api/shopify/.
-
-### File locations
-- src/lib/shopify/hmac.js          — HMAC verification utility
-- src/lib/shopify/sessionToken.js  — Session token (JWT) verification
-- src/app/api/shopify/install/route.js   — Install entry point
-- src/app/api/shopify/callback/route.js  — OAuth callback, token exchange
-
-### OAuth flow sequence
-1. Shopify hits /api/shopify/install with shop, hmac, timestamp params
-2. Install route verifies HMAC, builds authorization URL, redirects merchant to Shopify
-3. Merchant approves the app on Shopify
-4. Shopify redirects to /api/shopify/callback with shop, code, state, hmac params
-5. Callback route verifies HMAC, exchanges code for permanent access token
-6. Callback upserts tenant record in Supabase (shop_domain + access_token)
-7. Merchant is redirected into the embedded app in Shopify Admin
-
-### Required scopes
-read_products, read_inventory, write_inventory, read_locations,
-read_merchant_managed_fulfillment_orders
-
-### Shop domain validation
-All routes that accept a shop param must validate it with this regex:
-  /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/
-Never trust or redirect to an unvalidated shop domain.
-
-### HMAC verification
-All OAuth requests from Shopify must have their HMAC verified before
-any processing occurs. Use verifyOAuthHmac(searchParams) from
-@/lib/shopify/hmac for install and callback routes.
-
-### State param (CSRF protection)
-The install route generates a random nonce (crypto.randomUUID()) and
-passes it as the state param to Shopify. Shopify returns it unchanged
-in the callback. In production, this must be stored in a signed cookie
-during install and compared in the callback.
-TODO: Implement signed cookie CSRF protection before production.
-
-### Tenant upsert on install
-The callback route upserts into the tenants table using onConflict: "shop_domain".
-This handles both first installs and reinstalls correctly.
-On reinstall, access_token is updated and uninstalled_at is cleared.
-
-### Redirect after OAuth
-After successful OAuth, the merchant is redirected to:
-  https://{shop}/admin/apps/{app-handle}
-This loads Stock Buddy inside the Shopify Admin iframe.
-
-### Dev Dashboard
-App configuration (App URL, redirect URLs, scopes) is managed at:
-  https://dev.shopify.com (Shopify Dev Dashboard)
-Not in the Partners Dashboard — Shopify moved app config to the Dev Dashboard.
-
-### ngrok for local development
-Shopify cannot redirect to localhost. Use ngrok to expose a public HTTPS URL:
-  ngrok http 3000
-Update SHOPIFY_APP_URL in .env.local and the App URL + redirect URL in the
-Dev Dashboard every time the ngrok URL changes (free plan generates a new URL
-on each restart). The redirect URL to whitelist is:
-  https://{ngrok-url}/api/shopify/callback
-
-BEFORE GOING TO PRODUCTION:
-- Replace ngrok URL with real production URL in SHOPIFY_APP_URL
-- Update App URL and redirect URL in Dev Dashboard to production URL
-- Implement signed cookie CSRF check for state param in callback route
-
-
-=====================================================================
-SECTION 22 — SHOPIFY EMBEDDED APP (APP BRIDGE)
-=====================================================================
-
-Stock Buddy is an embedded Shopify app — it runs inside an iframe
-within the Shopify Admin. This affects how authentication works on
-every API request.
-
-### Why session tokens are required
-Embedded apps run inside an iframe. Browsers block third-party cookies
-in iframes, so standard cookie-based sessions don't work. Instead,
-Shopify's App Bridge JS library automatically attaches a short-lived
-JWT (session token) to every API request the frontend makes.
-
-### Session token structure
-Shopify session tokens are HS256-signed JWTs containing:
-  iss  — issuer: "https://{shop}/admin"
-  dest — destination: "https://{shop}" (use this to extract shop domain)
-  aud  — audience: your SHOPIFY_API_KEY (client ID)
-  sub  — merchant user ID
-  exp  — expiration (tokens are short-lived, ~60 seconds)
-  nbf  — not before
-  iat  — issued at
-  jti  — unique token ID
-  sid  — session ID
-
-### Session token verification utility
-File: src/lib/shopify/sessionToken.js
-Export: getShopFromSessionToken(request)
-
-Usage in API routes:
-  import { getShopFromSessionToken } from "@/lib/shopify/sessionToken";
-  const shop = await getShopFromSessionToken(request);
-  if (!shop) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-Verifies: signature, algorithm (HS256), expiration, not-before,
-audience (must match SHOPIFY_API_KEY), shop domain format.
-
-### Authorization header format
-App Bridge sends the token as:
-  Authorization: Bearer {jwt}
-
-### Dev fallback
-getShopFromSessionToken() falls back to DEV_SHOP_DOMAIN if no
-Authorization header is present. This allows local dev to work
-without App Bridge running.
-REMOVE THIS FALLBACK BEFORE GOING TO PRODUCTION.
-
-### App Bridge frontend wiring (COMPLETE)
-App Bridge is installed and initialized in the app shell.
-- @shopify/app-bridge-react is installed
-- AppBridgeProvider.jsx lives at src/app/components/AppBridgeProvider.jsx
-- AppBridgeProvider is wrapped in Suspense in layout.js (required by useSearchParams)
-- Reads shop and host params from URL — both supplied by Shopify when loading in iframe
-- If shop/host are absent (local dev), renders children directly without App Bridge
-- NEXT_PUBLIC_SHOPIFY_API_KEY is the env var used by AppBridgeProvider (browser-accessible)
-- proxy.js forwards the host param as x-shopify-host on every request
-
-Remaining before production:
-- Remove DEV_SHOP_DOMAIN fallbacks from sessionToken.js and tenants.js
-- Verify session tokens are being sent on API requests when running inside Shopify Admin
-- Verify all API routes reject requests with invalid or missing session tokens
-
-### Production auth sequence
-1. Merchant opens app in Shopify Admin
-2. App Bridge initializes, fetches a session token from Shopify
-3. Frontend attaches token to every API request as Authorization: Bearer {jwt}
-4. API routes call getShopFromSessionToken(request) to verify and get shop
-5. Shop domain is used to resolve tenantId via getTenantId() in tenants.js
-6. All Supabase queries are scoped to that tenantId
-
-BEFORE GOING TO PRODUCTION:
-- Remove DEV_SHOP_DOMAIN fallback from sessionToken.js
-- Remove DEV_SHOP_DOMAIN fallback from tenants.js
-- Verify all API routes reject requests with invalid or missing session tokens
-
-
-=====================================================================
-SECTION 23 — SHOPIFY AUTH FILE REFERENCE
-=====================================================================
-
-All Shopify authentication utilities live in src/lib/shopify/.
-This folder is separate from src/lib/sync/ (which handles data sync).
-
-### src/lib/shopify/hmac.js
-Purpose: HMAC-SHA256 verification for OAuth requests and webhooks.
-Exports:
-  verifyOAuthHmac(searchParams)
-    - Input: URLSearchParams from the incoming request URL
-    - Strips hmac param, sorts remaining params, signs, compares
-    - Returns: Promise<boolean>
-    - Use in: install route, callback route
-
-  verifyWebhookHmac(rawBody, signature)
-    - Input: raw request body (string/Buffer/Uint8Array), X-Shopify-Hmac-SHA256 header value
-    - Signs raw body, compares to base64-encoded signature
-    - Returns: Promise<boolean>
-    - Use in: webhook handler routes
-    - IMPORTANT: must receive raw body before JSON.parse()
-
-Uses Web Crypto API — works in Node.js 18+ and Edge Runtime.
-Uses constant-time comparison (safeEqual) to prevent timing attacks.
-Reads SHOPIFY_API_SECRET from environment.
-
-### src/lib/shopify/sessionToken.js
-Purpose: JWT verification for embedded app session tokens.
-Exports:
-  getShopFromSessionToken(request)
-    - Input: Next.js API route Request object
-    - Reads Authorization: Bearer {jwt} header
-    - Verifies signature, exp, nbf, aud, shop domain
-    - Returns: Promise<string|null> — shop domain or null if invalid
-    - Falls back to DEV_SHOP_DOMAIN in dev (remove before production)
-    - Use in: all API routes that need tenant identity
-
-### src/app/components/AppBridgeProvider.jsx
-Purpose: Initializes Shopify App Bridge in the embedded app iframe.
-- Client component — uses useSearchParams() and browser APIs
-- Reads shop and host from URL params
-- Wraps children in Shopify's <Provider> when params are present
-- Renders children directly when params are absent (local dev fallback)
-- Imported by layout.js, wrapped in Suspense
-
-### src/app/api/shopify/install/route.js
-Purpose: OAuth install entry point.
-- Validates shop param format
-- Verifies HMAC
-- Builds Shopify authorization URL with required scopes
-- Generates nonce (state param) for CSRF protection
-- Redirects merchant to Shopify for app approval
-
-### src/app/api/shopify/callback/route.js
-Purpose: OAuth callback — completes the install flow.
-- Validates shop param format
-- Verifies HMAC
-- Validates state param presence
-- Exchanges temporary code for permanent access token
-- Upserts tenant in Supabase (handles installs and reinstalls)
-- Redirects merchant into the embedded app
+POST /api/request-access (src/app/api/request-access/route.js)
+- No auth required (public form)
+- Validates required fields: store_url, contact_name, contact_email,
+  understands_private_beta, agrees_no_share_link
+- Inserts into access_requests table with status = 'pending'
+- Returns { success: true } on success
+
+POST /api/contact (src/app/api/contact/route.js)
+- No auth required (public form)
+- Validates required fields: name, email, message
+- Sends plain-text email to hello@brandongillon.com via SMTP
+- Sets replyTo to submitter's email so replies go directly to them
+- Uses same nodemailer transporter pattern as sendPOEmail.js
+
+### Beta tester approval workflow (manual, no automation)
+1. Review submissions in Supabase: access_requests table
+2. Update status to 'approved' or 'rejected' and set reviewed_at
+3. Manually add approved applicant to beta_testers table
+4. Send them the direct OAuth URL for their shop domain
+5. After they install, their tenant record is created automatically
+   and the admin page resolves their tenant_id via shopify_domain match
+
+### Key files
+- src/app/page.jsx — root route, redirects to /request-access
+- src/app/request-access/page.jsx — intro page (Page 1)
+- src/app/request-access/components/RequestAccessIntro.jsx — intro client component
+- src/app/request-access/form/page.jsx — form page (Page 2)
+- src/app/request-access/form/components/RequestAccessForm.jsx — form client component
+- src/app/api/request-access/route.js — form submission handler
+- src/app/api/contact/route.js — contact modal submission handler
+- src/app/components/InstallPage.jsx — retained but not currently used
