@@ -112,6 +112,7 @@ const INITIAL_FORM = {
   willing_to_provide_feedback: '',
   open_to_onboarding_calls: '',
   how_soon_to_start: '',
+  how_soon_to_start_option: '',
   anything_else: '',
   understands_private_beta: false,
   agrees_no_share_link: false,
@@ -170,7 +171,8 @@ function isFormComplete(form) {
     form.why_interested.trim() &&
     form.willing_to_provide_feedback !== '' &&
     form.open_to_onboarding_calls !== '' &&
-    form.how_soon_to_start &&
+    form.how_soon_to_start_option &&
+    (form.how_soon_to_start_option !== 'Custom' || form.how_soon_to_start) &&
     form.understands_private_beta &&
     form.agrees_no_share_link
   );
@@ -213,10 +215,12 @@ export default function RequestAccessForm() {
 
     setSubmitting(true);
     try {
+      // eslint-disable-next-line no-unused-vars
+      const { how_soon_to_start_option, ...payload } = form;
       const res = await fetch('/api/request-access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
 
@@ -383,15 +387,38 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label required>How soon are you looking to get started?</Label>
-                <select className={selectCls()} value={form.how_soon_to_start} onChange={e => set('how_soon_to_start', e.target.value)} disabled={submitting}>
-                  <option value="">Select…</option>
-                  <option>Immediately</option>
-                  <option>Within the next month</option>
-                  <option>1–3 months</option>
-                  <option>3–6 months</option>
-                  <option>Just exploring for now</option>
-                </select>
+                <Label required>When do you expect to start?</Label>
+                <div className="flex flex-col gap-2 mt-2">
+                  {['Immediately', 'Next Week', 'Custom', "I'm not sure"].map(v => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="how_soon_to_start"
+                        value={v}
+                        checked={form.how_soon_to_start_option === v}
+                        onChange={() => {
+                          set('how_soon_to_start_option', v);
+                          if (v !== 'Custom') set('how_soon_to_start', v);
+                          else set('how_soon_to_start', '');
+                        }}
+                        disabled={submitting}
+                        className="h-4 w-4 border-gray-300 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">{v}</span>
+                    </label>
+                  ))}
+                  <input
+                    type="date"
+                    disabled={submitting || form.how_soon_to_start_option !== 'Custom'}
+                    value={form.how_soon_to_start_option === 'Custom' ? form.how_soon_to_start : ''}
+                    onChange={e => set('how_soon_to_start', e.target.value)}
+                    className={`mt-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-opacity w-40 ${
+                      form.how_soon_to_start_option === 'Custom'
+                        ? 'border-gray-300 opacity-100'
+                        : 'border-gray-200 opacity-40 pointer-events-none'
+                    }`}
+                  />
+                </div>
               </div>
 
               <div className="md:col-span-3">

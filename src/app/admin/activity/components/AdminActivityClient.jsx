@@ -251,26 +251,20 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
                 <ModalSection title="Tester Record">
                   <Row label="Email"     value={tester.contact_email ?? '—'} />
                   <Row label="Phone"     value={tester.contact_phone ?? '—'} />
-                  <Row label="Invited"   value={formatDate(tester.invited_at)} />
+                  {accessRequest && <Row label="Submitted" value={formatDate(accessRequest.created_at)} />}
+                  <Row label="Invited"   value={tester.invited_at ? formatDate(tester.invited_at) : '—'} />
                   <Row label="Installed" value={tester.installed_at ? formatDate(tester.installed_at) : '—'} />
                   <Row label="Connected" value={tester.connected_at ? formatDate(tester.connected_at) : '—'} />
+                  {accessRequest?.reviewed_at && <Row label="Reviewed" value={formatDate(accessRequest.reviewed_at)} />}
                 </ModalSection>
 
                 {accessRequest && (
-                  <>
-                    <ModalSection title="Business Profile">
-                      <Row label="Company Size"         value={accessRequest.company_size ?? '—'} />
-                      <Row label="Monthly Order Volume" value={accessRequest.monthly_order_volume ?? '—'} />
-                      <Row label="SKUs / Variants"      value={accessRequest.num_skus_variants ?? '—'} />
-                      <Row label="Inventory Methods"    value={(accessRequest.current_inventory_methods ?? []).join(', ') || '—'} />
-                    </ModalSection>
-
-                    <ModalSection title="Submission">
-                      <Row label="Submitted" value={formatDate(accessRequest.created_at)} />
-                      <Row label="Status"    value={accessRequest.status} />
-                      {accessRequest.reviewed_at && <Row label="Reviewed" value={formatDate(accessRequest.reviewed_at)} />}
-                    </ModalSection>
-                  </>
+                  <ModalSection title="Business Profile">
+                    <Row label="Company Size"         value={accessRequest.company_size ?? '—'} />
+                    <Row label="Monthly Order Volume" value={accessRequest.monthly_order_volume ?? '—'} />
+                    <Row label="SKUs / Variants"      value={accessRequest.num_skus_variants ?? '—'} />
+                    <Row label="Inventory Methods"    value={(accessRequest.current_inventory_methods ?? []).join(', ') || '—'} />
+                  </ModalSection>
                 )}
 
                 {!accessRequest && (
@@ -331,8 +325,8 @@ function ModalSection({ title, children }) {
 
 function Row({ label, value }) {
   return (
-    <div className="flex gap-2">
-      <span className="text-gray-500 shrink-0 w-48">{label}</span>
+    <div className="text-sm">
+      <span className="text-gray-500">{label}: </span>
       <span className="text-gray-900">{value ?? '—'}</span>
     </div>
   );
