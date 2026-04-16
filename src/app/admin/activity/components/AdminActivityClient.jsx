@@ -150,16 +150,12 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
 
 function ApproveModal({ tester, accessRequest, adminKey, onClose, onApproved }) {
   const installUrl = `https://stock-buddy.brandongillon.com/api/shopify/install?shop=${accessRequest?.store_url ?? ''}`;
+  const firstName  = (accessRequest?.contact_name ?? tester.contact_name ?? '').split(' ')[0] || 'there';
 
   const approvalBody =
-`Hi ${accessRequest?.contact_name ?? 'there'},
+`Great news — your request to join the Stock Buddy private beta has been approved!
 
-Great news — your request to join the Stock Buddy private beta has been approved!
-
-You can install Stock Buddy into your Shopify store using the link below. This link is specific to your store and will not work for any other Shopify account.
-
-Install link:
-${installUrl}
+You can install Stock Buddy into your Shopify store using the button below. This link is specific to your store and will not work for any other Shopify account.
 
 Once installed, Stock Buddy will appear inside your Shopify Admin. If you run into any issues during setup, feel free to reply to this email and I'll help you get sorted.
 
@@ -191,9 +187,11 @@ Buddy System Apps`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           access_request_id: accessRequest?.id ?? null,
-          to_email:  form.to,
-          subject:   form.subject,
-          message:   form.message,
+          to_email:     form.to,
+          subject:      form.subject,
+          message:      form.message,
+          contact_name: accessRequest?.contact_name ?? tester.contact_name ?? '',
+          store_url:    accessRequest?.store_url ?? tester.shopify_domain ?? '',
         }),
       });
       const data = await res.json();
@@ -210,7 +208,7 @@ Buddy System Apps`;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-base font-semibold text-gray-900">Send Approval Email</h3>
@@ -226,71 +224,40 @@ Buddy System Apps`;
             <div className="text-3xl mb-3">✅</div>
             <p className="text-sm font-semibold text-gray-900 mb-1">Approval email sent.</p>
             <p className="text-sm text-gray-500">The request has been marked as approved.</p>
-            <button onClick={onClose} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
-              Close
-            </button>
+            <button onClick={onClose} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">Close</button>
           </div>
         ) : (
           <div className="px-6 py-5 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
-              <input
-                type="email"
-                value={form.to}
-                onChange={e => set('to', e.target.value)}
-                disabled={sending}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
+            <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+              <p className="text-xs text-blue-700">The greeting <strong>"Hi {firstName},"</strong> and install button are added automatically — no need to include them in the message body.</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-              <input
-                type="text"
-                value={form.from}
-                disabled
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
+                <input type="email" value={form.to} onChange={e => set('to', e.target.value)} disabled={sending} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                <input type="text" value={form.from} disabled className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                value={form.subject}
-                onChange={e => set('subject', e.target.value)}
-                disabled={sending}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
+              <input type="text" value={form.subject} onChange={e => set('subject', e.target.value)} disabled={sending} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
-              <textarea
-                value={form.message}
-                onChange={e => set('message', e.target.value)}
-                disabled={sending}
-                rows={10}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
-              />
+              <textarea value={form.message} onChange={e => set('message', e.target.value)} disabled={sending} rows={10} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50" />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex justify-end gap-3 pt-1">
-              <button
-                onClick={onClose}
-                disabled={sending}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={sending || !form.to.trim() || !form.subject.trim() || !form.message.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
-              >
+              <button onClick={onClose} disabled={sending} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+              <button onClick={handleSend} disabled={sending || !form.to.trim() || !form.subject.trim() || !form.message.trim()} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors">
                 {sending ? 'Sending…' : 'Send Email'}
               </button>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
@@ -298,9 +265,10 @@ Buddy System Apps`;
 
 // ── Reject Modal ──────────────────────────────────────────────────────────────
 
-const REJECTION_BODY = `Hi there,
+function RejectModal({ tester, accessRequest, adminKey, onClose, onRejected }) {
+  const firstName = (accessRequest?.contact_name ?? tester.contact_name ?? '').split(' ')[0] || 'there';
 
-Thank you for your interest in joining the Stock Buddy private beta and for taking the time to submit your request. We truly appreciate your willingness to explore new tools and help shape the early versions of the product.
+  const REJECTION_BODY = `Thank you for your interest in joining the Stock Buddy private beta and for taking the time to submit your request. We truly appreciate your willingness to explore new tools and help shape the early versions of the product.
 
 At this time, we're not able to approve your request for beta access. The current phase of the beta has limited capacity, and we're onboarding merchants in stages based on specific testing needs and technical constraints.
 
@@ -311,16 +279,15 @@ Thank you again for your interest and understanding. If you have any questions o
 Best regards, Brandon
 Buddy System Apps`;
 
-function RejectModal({ tester, accessRequest, adminKey, onClose, onRejected }) {
-  const [form, setForm]         = useState({
+  const [form, setForm]       = useState({
     to:      tester.contact_email ?? '',
     from:    'hello@brandongillon.com',
     subject: 'Your Stock Buddy Beta Request',
     message: REJECTION_BODY,
   });
-  const [sending, setSending]   = useState(false);
-  const [error, setError]       = useState(null);
-  const [sent, setSent]         = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError]     = useState(null);
+  const [sent, setSent]       = useState(false);
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }));
@@ -335,9 +302,10 @@ function RejectModal({ tester, accessRequest, adminKey, onClose, onRejected }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           access_request_id: accessRequest?.id ?? null,
-          to_email:  form.to,
-          subject:   form.subject,
-          message:   form.message,
+          to_email:     form.to,
+          subject:      form.subject,
+          message:      form.message,
+          contact_name: accessRequest?.contact_name ?? tester.contact_name ?? '',
         }),
       });
       const data = await res.json();
@@ -354,7 +322,7 @@ function RejectModal({ tester, accessRequest, adminKey, onClose, onRejected }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-base font-semibold text-gray-900">Send Rejection Email</h3>
@@ -370,71 +338,40 @@ function RejectModal({ tester, accessRequest, adminKey, onClose, onRejected }) {
             <div className="text-3xl mb-3">✅</div>
             <p className="text-sm font-semibold text-gray-900 mb-1">Rejection email sent.</p>
             <p className="text-sm text-gray-500">The request has been marked as rejected.</p>
-            <button onClick={onClose} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
-              Close
-            </button>
+            <button onClick={onClose} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">Close</button>
           </div>
         ) : (
           <div className="px-6 py-5 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
-              <input
-                type="email"
-                value={form.to}
-                onChange={e => set('to', e.target.value)}
-                disabled={sending}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
+            <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+              <p className="text-xs text-blue-700">The greeting <strong>"Hi {firstName},"</strong> is added automatically — no need to include it in the message body.</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
-              <input
-                type="text"
-                value={form.from}
-                disabled
-                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
+                <input type="email" value={form.to} onChange={e => set('to', e.target.value)} disabled={sending} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                <input type="text" value={form.from} disabled className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                value={form.subject}
-                onChange={e => set('subject', e.target.value)}
-                disabled={sending}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
+              <input type="text" value={form.subject} onChange={e => set('subject', e.target.value)} disabled={sending} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
-              <textarea
-                value={form.message}
-                onChange={e => set('message', e.target.value)}
-                disabled={sending}
-                rows={10}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
-              />
+              <textarea value={form.message} onChange={e => set('message', e.target.value)} disabled={sending} rows={10} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50" />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex justify-end gap-3 pt-1">
-              <button
-                onClick={onClose}
-                disabled={sending}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={sending || !form.to.trim() || !form.subject.trim() || !form.message.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
-              >
+              <button onClick={onClose} disabled={sending} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50">Cancel</button>
+              <button onClick={handleSend} disabled={sending || !form.to.trim() || !form.subject.trim() || !form.message.trim()} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors">
                 {sending ? 'Sending…' : 'Send Email'}
               </button>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

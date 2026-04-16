@@ -1,9 +1,10 @@
 // src/app/api/admin/reject-tester/route.js
-// Sends a rejection email to the applicant and marks the access_request as rejected.
+// Sends a rejection email and marks the access_request as rejected.
 
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import nodemailer from 'nodemailer';
+import { buildEmailHtml } from '@/lib/email/buildEmailHtml';
 
 export async function POST(request) {
   const { searchParams } = new URL(request.url);
@@ -18,14 +19,28 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { access_request_id, to_email, subject, message } = body;
+  const { access_request_id, to_email, subject, message, contact_name } = body;
 
   if (!access_request_id) return NextResponse.json({ error: 'access_request_id is required.' }, { status: 400 });
   if (!to_email?.trim())   return NextResponse.json({ error: 'Recipient email is required.' }, { status: 400 });
   if (!subject?.trim())    return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   if (!message?.trim())    return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
 
-  // ── Send rejection email ──────────────────────────────────────────────────
+  const firstName = (contact_name ?? '').split(' ')[0] || 'there';
+
+  const bodyParagraphs = message
+    .trim()
+    .split(/\n\n+/)
+    .map(p => `<p style="margin:0 0 16px 0;">${p.replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">Hi ${firstName},</p>
+    ${bodyParagraphs}
+  `;
+
+  const textEmail = `Hi ${firstName},\n\n${message.trim()}\n\nBest regards, Brandon\nBuddy System Apps`;
+
   const transporter = nodemailer.createTransport({
     host:   process.env.SMTP_HOST,
     port:   Number(process.env.SMTP_PORT),
@@ -35,29 +50,25 @@ export async function POST(request) {
 
   try {
     await transporter.sendMail({
-      from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
+      from:    '"Stock Buddy" <hello@brandongillon.com>',
       to:      to_email.trim(),
-      replyTo: process.env.SMTP_USER,
+      replyTo: 'hello@brandongillon.com',
       subject: subject.trim(),
-      text:    message.trim(),
+      text:    textEmail,
+      html:    buildEmailHtml({ bodyHtml }),
     });
   } catch (err) {
     console.error('[reject-tester] SMTP error:', err);
     return NextResponse.json({ error: 'Failed to send email. Please try again.' }, { status: 500 });
   }
 
-  // ── Update access_requests status ─────────────────────────────────────────
   const { error: updateError } = await supabase
     .from('access_requests')
     .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
     .eq('id', access_request_id);
 
-  if (updateError) {
-    console.error('[reject-tester] DB update error:', updateError);
-    // Email already sent — log but don't fail the response
-  }
+  if (updateError) console.error('[reject-tester] DB update error:', updateError);
 
-  // ── Sync beta_testers notes ───────────────────────────────────────────────
   await supabase
     .from('beta_testers')
     .update({ notes: 'Rejected', is_active: false })

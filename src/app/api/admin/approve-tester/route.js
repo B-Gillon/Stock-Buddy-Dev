@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import nodemailer from 'nodemailer';
+import { buildEmailHtml } from '@/lib/email/buildEmailHtml';
 
 export async function POST(request) {
   const { searchParams } = new URL(request.url);
@@ -18,14 +19,43 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { access_request_id, to_email, subject, message } = body;
+  const { access_request_id, to_email, subject, message, contact_name, store_url } = body;
 
   if (!access_request_id) return NextResponse.json({ error: 'access_request_id is required.' }, { status: 400 });
   if (!to_email?.trim())   return NextResponse.json({ error: 'Recipient email is required.' }, { status: 400 });
   if (!subject?.trim())    return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   if (!message?.trim())    return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
 
-  // ── Send approval email ───────────────────────────────────────────────────
+  const installUrl = `https://stock-buddy.brandongillon.com/api/shopify/install?shop=${store_url}`;
+  const firstName  = (contact_name ?? '').split(' ')[0] || 'there';
+
+  // Convert editable message body to HTML paragraphs (skip the greeting line — we inject it)
+  const bodyParagraphs = message
+    .trim()
+    .split(/\n\n+/)
+    .map(p => `<p style="margin:0 0 16px 0;">${p.replace(/\n/g, '<br/>')}</p>`)
+    .join('');
+
+  const bodyHtml = `
+    <p style="margin:0 0 16px 0;">Hi ${firstName},</p>
+    ${bodyParagraphs}
+    <table cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+      <tr>
+        <td style="border-radius:6px;background-color:#2563eb;">
+          <a href="${installUrl}" target="_blank"
+            style="display:inline-block;padding:12px 28px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">
+            Install Stock Buddy
+          </a>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:12px;color:#6b7280;">
+      Or copy this link: <a href="${installUrl}" style="color:#2563eb;">${installUrl}</a>
+    </p>
+  `;
+
+  const textEmail = `Hi ${firstName},\n\n${message.trim()}\n\nInstall link:\n${installUrl}\n\nBest regards, Brandon\nBuddy System Apps`;
+
   const transporter = nodemailer.createTransport({
     host:   process.env.SMTP_HOST,
     port:   Number(process.env.SMTP_PORT),
@@ -35,28 +65,25 @@ export async function POST(request) {
 
   try {
     await transporter.sendMail({
-      from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
+      from:    '"Stock Buddy" <hello@brandongillon.com>',
       to:      to_email.trim(),
-      replyTo: process.env.SMTP_USER,
+      replyTo: 'hello@brandongillon.com',
       subject: subject.trim(),
-      text:    message.trim(),
+      text:    textEmail,
+      html:    buildEmailHtml({ bodyHtml }),
     });
   } catch (err) {
     console.error('[approve-tester] SMTP error:', err);
     return NextResponse.json({ error: 'Failed to send email. Please try again.' }, { status: 500 });
   }
 
-  // ── Update access_requests status ─────────────────────────────────────────
   const { error: updateError } = await supabase
     .from('access_requests')
     .update({ status: 'approved', reviewed_at: new Date().toISOString() })
     .eq('id', access_request_id);
 
-  if (updateError) {
-    console.error('[approve-tester] DB update error:', updateError);
-  }
+  if (updateError) console.error('[approve-tester] DB update error:', updateError);
 
-  // ── Sync beta_testers ─────────────────────────────────────────────────────
   await supabase
     .from('beta_testers')
     .update({ notes: 'Approved', is_active: true, invited_at: new Date().toISOString() })
