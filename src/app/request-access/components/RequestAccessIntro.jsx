@@ -75,12 +75,10 @@ export default function RequestAccessIntro() {
         <InstallHeader />
       </div>
 
-      {/* py-6 instead of py-12 — halves the gap between header and cards */}
       <div className="flex-1 flex items-center justify-center py-6">
         <div className="w-full max-w-6xl px-4 flex flex-col lg:flex-row gap-6 items-stretch">
 
           {/* ── Left card ───────────────────────────────────────── */}
-          {/* pb-5 removes excess space below button */}
           <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm px-10 pt-5 pb-5 flex flex-col">
             <div className="space-y-4 text-sm text-gray-700 flex-1">
               <p>
@@ -96,19 +94,23 @@ export default function RequestAccessIntro() {
                 </p>
               </div>
             </div>
-            <div className="mt-4">
+            <div className="mt-4 flex gap-3">
               <button
                 onClick={() => router.push('/request-access/form')}
-                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md transition-colors"
+                className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md transition-colors"
               >
                 Request Access
               </button>
+              <a
+                href="mailto:hello@brandongillon.com"
+                className="flex-1 py-2.5 px-4 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-md border border-gray-300 transition-colors text-center"
+              >
+                Have Questions?
+              </a>
             </div>
           </div>
 
           {/* ── Right side — 2x2 mini cards ─────────────────────── */}
-          {/* items-stretch on the row + h-full on grid + grid-rows-2 ensures
-              the four cards fill the full height of the left card */}
           <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-4">
             {MINI_CARDS.map((card) => (
               <div key={card.title} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col">
