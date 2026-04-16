@@ -23,8 +23,7 @@ Columns:
 • 	contact_email — text — nullable
 • 	contact_phone — text — nullable
 • 	shopify_domain — text — nullable
-• 	notes — text — nullable
-• 	invited_at — timestamptz — nullable — default: now()
+• 	notes — text — nullable — tracks registry status: 'Form Submitted' (auto-set on form submission), 'Approved', 'Rejected' (set via admin detail modal), or freeform admin notes for manually added testers
 • 	installed_at — timestamptz — nullable
 • 	connected_at — timestamptz — nullable
 • 	is_active — boolean — not null — default: true
@@ -66,7 +65,7 @@ Columns:
 • 	monthly_order_volume — text — nullable
 • 	num_skus_variants — text — nullable
 • 	current_inventory_methods — text[] — nullable
-• 	has_supplier_requirements — boolean — nullable
+• 	how_send_pos_to_suppliers — text — nullable
 • 	how_create_pos_today — text — nullable
 • 	biggest_challenge — text — nullable
 • 	why_interested — text — nullable
@@ -92,7 +91,12 @@ Relationships:
 • 	none — not linked to tenants (pre-install table)
 Notes:
 • 	Populated by the /request-access/form page via POST /api/request-access.
-• 	Approved applicants should be manually added to beta_testers and given an install link.
+• 	store_url is normalized on insert (protocol and trailing slash stripped).
+• 	On successful insert, a matching row is automatically added to beta_testers
+  with notes = 'Form Submitted' and is_active = false.
+• 	Approved applicants should be sent the direct OAuth install URL for their shop domain.
+• 	Approving/rejecting via the admin detail modal PATCHes this table and syncs
+  beta_testers.notes to 'Approved' or 'Rejected'.
 
 ============================================================
 TABLE: inventory_items
