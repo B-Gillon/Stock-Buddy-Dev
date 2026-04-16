@@ -10,9 +10,34 @@ export default async function AdminActivityPage({ searchParams }) {
   if (key !== process.env.ADMIN_SECRET_KEY) redirect('/dashboard');
 
   // ── Beta Testers ─────────────────────────────────────────────────────────
-  const { data: betaTesters } = await supabase.from('beta_testers').select('*').order('invited_at', { ascending: false });
+  const { data: betaTestersRaw } = await supabase
+    .from('beta_testers')
+    .select('*')
+    .order('invited_at', { ascending: false });
 
-  const { data: lastSessions } = await supabase.from('beta_tester_sessions').select('tenant_id, accessed_at').order('accessed_at', { ascending: false });
+  // Join against tenants on shopify_domain so tenant_id is populated
+  // even if it wasn't explicitly written to beta_testers at install time.
+  const { data: tenants } = await supabase
+    .from('tenants')
+    .select('id, shop_domain, access_token');
+
+  const tenantByDomain = {};
+  for (const t of (tenants ?? [])) {
+    tenantByDomain[t.shop_domain] = t;
+  }
+
+  const betaTesters = (betaTestersRaw ?? []).map((bt) => {
+    // If tenant_id is already set, keep it.
+    // Otherwise, try to match by shopify_domain.
+    if (bt.tenant_id) return bt;
+    const matched = bt.shopify_domain ? tenantByDomain[bt.shopify_domain] : null;
+    return matched ? { ...bt, tenant_id: matched.id } : bt;
+  });
+
+  const { data: lastSessions } = await supabase
+    .from('beta_tester_sessions')
+    .select('tenant_id, accessed_at')
+    .order('accessed_at', { ascending: false });
 
   const lastSessionMap = {};
   for (const s of (lastSessions ?? [])) {
@@ -20,7 +45,7 @@ export default async function AdminActivityPage({ searchParams }) {
   }
 
   // ── Per-tenant stats ─────────────────────────────────────────────────────
-  const connectedTenantIds = (betaTesters ?? []).filter(t => t.tenant_id).map(t => t.tenant_id);
+  const connectedTenantIds = betaTesters.filter(t => t.tenant_id).map(t => t.tenant_id);
   const tenantStats = {};
 
   for (const tenantId of connectedTenantIds) {
@@ -72,13 +97,25 @@ export default async function AdminActivityPage({ searchParams }) {
   const { count: poReceived }           = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'received');
   const { count: poCancelled }          = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'cancelled');
   const { data: latestPO }              = await supabase.from('purchase_orders').select('created_at').order('created_at', { ascending: false }).limit(1).single();
-  const { data: errors }                = await supabase.from('error_log').select('id, source, message, context, created_at').order('created_at', { ascending: false }).limit(50);
-  const { count: errorCount }           = await supabase.from('error_log').select('*', { count: 'exact', head: true });
+
+  // Fetch errors with tenant_id so the client can show Account Name
+  const { data: errors }  = await supabase
+    .from('error_log')
+    .select('id, source, message, context, created_at, tenant_id')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  const { count: errorCount } = await supabase.from('error_log').select('*', { count: 'exact', head: true });
+
+  // Build tenantId → contact_name map for error log Account Name column
+  const tenantNameMap = {};
+  for (const bt of betaTesters) {
+    if (bt.tenant_id) tenantNameMap[bt.tenant_id] = bt.contact_name;
+  }
 
   return (
     <AdminActivityClient
       adminKey={key}
-      betaTesters={betaTesters ?? []}
+      betaTesters={betaTesters}
       lastSessionMap={lastSessionMap}
       tenantStats={tenantStats}
       productCount={productCount ?? 0}
@@ -101,7 +138,7 @@ export default async function AdminActivityPage({ searchParams }) {
       poLastCreated={latestPO?.created_at ?? null}
       errors={errors ?? []}
       errorCount={errorCount ?? 0}
+      tenantNameMap={tenantNameMap}
     />
   );
 }
-

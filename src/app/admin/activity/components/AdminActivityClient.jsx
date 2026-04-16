@@ -133,7 +133,7 @@ function TesterActivityCard({ tester, stats, lastAccessed }) {
                 <td className="px-4 py-2 text-gray-700">{row.label}</td>
                 <td className="px-4 py-2 text-gray-900 font-medium">{typeof row.total === 'number' ? row.total.toLocaleString() : row.total}</td>
                 <td className="px-4 py-2 text-gray-500">{row.date ? formatDate(row.date) : '—'}</td>
-                <td className="px-4 py-2">{row.label.startsWith('POs') || row.label === 'Products' || row.label === 'Inventory' ? (hasErrors ? <span className="text-red-600 text-xs font-medium">See error log</span> : <span className="text-green-600 text-xs">checkmark</span>) : '—'}</td>
+                <td className="px-4 py-2">{row.label.startsWith('POs') || row.label === 'Products' || row.label === 'Inventory' ? (hasErrors ? <span className="text-red-600 text-xs font-medium">See error log</span> : <span className="text-green-600 text-xs">✓</span>) : '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -178,11 +178,32 @@ export default function AdminActivityClient({
   vendorCount, vendorLastSync, inventoryLastSync,
   supplierCount, supplierLastCreated, supplierVariantCount, supplierVariantLastCreated,
   poTotal, poDraft, poReleased, poPartiallyReceived, poReceived, poCancelled, poLastCreated,
-  errors, errorCount,
+  errors: initialErrors, errorCount: initialErrorCount,
+  tenantNameMap,
 }) {
   const [testers, setTesters]             = useState(betaTesters);
   const [showAddModal, setShowAddModal]   = useState(false);
   const [expandedError, setExpandedError] = useState(null);
+  const [errors, setErrors]               = useState(initialErrors);
+  const [errorCount, setErrorCount]       = useState(initialErrorCount);
+  const [deletingId, setDeletingId]       = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  async function handleDeleteError(id) {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/errors/${id}?key=${adminKey}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      setErrors(prev => prev.filter(e => e.id !== id));
+      setErrorCount(prev => Math.max(0, prev - 1));
+      if (expandedError === id) setExpandedError(null);
+    } catch (err) {
+      console.error('Failed to delete error:', err);
+    } finally {
+      setDeletingId(null);
+      setConfirmDeleteId(null);
+    }
+  }
 
   const syncRows = [
     { label: 'Products',              count: productCount,         lastSync: productLastSync },
@@ -253,7 +274,9 @@ export default function AdminActivityClient({
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(t.invited_at)}</td>
                     <td className="px-4 py-3"><StatusPill value={!!t.installed_at} /></td>
                     <td className="px-4 py-3"><StatusPill value={!!t.connected_at} /></td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">
+                      {t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}
+                    </td>
                     <td className="px-4 py-3"><StatusPill value={t.is_active} trueLabel="Active" falseLabel="Inactive" /></td>
                   </tr>
                 ))}
@@ -300,23 +323,74 @@ export default function AdminActivityClient({
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['When', 'Source', 'Message', 'Context'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  {['Account', 'When', 'Source', 'Message', 'Context', ''].map((h, i) => (
+                    <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {errors.map((e) => (
-                  <tr key={e.id} className="hover:bg-red-50 cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{formatDate(e.created_at)}</td>
-                    <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span></td>
-                    <td className="px-4 py-3 text-red-700">
+                  <tr key={e.id} className="hover:bg-red-50">
+                    {/* Account Name */}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {e.tenant_id && tenantNameMap?.[e.tenant_id]
+                        ? <span className="text-xs font-medium text-gray-700">{tenantNameMap[e.tenant_id]}</span>
+                        : <span className="text-xs text-gray-400">—</span>
+                      }
+                    </td>
+                    {/* When */}
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{formatDate(e.created_at)}</td>
+                    {/* Source */}
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span>
+                    </td>
+                    {/* Message — clickable to expand context */}
+                    <td
+                      className="px-4 py-3 text-red-700 cursor-pointer"
+                      onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}
+                    >
                       <div>{e.message}</div>
                       {expandedError === e.id && e.context && (
                         <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-600 whitespace-pre-wrap">{JSON.stringify(e.context, null, 2)}</pre>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{e.context ? 'Click to expand' : '—'}</td>
+                    {/* Context hint */}
+                    <td
+                      className="px-4 py-3 text-gray-400 text-xs cursor-pointer"
+                      onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}
+                    >
+                      {e.context ? (expandedError === e.id ? 'Collapse' : 'Click to expand') : '—'}
+                    </td>
+                    {/* Delete */}
+                    <td className="px-4 py-3">
+                      {confirmDeleteId === e.id ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDeleteError(e.id)}
+                            disabled={deletingId === e.id}
+                            className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 px-2 py-1 rounded"
+                          >
+                            {deletingId === e.id ? '…' : 'Confirm'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-xs text-gray-500 hover:text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(e.id)}
+                          className="text-xs text-gray-400 hover:text-red-600 transition-colors"
+                          title="Delete this error"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m-4 0H5" />
+                          </svg>
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
