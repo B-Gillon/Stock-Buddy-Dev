@@ -82,7 +82,7 @@ export default function RequestAccessIntro() {
           <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm px-10 pt-5 pb-5 flex flex-col">
             <div className="space-y-4 text-sm text-gray-700 flex-1">
               <p>
-                <strong className="text-gray-900">Stock Buddy</strong> is a Shopify-embedded inventory and purchase order management app built for merchants who need more than Shopify's built-in tools. It lets you create and manage purchase orders, track incoming inventory, sync stock levels to Shopify in real time, and coordinate with suppliers — all from inside Shopify Admin.
+                <strong className="text-gray-900">Stock Buddy</strong> is a Shopify-embedded inventory and purchase order management app built for merchants who need more than Shopify's built-in tools. It lets you create and manage purchase orders, track incoming inventory, sync stock levels to Shopify in real time, and coordinate with suppliers — all within Shopify Admin.
               </p>
               <p>
                 Stock Buddy is designed for <strong className="text-gray-900">independent Shopify merchants</strong> who manage physical inventory, work with one or more suppliers, and need a structured process for purchasing and receiving goods.
