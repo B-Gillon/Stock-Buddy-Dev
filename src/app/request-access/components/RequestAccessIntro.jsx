@@ -85,32 +85,17 @@ export default function RequestAccessIntro() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
+      {/* Header — max-w-6xl to match cards */}
       <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
         <InstallHeader />
       </div>
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-5xl flex flex-col lg:flex-row gap-6 items-stretch">
+        {/* Cards constrained to same max-w-6xl as header */}
+        <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-6 items-stretch">
 
           {/* ── Left card — about + CTA ─────────────────────────── */}
           <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm p-10 flex flex-col">
-
-            {/* Card header */}
-            <div className="flex items-center gap-5 mb-8">
-              <Image
-                src="/STOCK_BUDDY_LOGO__1_.png"
-                alt="Stock Buddy"
-                width={72}
-                height={72}
-                className="h-16 w-auto object-contain shrink-0"
-              />
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Stock Buddy</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Inventory &amp; purchase order management<br />for Shopify merchants
-                </p>
-              </div>
-            </div>
 
             {/* Body copy */}
             <div className="space-y-4 text-sm text-gray-700 mb-8 flex-1">
