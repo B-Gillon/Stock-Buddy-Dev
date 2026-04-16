@@ -75,12 +75,13 @@ export default function RequestAccessIntro() {
         <InstallHeader />
       </div>
 
-      <div className="flex-1 flex items-center justify-center py-12">
+      {/* py-6 instead of py-12 — halves the gap between header and cards */}
+      <div className="flex-1 flex items-center justify-center py-6">
         <div className="w-full max-w-6xl px-4 flex flex-col lg:flex-row gap-6 items-stretch">
 
           {/* ── Left card ───────────────────────────────────────── */}
-          {/* pt-5 aligns first line of text with mini card icon/title row */}
-          <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm px-10 pt-5 pb-10 flex flex-col">
+          {/* pb-5 removes excess space below button */}
+          <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm px-10 pt-5 pb-5 flex flex-col">
             <div className="space-y-4 text-sm text-gray-700 flex-1">
               <p>
                 <strong className="text-gray-900">Stock Buddy</strong> is a Shopify-embedded inventory and purchase order management app built for merchants who need more than Shopify's built-in tools. It lets you create and manage purchase orders, track incoming inventory, sync stock levels to Shopify in real time, and coordinate with suppliers — all from inside your Shopify Admin.
@@ -95,7 +96,6 @@ export default function RequestAccessIntro() {
                 </p>
               </div>
             </div>
-            {/* mt-4 = tighter gap between yellow box and button */}
             <div className="mt-4">
               <button
                 onClick={() => router.push('/request-access/form')}
@@ -107,10 +107,11 @@ export default function RequestAccessIntro() {
           </div>
 
           {/* ── Right side — 2x2 mini cards ─────────────────────── */}
-          {/* flex-1 removed from ul so cards don't stretch vertically */}
-          <div className="flex-1 grid grid-cols-2 gap-4 content-start">
+          {/* items-stretch on the row + h-full on grid + grid-rows-2 ensures
+              the four cards fill the full height of the left card */}
+          <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-4">
             {MINI_CARDS.map((card) => (
-              <div key={card.title} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+              <div key={card.title} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-base">{card.icon}</span>
                   <h3 className="text-sm font-semibold text-gray-900">{card.title}</h3>
