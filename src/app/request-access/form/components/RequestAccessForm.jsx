@@ -37,7 +37,8 @@ function InstallHeader() {
             </p>
           </div>
         </div>
-        <div className="flex flex-col items-end justify-end pb-0.5">
+        <div className="flex flex-col items-end justify-end pb-0.5 gap-1">
+          <h2 className="text-lg font-semibold text-white tracking-wide">Request Access Form</h2>
           <span className="text-xs text-gray-400">A Buddy System app by Brandon Gillon</span>
         </div>
       </div>
@@ -94,9 +95,17 @@ function textareaCls() {
   return 'w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50';
 }
 
-function SectionTitle({ children }) {
+function Card({ children }) {
   return (
-    <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide pt-4 pb-1 border-b border-gray-200 mb-4">
+    <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-8">
+      {children}
+    </div>
+  );
+}
+
+function CardTitle({ children }) {
+  return (
+    <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide pb-2 border-b border-gray-200 mb-5">
       {children}
     </h3>
   );
@@ -104,10 +113,10 @@ function SectionTitle({ children }) {
 
 export default function RequestAccessForm() {
   const router = useRouter();
-  const [form, setForm]       = useState(INITIAL_FORM);
+  const [form, setForm]             = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]     = useState(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [error, setError]           = useState(null);
+  const [submitted, setSubmitted]   = useState(false);
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }));
@@ -178,238 +187,234 @@ export default function RequestAccessForm() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
+      {/* Header */}
       <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
         <InstallHeader />
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl shadow-sm p-10">
+      {/* Cards */}
+      <form onSubmit={handleSubmit}>
+        <div className="px-4 py-8 max-w-6xl mx-auto w-full flex flex-col gap-6">
 
-          {/* Card header */}
-          <div className="flex items-center gap-5 mb-6">
-            <Image
-              src="/STOCK_BUDDY_LOGO__1_.png"
-              alt="Stock Buddy"
-              width={72}
-              height={72}
-              className="h-16 w-auto object-contain shrink-0"
-            />
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Request Access</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Tell us about your store and how you manage inventory today.
-              </p>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-
-            {/* ── Contact Info ─────────────────────────────────────── */}
-            <SectionTitle>Contact Info</SectionTitle>
-
-            <div>
-              <Label required>Shopify Store URL</Label>
-              <input className={inputCls()} type="text" placeholder="my-store.myshopify.com" value={form.store_url} onChange={e => set('store_url', e.target.value)} disabled={submitting} required />
-            </div>
-
-            <div>
-              <Label required>Contact Name</Label>
-              <input className={inputCls()} type="text" placeholder="Jane Smith" value={form.contact_name} onChange={e => set('contact_name', e.target.value)} disabled={submitting} required />
-            </div>
-
-            <div>
-              <Label required>Contact Email</Label>
-              <input className={inputCls()} type="email" placeholder="jane@mystore.com" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} disabled={submitting} required />
-            </div>
-
-            {/* ── Business Profile ─────────────────────────────────── */}
-            <SectionTitle>Business Profile</SectionTitle>
-
-            <div>
-              <Label>Company Size</Label>
-              <select className={selectCls()} value={form.company_size} onChange={e => set('company_size', e.target.value)} disabled={submitting}>
-                <option value="">Select…</option>
-                <option>Just me</option>
-                <option>2–5 employees</option>
-                <option>6–20 employees</option>
-                <option>21–100 employees</option>
-                <option>100+ employees</option>
-              </select>
-            </div>
-
-            <div>
-              <Label>Monthly Order Volume</Label>
-              <select className={selectCls()} value={form.monthly_order_volume} onChange={e => set('monthly_order_volume', e.target.value)} disabled={submitting}>
-                <option value="">Select…</option>
-                <option>Under 100 orders/month</option>
-                <option>100–500 orders/month</option>
-                <option>500–2,000 orders/month</option>
-                <option>2,000–10,000 orders/month</option>
-                <option>10,000+ orders/month</option>
-              </select>
-            </div>
-
-            <div>
-              <Label>Number of SKUs / Variants</Label>
-              <select className={selectCls()} value={form.num_skus_variants} onChange={e => set('num_skus_variants', e.target.value)} disabled={submitting}>
-                <option value="">Select…</option>
-                <option>Under 100</option>
-                <option>100–500</option>
-                <option>500–2,000</option>
-                <option>2,000–10,000</option>
-                <option>10,000+</option>
-              </select>
-            </div>
-
-            <div>
-              <Label>Current Inventory Management Method</Label>
-              <p className="text-xs text-gray-500 mb-2">Select all that apply.</p>
-              <div className="space-y-2">
-                {INVENTORY_METHOD_OPTIONS.map(method => (
-                  <label key={method} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.current_inventory_methods.includes(method)}
-                      onChange={() => toggleMethod(method)}
-                      disabled={submitting}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700">{method}</span>
-                  </label>
-                ))}
+          {/* ── Card 1: Contact Info ───────────────────────────── */}
+          <Card>
+            <CardTitle>Contact Info</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div>
+                <Label required>Shopify Store URL</Label>
+                <input className={inputCls()} type="text" placeholder="my-store.myshopify.com" value={form.store_url} onChange={e => set('store_url', e.target.value)} disabled={submitting} required />
+              </div>
+              <div>
+                <Label required>Contact Name</Label>
+                <input className={inputCls()} type="text" placeholder="Jane Smith" value={form.contact_name} onChange={e => set('contact_name', e.target.value)} disabled={submitting} required />
+              </div>
+              <div>
+                <Label required>Contact Email</Label>
+                <input className={inputCls()} type="email" placeholder="jane@mystore.com" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} disabled={submitting} required />
               </div>
             </div>
+          </Card>
 
-            <div>
-              <Label>Do you have specific supplier requirements? (e.g. multiple suppliers, EDI, dropship)</Label>
-              <div className="flex gap-4 mt-1">
-                {['yes', 'no'].map(v => (
-                  <label key={v} className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="has_supplier_requirements" value={v} checked={form.has_supplier_requirements === v} onChange={() => set('has_supplier_requirements', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
-                    <span className="text-sm text-gray-700 capitalize">{v}</span>
-                  </label>
-                ))}
+          {/* ── Card 2: Business Profile ───────────────────────── */}
+          <Card>
+            <CardTitle>Business Profile</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+              <div>
+                <Label>Company Size</Label>
+                <select className={selectCls()} value={form.company_size} onChange={e => set('company_size', e.target.value)} disabled={submitting}>
+                  <option value="">Select…</option>
+                  <option>Just me</option>
+                  <option>2–5 employees</option>
+                  <option>6–20 employees</option>
+                  <option>21–100 employees</option>
+                  <option>100+ employees</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Monthly Order Volume</Label>
+                <select className={selectCls()} value={form.monthly_order_volume} onChange={e => set('monthly_order_volume', e.target.value)} disabled={submitting}>
+                  <option value="">Select…</option>
+                  <option>Under 100 orders/month</option>
+                  <option>100–500 orders/month</option>
+                  <option>500–2,000 orders/month</option>
+                  <option>2,000–10,000 orders/month</option>
+                  <option>10,000+ orders/month</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Number of SKUs / Variants</Label>
+                <select className={selectCls()} value={form.num_skus_variants} onChange={e => set('num_skus_variants', e.target.value)} disabled={submitting}>
+                  <option value="">Select…</option>
+                  <option>Under 100</option>
+                  <option>100–500</option>
+                  <option>500–2,000</option>
+                  <option>2,000–10,000</option>
+                  <option>10,000+</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <Label>Current Inventory Management Method</Label>
+                <p className="text-xs text-gray-500 mb-2">Select all that apply.</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                  {INVENTORY_METHOD_OPTIONS.map(method => (
+                    <label key={method} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={form.current_inventory_methods.includes(method)}
+                        onChange={() => toggleMethod(method)}
+                        disabled={submitting}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                      />
+                      <span className="text-sm text-gray-700">{method}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label>Specific supplier requirements? <span className="font-normal text-gray-500">(e.g. EDI, dropship)</span></Label>
+                <div className="flex gap-4 mt-2">
+                  {['yes', 'no'].map(v => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="has_supplier_requirements" value={v} checked={form.has_supplier_requirements === v} onChange={() => set('has_supplier_requirements', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
+                      <span className="text-sm text-gray-700 capitalize">{v}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+          </Card>
+
+          {/* ── Card 3: Current Process ────────────────────────── */}
+          <Card>
+            <CardTitle>Current Process</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div>
+                <Label>How do you create purchase orders today?</Label>
+                <textarea className={textareaCls()} rows={4} placeholder="e.g. manually in Excel, emailing suppliers directly, using a separate app…" value={form.how_create_pos_today} onChange={e => set('how_create_pos_today', e.target.value)} disabled={submitting} />
+              </div>
+              <div>
+                <Label>What is your biggest inventory or purchasing challenge?</Label>
+                <textarea className={textareaCls()} rows={4} placeholder="e.g. tracking what's on order, reconciling received goods, stock-outs…" value={form.biggest_challenge} onChange={e => set('biggest_challenge', e.target.value)} disabled={submitting} />
+              </div>
+              <div>
+                <Label>Why are you interested in Stock Buddy?</Label>
+                <textarea className={textareaCls()} rows={4} placeholder="What problem are you hoping it solves for you?" value={form.why_interested} onChange={e => set('why_interested', e.target.value)} disabled={submitting} />
               </div>
             </div>
+          </Card>
 
-            {/* ── Current Process ──────────────────────────────────── */}
-            <SectionTitle>Current Process</SectionTitle>
+          {/* ── Card 4: Beta Participation + Acknowledgements ─── */}
+          <Card>
+            <CardTitle>Beta Participation</CardTitle>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-            <div>
-              <Label>How do you create purchase orders today?</Label>
-              <textarea className={textareaCls()} rows={3} placeholder="e.g. manually in Excel, emailing suppliers directly, using a separate app…" value={form.how_create_pos_today} onChange={e => set('how_create_pos_today', e.target.value)} disabled={submitting} />
-            </div>
-
-            <div>
-              <Label>What is your biggest inventory or purchasing challenge?</Label>
-              <textarea className={textareaCls()} rows={3} placeholder="e.g. tracking what's on order, reconciling received goods, stock-outs…" value={form.biggest_challenge} onChange={e => set('biggest_challenge', e.target.value)} disabled={submitting} />
-            </div>
-
-            <div>
-              <Label>Why are you interested in Stock Buddy?</Label>
-              <textarea className={textareaCls()} rows={3} placeholder="What problem are you hoping it solves for you?" value={form.why_interested} onChange={e => set('why_interested', e.target.value)} disabled={submitting} />
-            </div>
-
-            {/* ── Beta Participation ───────────────────────────────── */}
-            <SectionTitle>Beta Participation</SectionTitle>
-
-            <div>
-              <Label>Are you willing to provide feedback during the beta?</Label>
-              <div className="flex gap-4 mt-1">
-                {['yes', 'no'].map(v => (
-                  <label key={v} className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="willing_to_provide_feedback" value={v} checked={form.willing_to_provide_feedback === v} onChange={() => set('willing_to_provide_feedback', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
-                    <span className="text-sm text-gray-700 capitalize">{v}</span>
-                  </label>
-                ))}
+              <div>
+                <Label>Are you willing to provide feedback during the beta?</Label>
+                <div className="flex gap-4 mt-2">
+                  {['yes', 'no'].map(v => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="willing_to_provide_feedback" value={v} checked={form.willing_to_provide_feedback === v} onChange={() => set('willing_to_provide_feedback', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
+                      <span className="text-sm text-gray-700 capitalize">{v}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <Label>Are you open to onboarding calls or periodic check-ins?</Label>
-              <div className="flex gap-4 mt-1">
-                {['yes', 'no'].map(v => (
-                  <label key={v} className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="open_to_onboarding_calls" value={v} checked={form.open_to_onboarding_calls === v} onChange={() => set('open_to_onboarding_calls', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
-                    <span className="text-sm text-gray-700 capitalize">{v}</span>
-                  </label>
-                ))}
+              <div>
+                <Label>Are you open to onboarding calls or periodic check-ins?</Label>
+                <div className="flex gap-4 mt-2">
+                  {['yes', 'no'].map(v => (
+                    <label key={v} className="flex items-center gap-2 cursor-pointer">
+                      <input type="radio" name="open_to_onboarding_calls" value={v} checked={form.open_to_onboarding_calls === v} onChange={() => set('open_to_onboarding_calls', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
+                      <span className="text-sm text-gray-700 capitalize">{v}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
+
+              <div>
+                <Label>How soon are you looking to get started?</Label>
+                <select className={selectCls()} value={form.how_soon_to_start} onChange={e => set('how_soon_to_start', e.target.value)} disabled={submitting}>
+                  <option value="">Select…</option>
+                  <option>Immediately</option>
+                  <option>Within the next month</option>
+                  <option>1–3 months</option>
+                  <option>3–6 months</option>
+                  <option>Just exploring for now</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-3">
+                <Label>Anything else we should know? (optional)</Label>
+                <textarea className={textareaCls()} rows={3} placeholder="Anything else that might help us evaluate your application…" value={form.anything_else} onChange={e => set('anything_else', e.target.value)} disabled={submitting} />
+              </div>
+
             </div>
 
-            <div>
-              <Label>How soon are you looking to get started?</Label>
-              <select className={selectCls()} value={form.how_soon_to_start} onChange={e => set('how_soon_to_start', e.target.value)} disabled={submitting}>
-                <option value="">Select…</option>
-                <option>Immediately</option>
-                <option>Within the next month</option>
-                <option>1–3 months</option>
-                <option>3–6 months</option>
-                <option>Just exploring for now</option>
-              </select>
-            </div>
+            {/* Acknowledgements — within same card, separated by a rule */}
+            <div className="mt-6 pt-5 border-t border-gray-200">
+              <p className="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-4">Acknowledgements</p>
+              <div className="space-y-3 mb-6">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.understands_private_beta}
+                    onChange={e => set('understands_private_beta', e.target.checked)}
+                    disabled={submitting}
+                    className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
+                  />
+                  <span className="text-sm text-gray-700">
+                    <strong>Required:</strong> I understand this is a private beta and approval is not guaranteed.
+                  </span>
+                </label>
 
-            <div>
-              <Label>Anything else we should know? (optional)</Label>
-              <textarea className={textareaCls()} rows={3} placeholder="Anything else that might help us evaluate your application…" value={form.anything_else} onChange={e => set('anything_else', e.target.value)} disabled={submitting} />
-            </div>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.agrees_no_share_link}
+                    onChange={e => set('agrees_no_share_link', e.target.checked)}
+                    disabled={submitting}
+                    className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
+                  />
+                  <span className="text-sm text-gray-700">
+                    <strong>Required:</strong> I agree not to share the install link with anyone outside my organization.
+                  </span>
+                </label>
+              </div>
 
-            {/* ── Acknowledgements ─────────────────────────────────── */}
-            <SectionTitle>Acknowledgements</SectionTitle>
+              {error && (
+                <p className="text-sm text-red-600 mb-4">{error}</p>
+              )}
 
-            <div className="space-y-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.understands_private_beta}
-                  onChange={e => set('understands_private_beta', e.target.checked)}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.push('/request-access')}
                   disabled={submitting}
-                  className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
-                />
-                <span className="text-sm text-gray-700">
-                  <strong>Required:</strong> I understand this is a private beta and approval is not guaranteed.
-                </span>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.agrees_no_share_link}
-                  onChange={e => set('agrees_no_share_link', e.target.checked)}
-                  disabled={submitting}
-                  className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
-                />
-                <span className="text-sm text-gray-700">
-                  <strong>Required:</strong> I agree not to share the install link with anyone outside my organization.
-                </span>
-              </label>
+                  className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  ← Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || !form.understands_private_beta || !form.agrees_no_share_link || !form.store_url.trim() || !form.contact_name.trim() || !form.contact_email.trim()}
+                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
+                >
+                  {submitting ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </div>
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600">{error}</p>
-            )}
+          </Card>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => router.push('/request-access')}
-                disabled={submitting}
-                className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
-              >
-                ← Back
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || !form.understands_private_beta || !form.agrees_no_share_link || !form.store_url.trim() || !form.contact_name.trim() || !form.contact_email.trim()}
-                className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
-              >
-                {submitting ? 'Submitting…' : 'Submit Request'}
-              </button>
-            </div>
-
-          </form>
         </div>
-      </div>
+      </form>
 
     </div>
   );
