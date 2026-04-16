@@ -19,14 +19,12 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { access_request_id, to_email, subject, message, contact_name } = body;
+  const { access_request_id, to_email, subject, message } = body;
 
   if (!access_request_id) return NextResponse.json({ error: 'access_request_id is required.' }, { status: 400 });
   if (!to_email?.trim())   return NextResponse.json({ error: 'Recipient email is required.' }, { status: 400 });
   if (!subject?.trim())    return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   if (!message?.trim())    return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
-
-  const firstName = (contact_name ?? '').split(' ')[0] || 'there';
 
   const bodyParagraphs = message
     .trim()
@@ -34,12 +32,9 @@ export async function POST(request) {
     .map(p => `<p style="margin:0 0 16px 0;">${p.replace(/\n/g, '<br/>')}</p>`)
     .join('');
 
-  const bodyHtml = `
-    <p style="margin:0 0 16px 0;">Hi ${firstName},</p>
-    ${bodyParagraphs}
-  `;
+  const bodyHtml = `${bodyParagraphs}`;
 
-  const textEmail = `Hi ${firstName},\n\n${message.trim()}\n\nBest regards, Brandon\nBuddy System Apps`;
+  const textEmail = message.trim();
 
   const transporter = nodemailer.createTransport({
     host:   process.env.SMTP_HOST,

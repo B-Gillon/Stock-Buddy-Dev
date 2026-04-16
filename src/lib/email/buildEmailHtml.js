@@ -17,39 +17,38 @@ export function buildEmailHtml({ bodyHtml }) {
 </head>
 <body style="margin:0;padding:0;background-color:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
 
-  <!-- Outer wrapper -->
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f9fafb;padding:32px 16px;">
     <tr>
       <td align="center">
-        <!-- Card -->
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
 
           <!-- ── Header ── -->
           <tr>
-            <td style="background-color:#1f2937;padding:20px 28px;">
+            <td style="background-color:#1f2937;padding:18px 24px;">
               <table width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td style="vertical-align:middle;">
-                    <!-- Logo -->
+                  <!-- Logo -->
+                  <td style="vertical-align:middle;width:56px;">
                     <img
                       src="https://stock-buddy.brandongillon.com/SB_Email_Logo.png"
-                      alt="Stock Buddy"
-                      width="52"
-                      height="52"
-                      style="display:block;border:0;border-radius:6px;"
+                      alt="SB"
+                      width="48"
+                      height="48"
+                      style="display:block;width:48px;height:48px;border:0;border-radius:6px;object-fit:contain;"
                     />
                   </td>
-                  <td style="vertical-align:middle;padding-left:14px;">
-                    <!-- Brand name with gradient simulation (two-color fallback) -->
-                    <div style="font-size:22px;font-weight:700;background:linear-gradient(to right,#11E0FC,#0099FF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:#0099FF;line-height:1.2;">
+                  <!-- Brand name -->
+                  <td style="vertical-align:middle;padding-left:12px;">
+                    <div style="font-size:20px;font-weight:700;color:#0099FF;line-height:1.2;letter-spacing:-0.3px;">
                       Stock Buddy
                     </div>
-                    <div style="font-size:11px;color:#9ca3af;margin-top:2px;-webkit-text-fill-color:#9ca3af;">
+                    <div style="font-size:11px;color:#9ca3af;margin-top:3px;">
                       Inventory Management for the Modern Age
                     </div>
                   </td>
-                  <td style="vertical-align:middle;text-align:right;">
-                    <div style="font-size:11px;color:#6b7280;-webkit-text-fill-color:#6b7280;">
+                  <!-- Right: A Buddy System app — bottom aligned -->
+                  <td style="vertical-align:bottom;text-align:right;padding-bottom:2px;">
+                    <div style="font-size:10px;color:#6b7280;">
                       A Buddy System app
                     </div>
                   </td>

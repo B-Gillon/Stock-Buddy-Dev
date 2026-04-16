@@ -19,7 +19,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { access_request_id, to_email, subject, message, contact_name, store_url } = body;
+  const { access_request_id, to_email, subject, message, store_url } = body;
 
   if (!access_request_id) return NextResponse.json({ error: 'access_request_id is required.' }, { status: 400 });
   if (!to_email?.trim())   return NextResponse.json({ error: 'Recipient email is required.' }, { status: 400 });
@@ -27,9 +27,7 @@ export async function POST(request) {
   if (!message?.trim())    return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
 
   const installUrl = `https://stock-buddy.brandongillon.com/api/shopify/install?shop=${store_url}`;
-  const firstName  = (contact_name ?? '').split(' ')[0] || 'there';
 
-  // Convert editable message body to HTML paragraphs (skip the greeting line — we inject it)
   const bodyParagraphs = message
     .trim()
     .split(/\n\n+/)
@@ -37,7 +35,6 @@ export async function POST(request) {
     .join('');
 
   const bodyHtml = `
-    <p style="margin:0 0 16px 0;">Hi ${firstName},</p>
     ${bodyParagraphs}
     <table cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
       <tr>
@@ -54,7 +51,7 @@ export async function POST(request) {
     </p>
   `;
 
-  const textEmail = `Hi ${firstName},\n\n${message.trim()}\n\nInstall link:\n${installUrl}\n\nBest regards, Brandon\nBuddy System Apps`;
+  const textEmail = `${message.trim()}\n\nInstall link:\n${installUrl}`;
 
   const transporter = nodemailer.createTransport({
     host:   process.env.SMTP_HOST,

@@ -153,7 +153,9 @@ function ApproveModal({ tester, accessRequest, adminKey, onClose, onApproved }) 
   const firstName  = (accessRequest?.contact_name ?? tester.contact_name ?? '').split(' ')[0] || 'there';
 
   const approvalBody =
-`Great news — your request to join the Stock Buddy private beta has been approved!
+`Hi ${firstName},
+
+Great news — your request to join the Stock Buddy private beta has been approved!
 
 You can install Stock Buddy into your Shopify store using the button below. This link is specific to your store and will not work for any other Shopify account.
 
@@ -161,8 +163,8 @@ Once installed, Stock Buddy will appear inside your Shopify Admin. If you run in
 
 Thank you for your patience, and welcome to the beta!
 
-Best regards, Brandon
-Buddy System Apps`;
+Best Regards,
+Brandon`;
 
   const [form, setForm]       = useState({
     to:      tester.contact_email ?? '',
@@ -228,9 +230,6 @@ Buddy System Apps`;
           </div>
         ) : (
           <div className="px-6 py-5 space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-              <p className="text-xs text-blue-700">The greeting <strong>"Hi {firstName},"</strong> and install button are added automatically — no need to include them in the message body.</p>
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
@@ -247,7 +246,7 @@ Buddy System Apps`;
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
-              <textarea value={form.message} onChange={e => set('message', e.target.value)} disabled={sending} rows={10} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50" />
+              <textarea value={form.message} onChange={e => set('message', e.target.value)} disabled={sending} rows={12} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50" />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex justify-end gap-3 pt-1">
@@ -268,7 +267,9 @@ Buddy System Apps`;
 function RejectModal({ tester, accessRequest, adminKey, onClose, onRejected }) {
   const firstName = (accessRequest?.contact_name ?? tester.contact_name ?? '').split(' ')[0] || 'there';
 
-  const REJECTION_BODY = `Thank you for your interest in joining the Stock Buddy private beta and for taking the time to submit your request. We truly appreciate your willingness to explore new tools and help shape the early versions of the product.
+  const REJECTION_BODY = `Hi ${firstName},
+
+Thank you for your interest in joining the Stock Buddy private beta and for taking the time to submit your request. We truly appreciate your willingness to explore new tools and help shape the early versions of the product.
 
 At this time, we're not able to approve your request for beta access. The current phase of the beta has limited capacity, and we're onboarding merchants in stages based on specific testing needs and technical constraints.
 
@@ -276,8 +277,8 @@ This decision is not a reflection of your business or your fit with Stock Buddy.
 
 Thank you again for your interest and understanding. If you have any questions or would like to stay updated on future availability, feel free to reach out anytime.
 
-Best regards, Brandon
-Buddy System Apps`;
+Best Regards,
+Brandon`;
 
   const [form, setForm]       = useState({
     to:      tester.contact_email ?? '',
@@ -342,9 +343,6 @@ Buddy System Apps`;
           </div>
         ) : (
           <div className="px-6 py-5 space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
-              <p className="text-xs text-blue-700">The greeting <strong>"Hi {firstName},"</strong> is added automatically — no need to include it in the message body.</p>
-            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
@@ -361,7 +359,7 @@ Buddy System Apps`;
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
-              <textarea value={form.message} onChange={e => set('message', e.target.value)} disabled={sending} rows={10} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50" />
+              <textarea value={form.message} onChange={e => set('message', e.target.value)} disabled={sending} rows={12} className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50" />
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex justify-end gap-3 pt-1">
