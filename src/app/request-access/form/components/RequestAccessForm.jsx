@@ -389,7 +389,7 @@ export default function RequestAccessForm() {
               <div>
                 <Label required>When do you expect to start?</Label>
                 <div className="flex flex-col gap-2 mt-2">
-                  {['Immediately', 'Next Week', 'Custom', "I'm not sure"].map(v => (
+                  {['Immediately', 'Next Week', "I'm not sure"].map(v => (
                     <label key={v} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="radio"
@@ -398,8 +398,7 @@ export default function RequestAccessForm() {
                         checked={form.how_soon_to_start_option === v}
                         onChange={() => {
                           set('how_soon_to_start_option', v);
-                          if (v !== 'Custom') set('how_soon_to_start', v);
-                          else set('how_soon_to_start', '');
+                          set('how_soon_to_start', v);
                         }}
                         disabled={submitting}
                         className="h-4 w-4 border-gray-300 text-blue-600"
@@ -407,17 +406,32 @@ export default function RequestAccessForm() {
                       <span className="text-sm text-gray-700">{v}</span>
                     </label>
                   ))}
-                  <input
-                    type="date"
-                    disabled={submitting || form.how_soon_to_start_option !== 'Custom'}
-                    value={form.how_soon_to_start_option === 'Custom' ? form.how_soon_to_start : ''}
-                    onChange={e => set('how_soon_to_start', e.target.value)}
-                    className={`mt-1 px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-opacity w-40 ${
-                      form.how_soon_to_start_option === 'Custom'
-                        ? 'border-gray-300 opacity-100'
-                        : 'border-gray-200 opacity-40 pointer-events-none'
-                    }`}
-                  />
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="how_soon_to_start"
+                      value="Custom"
+                      checked={form.how_soon_to_start_option === 'Custom'}
+                      onChange={() => {
+                        set('how_soon_to_start_option', 'Custom');
+                        set('how_soon_to_start', '');
+                      }}
+                      disabled={submitting}
+                      className="h-4 w-4 border-gray-300 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">Custom</span>
+                    <input
+                      type="date"
+                      disabled={submitting || form.how_soon_to_start_option !== 'Custom'}
+                      value={form.how_soon_to_start_option === 'Custom' ? form.how_soon_to_start : ''}
+                      onChange={e => set('how_soon_to_start', e.target.value)}
+                      className={`ml-1 px-2 py-1 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-opacity ${
+                        form.how_soon_to_start_option === 'Custom'
+                          ? 'border-gray-300 opacity-100'
+                          : 'border-gray-200 opacity-40 pointer-events-none'
+                      }`}
+                    />
+                  </label>
                 </div>
               </div>
 
