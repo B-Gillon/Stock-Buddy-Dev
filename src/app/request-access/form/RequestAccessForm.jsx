@@ -1,0 +1,416 @@
+"use client";
+
+// src/app/request-access/form/components/RequestAccessForm.jsx
+// Page 2 of the request-access flow.
+// Collects applicant info and submits to /api/request-access.
+
+import { useState } from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+
+const gradientStyle = {
+  background: 'linear-gradient(to right, #11E0FC, #0099FF)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+};
+
+function InstallHeader() {
+  return (
+    <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
+      <div className="flex items-end justify-between gap-4 min-w-0">
+        <div className="shrink-0 flex items-center gap-3 self-end pb-0.5">
+          <Image
+            src="/STOCK_BUDDY_LOGO__1_.png"
+            alt="Stock Buddy logo"
+            width={88}
+            height={88}
+            className="h-16 w-auto object-contain"
+          />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
+              <span className="text-xs text-gray-400">v1.0</span>
+            </div>
+            <p className="text-xs mt-0.5" style={gradientStyle}>
+              Inventory Management for the Modern Age
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col items-end justify-end pb-0.5">
+          <span className="text-xs text-gray-400">A Buddy System app by Brandon Gillon</span>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+const INVENTORY_METHOD_OPTIONS = [
+  'Shopify only',
+  'Spreadsheets (Excel / Google Sheets)',
+  'A separate inventory management app',
+  'Manual / pen and paper',
+  'ERP or warehouse management system',
+  'Other',
+];
+
+const INITIAL_FORM = {
+  store_url: '',
+  contact_name: '',
+  contact_email: '',
+  company_size: '',
+  monthly_order_volume: '',
+  num_skus_variants: '',
+  current_inventory_methods: [],
+  has_supplier_requirements: '',
+  how_create_pos_today: '',
+  biggest_challenge: '',
+  why_interested: '',
+  willing_to_provide_feedback: '',
+  open_to_onboarding_calls: '',
+  how_soon_to_start: '',
+  anything_else: '',
+  understands_private_beta: false,
+  agrees_no_share_link: false,
+};
+
+function Label({ children, required }) {
+  return (
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      {children}{required && <span className="text-red-500 ml-0.5">*</span>}
+    </label>
+  );
+}
+
+function inputCls() {
+  return 'w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50';
+}
+
+function selectCls() {
+  return 'w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white disabled:opacity-50';
+}
+
+function textareaCls() {
+  return 'w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50';
+}
+
+function SectionTitle({ children }) {
+  return (
+    <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide pt-4 pb-1 border-b border-gray-200 mb-4">
+      {children}
+    </h3>
+  );
+}
+
+export default function RequestAccessForm() {
+  const router = useRouter();
+  const [form, setForm]       = useState(INITIAL_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]     = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  function set(field, value) {
+    setForm(f => ({ ...f, [field]: value }));
+  }
+
+  function toggleMethod(method) {
+    setForm(f => {
+      const current = f.current_inventory_methods;
+      return {
+        ...f,
+        current_inventory_methods: current.includes(method)
+          ? current.filter(m => m !== method)
+          : [...current, method],
+      };
+    });
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+
+    if (!form.understands_private_beta || !form.agrees_no_share_link) {
+      setError('You must check both required acknowledgement boxes to submit.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/request-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          has_supplier_requirements:   form.has_supplier_requirements === 'yes' ? true : form.has_supplier_requirements === 'no' ? false : null,
+          willing_to_provide_feedback: form.willing_to_provide_feedback === 'yes' ? true : form.willing_to_provide_feedback === 'no' ? false : null,
+          open_to_onboarding_calls:    form.open_to_onboarding_calls === 'yes' ? true : form.open_to_onboarding_calls === 'no' ? false : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Submission failed.');
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
+          <InstallHeader />
+        </div>
+        <div className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
+            <div className="text-4xl mb-4">✅</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Request Submitted</h2>
+            <p className="text-sm text-gray-600">
+              Thanks for your interest in Stock Buddy. We'll review your application and reach out to you at <strong>{form.contact_email}</strong> if approved.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+
+      <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
+        <InstallHeader />
+      </div>
+
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl shadow-sm p-10">
+
+          {/* Card header */}
+          <div className="flex items-center gap-5 mb-6">
+            <Image
+              src="/STOCK_BUDDY_LOGO__1_.png"
+              alt="Stock Buddy"
+              width={72}
+              height={72}
+              className="h-16 w-auto object-contain shrink-0"
+            />
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Request Access</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Tell us about your store and how you manage inventory today.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* ── Contact Info ─────────────────────────────────────── */}
+            <SectionTitle>Contact Info</SectionTitle>
+
+            <div>
+              <Label required>Shopify Store URL</Label>
+              <input className={inputCls()} type="text" placeholder="my-store.myshopify.com" value={form.store_url} onChange={e => set('store_url', e.target.value)} disabled={submitting} required />
+            </div>
+
+            <div>
+              <Label required>Contact Name</Label>
+              <input className={inputCls()} type="text" placeholder="Jane Smith" value={form.contact_name} onChange={e => set('contact_name', e.target.value)} disabled={submitting} required />
+            </div>
+
+            <div>
+              <Label required>Contact Email</Label>
+              <input className={inputCls()} type="email" placeholder="jane@mystore.com" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} disabled={submitting} required />
+            </div>
+
+            {/* ── Business Profile ─────────────────────────────────── */}
+            <SectionTitle>Business Profile</SectionTitle>
+
+            <div>
+              <Label>Company Size</Label>
+              <select className={selectCls()} value={form.company_size} onChange={e => set('company_size', e.target.value)} disabled={submitting}>
+                <option value="">Select…</option>
+                <option>Just me</option>
+                <option>2–5 employees</option>
+                <option>6–20 employees</option>
+                <option>21–100 employees</option>
+                <option>100+ employees</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Monthly Order Volume</Label>
+              <select className={selectCls()} value={form.monthly_order_volume} onChange={e => set('monthly_order_volume', e.target.value)} disabled={submitting}>
+                <option value="">Select…</option>
+                <option>Under 100 orders/month</option>
+                <option>100–500 orders/month</option>
+                <option>500–2,000 orders/month</option>
+                <option>2,000–10,000 orders/month</option>
+                <option>10,000+ orders/month</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Number of SKUs / Variants</Label>
+              <select className={selectCls()} value={form.num_skus_variants} onChange={e => set('num_skus_variants', e.target.value)} disabled={submitting}>
+                <option value="">Select…</option>
+                <option>Under 100</option>
+                <option>100–500</option>
+                <option>500–2,000</option>
+                <option>2,000–10,000</option>
+                <option>10,000+</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Current Inventory Management Method</Label>
+              <p className="text-xs text-gray-500 mb-2">Select all that apply.</p>
+              <div className="space-y-2">
+                {INVENTORY_METHOD_OPTIONS.map(method => (
+                  <label key={method} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.current_inventory_methods.includes(method)}
+                      onChange={() => toggleMethod(method)}
+                      disabled={submitting}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">{method}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>Do you have specific supplier requirements? (e.g. multiple suppliers, EDI, dropship)</Label>
+              <div className="flex gap-4 mt-1">
+                {['yes', 'no'].map(v => (
+                  <label key={v} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="has_supplier_requirements" value={v} checked={form.has_supplier_requirements === v} onChange={() => set('has_supplier_requirements', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
+                    <span className="text-sm text-gray-700 capitalize">{v}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Current Process ──────────────────────────────────── */}
+            <SectionTitle>Current Process</SectionTitle>
+
+            <div>
+              <Label>How do you create purchase orders today?</Label>
+              <textarea className={textareaCls()} rows={3} placeholder="e.g. manually in Excel, emailing suppliers directly, using a separate app…" value={form.how_create_pos_today} onChange={e => set('how_create_pos_today', e.target.value)} disabled={submitting} />
+            </div>
+
+            <div>
+              <Label>What is your biggest inventory or purchasing challenge?</Label>
+              <textarea className={textareaCls()} rows={3} placeholder="e.g. tracking what's on order, reconciling received goods, stock-outs…" value={form.biggest_challenge} onChange={e => set('biggest_challenge', e.target.value)} disabled={submitting} />
+            </div>
+
+            <div>
+              <Label>Why are you interested in Stock Buddy?</Label>
+              <textarea className={textareaCls()} rows={3} placeholder="What problem are you hoping it solves for you?" value={form.why_interested} onChange={e => set('why_interested', e.target.value)} disabled={submitting} />
+            </div>
+
+            {/* ── Beta Participation ───────────────────────────────── */}
+            <SectionTitle>Beta Participation</SectionTitle>
+
+            <div>
+              <Label>Are you willing to provide feedback during the beta?</Label>
+              <div className="flex gap-4 mt-1">
+                {['yes', 'no'].map(v => (
+                  <label key={v} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="willing_to_provide_feedback" value={v} checked={form.willing_to_provide_feedback === v} onChange={() => set('willing_to_provide_feedback', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
+                    <span className="text-sm text-gray-700 capitalize">{v}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>Are you open to onboarding calls or periodic check-ins?</Label>
+              <div className="flex gap-4 mt-1">
+                {['yes', 'no'].map(v => (
+                  <label key={v} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="open_to_onboarding_calls" value={v} checked={form.open_to_onboarding_calls === v} onChange={() => set('open_to_onboarding_calls', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
+                    <span className="text-sm text-gray-700 capitalize">{v}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label>How soon are you looking to get started?</Label>
+              <select className={selectCls()} value={form.how_soon_to_start} onChange={e => set('how_soon_to_start', e.target.value)} disabled={submitting}>
+                <option value="">Select…</option>
+                <option>Immediately</option>
+                <option>Within the next month</option>
+                <option>1–3 months</option>
+                <option>3–6 months</option>
+                <option>Just exploring for now</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Anything else we should know? (optional)</Label>
+              <textarea className={textareaCls()} rows={3} placeholder="Anything else that might help us evaluate your application…" value={form.anything_else} onChange={e => set('anything_else', e.target.value)} disabled={submitting} />
+            </div>
+
+            {/* ── Acknowledgements ─────────────────────────────────── */}
+            <SectionTitle>Acknowledgements</SectionTitle>
+
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.understands_private_beta}
+                  onChange={e => set('understands_private_beta', e.target.checked)}
+                  disabled={submitting}
+                  className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
+                />
+                <span className="text-sm text-gray-700">
+                  <strong>Required:</strong> I understand this is a private beta and approval is not guaranteed.
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.agrees_no_share_link}
+                  onChange={e => set('agrees_no_share_link', e.target.checked)}
+                  disabled={submitting}
+                  className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
+                />
+                <span className="text-sm text-gray-700">
+                  <strong>Required:</strong> I agree not to share the install link with anyone outside my organization.
+                </span>
+              </label>
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => router.push('/request-access')}
+                disabled={submitting}
+                className="px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                ← Back
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !form.understands_private_beta || !form.agrees_no_share_link || !form.store_url.trim() || !form.contact_name.trim() || !form.contact_email.trim()}
+                className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
+              >
+                {submitting ? 'Submitting…' : 'Submit Request'}
+              </button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+    </div>
+  );
+}
