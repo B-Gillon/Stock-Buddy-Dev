@@ -1,12 +1,11 @@
 // src/app/page.jsx
 // Root route.
 // - If loaded inside Shopify (host + shop params present): redirect to /dashboard
-// - Otherwise: show the install landing page for new merchants
+// - Otherwise: redirect to /request-access (public landing page)
 
 export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
-import InstallPage from "./components/InstallPage";
 
 export default async function RootPage({ searchParams }) {
   const params = await searchParams;
@@ -18,6 +17,6 @@ export default async function RootPage({ searchParams }) {
     redirect(`/dashboard?shop=${shop}&host=${host}`);
   }
 
-  // Otherwise show the install landing page
-  return <InstallPage />;
+  // Otherwise send to the request-access intro page
+  redirect("/request-access");
 }
