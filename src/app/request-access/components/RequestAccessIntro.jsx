@@ -2,6 +2,7 @@
 
 // src/app/request-access/components/RequestAccessIntro.jsx
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
@@ -35,6 +36,122 @@ const MINI_CARDS = [
   },
 ];
 
+// ── Contact Modal ─────────────────────────────────────────────────────────────
+
+function ContactModal({ onClose }) {
+  const [form, setForm]       = useState({ name: '', email: '', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]     = useState(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  function set(field, value) {
+    setForm(f => ({ ...f, [field]: value }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Submission failed.');
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-base font-semibold text-gray-900">Have Questions?</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {submitted ? (
+          <div className="px-6 py-8 text-center">
+            <div className="text-3xl mb-3">✅</div>
+            <p className="text-sm font-semibold text-gray-900 mb-1">Message sent!</p>
+            <p className="text-sm text-gray-500">We'll get back to you at {form.email}.</p>
+            <button onClick={onClose} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
+              Close
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={e => set('name', e.target.value)}
+                disabled={submitting}
+                required
+                placeholder="Jane Smith"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={e => set('email', e.target.value)}
+                disabled={submitting}
+                required
+                placeholder="jane@mystore.com"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
+              <textarea
+                value={form.message}
+                onChange={e => set('message', e.target.value)}
+                disabled={submitting}
+                required
+                rows={4}
+                placeholder="What would you like to know?"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-3 pt-1">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !form.name.trim() || !form.email.trim() || !form.message.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
+              >
+                {submitting ? 'Sending…' : 'Send Message'}
+              </button>
+            </div>
+          </form>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+
 function InstallHeader() {
   return (
     <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
@@ -65,8 +182,11 @@ function InstallHeader() {
   );
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
+
 export default function RequestAccessIntro() {
   const router = useRouter();
+  const [showContact, setShowContact] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -101,12 +221,12 @@ export default function RequestAccessIntro() {
               >
                 Request Access
               </button>
-              <a
-                href="mailto:hello@brandongillon.com"
-                className="flex-1 py-2.5 px-4 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-md border border-gray-300 transition-colors text-center"
+              <button
+                onClick={() => setShowContact(true)}
+                className="flex-1 py-2.5 px-4 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-md border border-gray-300 transition-colors"
               >
                 Have Questions?
-              </a>
+              </button>
             </div>
           </div>
 
@@ -132,6 +252,8 @@ export default function RequestAccessIntro() {
 
         </div>
       </div>
+
+      {showContact && <ContactModal onClose={() => setShowContact(false)} />}
 
     </div>
   );
