@@ -43,8 +43,12 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
     setSaving(true);
     setError(null);
     try {
+      const normalized = {
+        ...form,
+        shopify_domain: form.shopify_domain.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, ''),
+      };
       const res = await fetch(`/api/admin/beta-testers?key=${adminKey}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(normalized),
       });
       if (!res.ok) throw new Error('Failed to add tester');
       onAdded(await res.json());
