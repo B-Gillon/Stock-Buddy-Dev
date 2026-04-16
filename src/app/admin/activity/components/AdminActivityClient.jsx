@@ -2,6 +2,7 @@
 // /src/app/admin/activity/components/AdminActivityClient.jsx
 
 import { useState } from 'react';
+import Image from 'next/image';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +30,49 @@ function SectionHeader({ children }) {
 
 function n(val) {
   return typeof val === 'number' ? val.toLocaleString() : '—';
+}
+
+const gradientStyle = {
+  background: 'linear-gradient(to right, #11E0FC, #0099FF)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+};
+
+// ── Admin Header (no nav) ─────────────────────────────────────────────────────
+
+function AdminHeader({ loadedAt }) {
+  return (
+    <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
+      <div className="flex items-end justify-between gap-4 min-w-0">
+        {/* Left: logo + brand */}
+        <div className="shrink-0 flex items-center gap-3 self-end pb-0.5">
+          <Image
+            src="/STOCK_BUDDY_LOGO__1_.png"
+            alt="Stock Buddy logo"
+            width={88}
+            height={88}
+            className="h-16 w-auto object-contain"
+          />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
+              <span className="text-xs text-gray-400">v1.0</span>
+            </div>
+            <p className="text-xs mt-0.5" style={gradientStyle}>
+              Inventory Management for the Modern Age
+            </p>
+          </div>
+        </div>
+
+        {/* Right: admin label + loaded time */}
+        <div className="flex flex-col items-end justify-end gap-1 pb-0.5">
+          <span className="text-sm font-semibold text-white tracking-wide">Admin — Activity & System Health</span>
+          <span className="text-xs text-gray-400">Loaded: {formatDate(loadedAt)}</span>
+        </div>
+      </div>
+    </header>
+  );
 }
 
 // ── Add Tester Modal ──────────────────────────────────────────────────────────
@@ -149,7 +193,6 @@ function CombinedStatsTable({ testers, tenantStats, globalTotals }) {
               </tr>
             );
           })}
-
           {/* Totals row */}
           <tr className="bg-gray-50 border-t-2 border-gray-300">
             <td className="px-4 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wide">Totals</td>
@@ -180,7 +223,11 @@ export default function AdminActivityClient({
   const [errorCount, setErrorCount]           = useState(initialErrorCount);
   const [deletingId, setDeletingId]           = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [selectedIds, setSelectedIds]         = useState(new Set());
+  const [bulkDeleting, setBulkDeleting]       = useState(false);
+  const [loadedAt]                            = useState(() => new Date().toISOString());
 
+  // ── Single delete ─────────────────────────────────────────────────────────
   async function handleDeleteError(id) {
     setDeletingId(id);
     try {
@@ -188,6 +235,7 @@ export default function AdminActivityClient({
       if (!res.ok) throw new Error('Delete failed');
       setErrors(prev => prev.filter(e => e.id !== id));
       setErrorCount(prev => Math.max(0, prev - 1));
+      setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
       if (expandedError === id) setExpandedError(null);
     } catch (err) {
       console.error('Failed to delete error:', err);
@@ -197,19 +245,51 @@ export default function AdminActivityClient({
     }
   }
 
+  // ── Bulk delete ───────────────────────────────────────────────────────────
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedIds);
+    const results = await Promise.allSettled(
+      ids.map(id => fetch(`/api/admin/errors/${id}?key=${adminKey}`, { method: 'DELETE' }))
+    );
+    const deleted = ids.filter((_, i) => results[i].status === 'fulfilled' && results[i].value.ok);
+    setErrors(prev => prev.filter(e => !deleted.includes(e.id)));
+    setErrorCount(prev => Math.max(0, prev - deleted.length));
+    setSelectedIds(new Set());
+    if (deleted.includes(expandedError)) setExpandedError(null);
+    setBulkDeleting(false);
+  }
+
+  // ── Checkbox helpers ──────────────────────────────────────────────────────
+  function toggleOne(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selectedIds.size === errors.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(errors.map(e => e.id)));
+    }
+  }
+
+  const allSelected = errors.length > 0 && selectedIds.size === errors.length;
+  const someSelected = selectedIds.size > 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-gray-900 text-white px-8 py-5">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Stock Buddy — Admin</h1>
-            <p className="text-gray-400 text-sm mt-0.5">Activity & System Health</p>
-          </div>
-          <span className="text-xs text-gray-400">Loaded: {formatDate(new Date().toISOString())}</span>
-        </div>
+
+      {/* Standard Stock Buddy header, no nav */}
+      <div className="px-4 pt-4 pb-0 max-w-6xl mx-auto">
+        <AdminHeader loadedAt={loadedAt} />
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
 
         {errorCount > 0 && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg px-5 py-4 flex items-center gap-3">
@@ -248,9 +328,7 @@ export default function AdminActivityClient({
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(t.invited_at)}</td>
                     <td className="px-4 py-3"><StatusPill value={!!t.installed_at} /></td>
                     <td className="px-4 py-3"><StatusPill value={!!t.connected_at} /></td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">
-                      {t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}
-                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}</td>
                     <td className="px-4 py-3"><StatusPill value={t.is_active} trueLabel="Active" falseLabel="Inactive" /></td>
                   </tr>
                 ))}
@@ -263,18 +341,30 @@ export default function AdminActivityClient({
         {testers.length > 0 && (
           <>
             <SectionHeader>Tester Activity</SectionHeader>
-            <CombinedStatsTable
-              testers={testers}
-              tenantStats={tenantStats}
-              globalTotals={globalTotals}
-            />
+            <CombinedStatsTable testers={testers} tenantStats={tenantStats} globalTotals={globalTotals} />
           </>
         )}
 
         {/* Error Log */}
-        <SectionHeader>
-          Error Log{errorCount > 0 && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">{errorCount}</span>}
-        </SectionHeader>
+        <div className="flex items-center justify-between mt-8 mb-3 pb-2 border-b border-gray-200">
+          <h2 className="text-base font-semibold text-gray-800">
+            Error Log
+            {errorCount > 0 && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">{errorCount}</span>}
+          </h2>
+          {someSelected && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium rounded-md transition-colors"
+            >
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m-4 0H5" />
+              </svg>
+              {bulkDeleting ? 'Deleting…' : `Delete ${selectedIds.size} selected`}
+            </button>
+          )}
+        </div>
+
         {errors.length === 0 ? (
           <div className="bg-green-50 border border-green-200 rounded-lg px-5 py-4">
             <p className="text-sm text-green-700 font-medium">No errors recorded</p>
@@ -284,51 +374,78 @@ export default function AdminActivityClient({
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  {/* Select-all checkbox */}
+                  <th className="px-4 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                      className="h-3.5 w-3.5 rounded border-gray-300 text-red-600 cursor-pointer"
+                    />
+                  </th>
                   {['Account', 'When', 'Source', 'Message', 'Context', ''].map((h, i) => (
                     <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {errors.map((e) => (
-                  <tr key={e.id} className="hover:bg-red-50">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {e.tenant_id && tenantNameMap?.[e.tenant_id]
-                        ? <span className="text-xs font-medium text-gray-700">{tenantNameMap[e.tenant_id]}</span>
-                        : <span className="text-xs text-gray-400">—</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{formatDate(e.created_at)}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span>
-                    </td>
-                    <td className="px-4 py-3 text-red-700 cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
-                      <div>{e.message}</div>
-                      {expandedError === e.id && e.context && (
-                        <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-600 whitespace-pre-wrap">{JSON.stringify(e.context, null, 2)}</pre>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
-                      {e.context ? (expandedError === e.id ? 'Collapse' : 'Click to expand') : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {confirmDeleteId === e.id ? (
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => handleDeleteError(e.id)} disabled={deletingId === e.id} className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 px-2 py-1 rounded">
-                            {deletingId === e.id ? '…' : 'Confirm'}
+                {errors.map((e) => {
+                  const isSelected = selectedIds.has(e.id);
+                  return (
+                    <tr key={e.id} className={`${isSelected ? 'bg-red-50' : 'hover:bg-red-50'}`}>
+                      {/* Row checkbox */}
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleOne(e.id)}
+                          className="h-3.5 w-3.5 rounded border-gray-300 text-red-600 cursor-pointer"
+                        />
+                      </td>
+                      {/* Account */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {e.tenant_id && tenantNameMap?.[e.tenant_id]
+                          ? <span className="text-xs font-medium text-gray-700">{tenantNameMap[e.tenant_id]}</span>
+                          : <span className="text-xs text-gray-400">—</span>
+                        }
+                      </td>
+                      {/* When */}
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{formatDate(e.created_at)}</td>
+                      {/* Source */}
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span>
+                      </td>
+                      {/* Message */}
+                      <td className="px-4 py-3 text-red-700 cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
+                        <div>{e.message}</div>
+                        {expandedError === e.id && e.context && (
+                          <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-600 whitespace-pre-wrap">{JSON.stringify(e.context, null, 2)}</pre>
+                        )}
+                      </td>
+                      {/* Context hint */}
+                      <td className="px-4 py-3 text-gray-400 text-xs cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
+                        {e.context ? (expandedError === e.id ? 'Collapse' : 'Click to expand') : '—'}
+                      </td>
+                      {/* Single delete */}
+                      <td className="px-4 py-3">
+                        {confirmDeleteId === e.id ? (
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleDeleteError(e.id)} disabled={deletingId === e.id} className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 px-2 py-1 rounded">
+                              {deletingId === e.id ? '…' : 'Confirm'}
+                            </button>
+                            <button onClick={() => setConfirmDeleteId(null)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmDeleteId(e.id)} className="text-xs text-gray-400 hover:text-red-600 transition-colors" title="Delete this error">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m-4 0H5" />
+                            </svg>
                           </button>
-                          <button onClick={() => setConfirmDeleteId(null)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmDeleteId(e.id)} className="text-xs text-gray-400 hover:text-red-600 transition-colors" title="Delete this error">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m2 0a1 1 0 00-1-1h-4a1 1 0 00-1 1m-4 0H5" />
-                          </svg>
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

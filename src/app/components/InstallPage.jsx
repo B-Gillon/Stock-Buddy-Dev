@@ -5,6 +5,46 @@
 // Collects the merchant's myshopify.com domain and kicks off OAuth.
 
 import { useState } from "react";
+import Image from "next/image";
+
+const gradientStyle = {
+  background: "linear-gradient(to right, #11E0FC, #0099FF)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
+};
+
+function InstallHeader() {
+  return (
+    <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
+      <div className="flex items-end justify-between gap-4 min-w-0">
+        {/* Left: logo + brand */}
+        <div className="shrink-0 flex items-center gap-3 self-end pb-0.5">
+          <Image
+            src="/STOCK_BUDDY_LOGO__1_.png"
+            alt="Stock Buddy logo"
+            width={88}
+            height={88}
+            className="h-16 w-auto object-contain"
+          />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-2">
+              <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
+              <span className="text-xs text-gray-400">v1.0</span>
+            </div>
+            <p className="text-xs mt-0.5" style={gradientStyle}>
+              Inventory Management for the Modern Age
+            </p>
+          </div>
+        </div>
+        {/* Right: tagline */}
+        <div className="flex flex-col items-end justify-end pb-0.5">
+          <span className="text-xs text-gray-400">A Buddy System app by Brandon Gillon</span>
+        </div>
+      </div>
+    </header>
+  );
+}
 
 export default function InstallPage() {
   const [shop, setShop]       = useState("");
@@ -24,220 +64,81 @@ export default function InstallPage() {
   function handleInstall(e) {
     e.preventDefault();
     setError("");
-
     const domain = validate(shop);
     if (!domain) {
       setError("Please enter a valid Shopify store domain (e.g. my-store.myshopify.com)");
       return;
     }
-
     setLoading(true);
     window.location.href = `/api/shopify/install?shop=${domain}`;
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "#0f1117",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      fontFamily: "'DM Sans', sans-serif",
-      padding: "24px",
-      position: "relative",
-      overflow: "hidden",
-    }}>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
 
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Syne:wght@700;800&display=swap');
-
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(24px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .install-input {
-          width: 100%;
-          background: rgba(255,255,255,0.06);
-          border: 1.5px solid rgba(255,255,255,0.12);
-          border-radius: 10px;
-          padding: 14px 16px;
-          color: #fff;
-          font-size: 15px;
-          font-family: 'DM Sans', sans-serif;
-          outline: none;
-          transition: border-color 0.2s, background 0.2s;
-          box-sizing: border-box;
-        }
-
-        .install-input::placeholder { color: rgba(255,255,255,0.3); }
-
-        .install-input:focus {
-          border-color: #11E0FC;
-          background: rgba(17, 224, 252, 0.06);
-        }
-
-        .install-btn {
-          width: 100%;
-          padding: 14px;
-          border-radius: 10px;
-          border: none;
-          cursor: pointer;
-          font-size: 15px;
-          font-weight: 600;
-          font-family: 'DM Sans', sans-serif;
-          background: linear-gradient(135deg, #11E0FC, #0099FF);
-          color: #0f1117;
-          transition: opacity 0.2s, transform 0.15s;
-          letter-spacing: 0.01em;
-        }
-
-        .install-btn:hover:not(:disabled) {
-          opacity: 0.9;
-          transform: translateY(-1px);
-        }
-
-        .install-btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .card {
-          animation: fadeUp 0.6s ease both;
-        }
-      `}</style>
-
-      {/* Background glow */}
-      <div style={{
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "600px",
-        height: "600px",
-        borderRadius: "50%",
-        background: "radial-gradient(circle, rgba(17,224,252,0.08) 0%, transparent 70%)",
-        pointerEvents: "none",
-      }} />
-
-      {/* Card */}
-      <div className="card" style={{
-        width: "100%",
-        maxWidth: "420px",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.09)",
-        borderRadius: "20px",
-        padding: "48px 40px",
-        backdropFilter: "blur(12px)",
-        position: "relative",
-        zIndex: 1,
-      }}>
-
-        {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <img
-            src="/STOCK_BUDDY_LOGO__1_.png"
-            alt="Stock Buddy"
-            style={{ height: "80px", width: "auto", objectFit: "contain" }}
-          />
-        </div>
-
-        {/* Heading */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <h1 style={{
-            fontFamily: "'Syne', sans-serif",
-            fontSize: "28px",
-            fontWeight: "800",
-            color: "#fff",
-            margin: "0 0 8px 0",
-            background: "linear-gradient(to right, #11E0FC, #0099FF)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
-          }}>
-            Stock Buddy
-          </h1>
-          <p style={{
-            color: "rgba(255,255,255,0.5)",
-            fontSize: "14px",
-            margin: 0,
-            lineHeight: 1.5,
-          }}>
-            Inventory & purchase order management<br />for Shopify merchants
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleInstall}>
-          <div style={{ marginBottom: "12px" }}>
-            <label style={{
-              display: "block",
-              color: "rgba(255,255,255,0.6)",
-              fontSize: "13px",
-              fontWeight: "500",
-              marginBottom: "8px",
-              letterSpacing: "0.02em",
-            }}>
-              YOUR SHOPIFY STORE DOMAIN
-            </label>
-            <input
-              className="install-input"
-              type="text"
-              placeholder="my-store.myshopify.com"
-              value={shop}
-              onChange={(e) => { setShop(e.target.value); setError(""); }}
-              autoComplete="off"
-              spellCheck={false}
-              disabled={loading}
-            />
-          </div>
-
-          {error && (
-            <p style={{
-              color: "#FC6D6D",
-              fontSize: "13px",
-              margin: "0 0 12px 0",
-              lineHeight: 1.4,
-            }}>
-              {error}
-            </p>
-          )}
-
-          <div style={{ marginTop: "20px" }}>
-            <button
-              className="install-btn"
-              type="submit"
-              disabled={loading || !shop.trim()}
-            >
-              {loading ? "Redirecting to Shopify..." : "Install Stock Buddy →"}
-            </button>
-          </div>
-        </form>
-
-        {/* Footer note */}
-        <p style={{
-          textAlign: "center",
-          color: "rgba(255,255,255,0.25)",
-          fontSize: "12px",
-          marginTop: "24px",
-          marginBottom: 0,
-          lineHeight: 1.5,
-        }}>
-          You'll be redirected to Shopify to approve the installation.
-        </p>
+      {/* Header */}
+      <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
+        <InstallHeader />
       </div>
 
-      {/* Bottom brand */}
-      <p style={{
-        marginTop: "32px",
-        color: "rgba(255,255,255,0.2)",
-        fontSize: "12px",
-        fontFamily: "'DM Sans', sans-serif",
-        zIndex: 1,
-      }}>
-        A Buddy System app by Brandon Gillon
-      </p>
+      {/* Centered install card */}
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl shadow-sm p-10">
+
+          {/* Card header: logo + title side by side */}
+          <div className="flex items-center gap-5 mb-8">
+            <Image
+              src="/STOCK_BUDDY_LOGO__1_.png"
+              alt="Stock Buddy"
+              width={72}
+              height={72}
+              className="h-16 w-auto object-contain shrink-0"
+            />
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Stock Buddy</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Inventory &amp; purchase order management<br />for Shopify merchants
+              </p>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleInstall} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Your Shopify store domain
+              </label>
+              <input
+                type="text"
+                placeholder="my-store.myshopify.com"
+                value={shop}
+                onChange={(e) => { setShop(e.target.value); setError(""); }}
+                autoComplete="off"
+                spellCheck={false}
+                disabled={loading}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading || !shop.trim()}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
+            >
+              {loading ? "Redirecting to Shopify…" : "Install Stock Buddy →"}
+            </button>
+          </form>
+
+          <p className="text-center text-xs text-gray-400 mt-6">
+            You'll be redirected to Shopify to approve the installation.
+          </p>
+        </div>
+      </div>
+
     </div>
   );
 }
