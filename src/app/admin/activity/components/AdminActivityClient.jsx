@@ -146,6 +146,156 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
   );
 }
 
+// ── Approve Modal ─────────────────────────────────────────────────────────────
+
+function ApproveModal({ tester, accessRequest, adminKey, onClose, onApproved }) {
+  const installUrl = `https://stock-buddy.brandongillon.com/api/shopify/install?shop=${accessRequest?.store_url ?? ''}`;
+
+  const approvalBody =
+`Hi ${accessRequest?.contact_name ?? 'there'},
+
+Great news — your request to join the Stock Buddy private beta has been approved!
+
+You can install Stock Buddy into your Shopify store using the link below. This link is specific to your store and will not work for any other Shopify account.
+
+Install link:
+${installUrl}
+
+Once installed, Stock Buddy will appear inside your Shopify Admin. If you run into any issues during setup, feel free to reply to this email and I'll help you get sorted.
+
+Thank you for your patience, and welcome to the beta!
+
+Best regards, Brandon
+Buddy System Apps`;
+
+  const [form, setForm]       = useState({
+    to:      tester.contact_email ?? '',
+    from:    'hello@brandongillon.com',
+    subject: "You're approved — install Stock Buddy",
+    message: approvalBody,
+  });
+  const [sending, setSending] = useState(false);
+  const [error, setError]     = useState(null);
+  const [sent, setSent]       = useState(false);
+
+  function set(field, value) {
+    setForm(f => ({ ...f, [field]: value }));
+  }
+
+  async function handleSend() {
+    setError(null);
+    setSending(true);
+    try {
+      const res = await fetch(`/api/admin/approve-tester?key=${adminKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_request_id: accessRequest?.id ?? null,
+          to_email:  form.to,
+          subject:   form.subject,
+          message:   form.message,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send.');
+      setSent(true);
+      onApproved();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-base font-semibold text-gray-900">Send Approval Email</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {sent ? (
+          <div className="px-6 py-8 text-center">
+            <div className="text-3xl mb-3">✅</div>
+            <p className="text-sm font-semibold text-gray-900 mb-1">Approval email sent.</p>
+            <p className="text-sm text-gray-500">The request has been marked as approved.</p>
+            <button onClick={onClose} className="mt-6 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors">
+              Close
+            </button>
+          </div>
+        ) : (
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To <span className="text-red-500">*</span></label>
+              <input
+                type="email"
+                value={form.to}
+                onChange={e => set('to', e.target.value)}
+                disabled={sending}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+              <input
+                type="text"
+                value={form.from}
+                disabled
+                className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subject <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                value={form.subject}
+                onChange={e => set('subject', e.target.value)}
+                disabled={sending}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message <span className="text-red-500">*</span></label>
+              <textarea
+                value={form.message}
+                onChange={e => set('message', e.target.value)}
+                disabled={sending}
+                rows={10}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-50"
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-3 pt-1">
+              <button
+                onClick={onClose}
+                disabled={sending}
+                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={sending || !form.to.trim() || !form.subject.trim() || !form.message.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
+              >
+                {sending ? 'Sending…' : 'Send Email'}
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
 // ── Reject Modal ──────────────────────────────────────────────────────────────
 
 const REJECTION_BODY = `Hi there,
@@ -297,7 +447,8 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
   const [loading, setLoading]             = useState(true);
   const [actioning, setActioning]         = useState(null);
   const [actionError, setActionError]     = useState(null);
-  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showRejectModal, setShowRejectModal]   = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
 
   const status = testerStatus(tester);
 
@@ -365,11 +516,11 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
                   Reject
                 </button>
                 <button
-                  onClick={() => handleAction('approved')}
+                  onClick={() => setShowApproveModal(true)}
                   disabled={!!actioning}
                   className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
                 >
-                  {actioning === 'approved' ? 'Approving…' : 'Approve'}
+                  Approve
                 </button>
               </>
             )}
@@ -465,6 +616,20 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
           onRejected={() => {
             onStatusChange(tester.id, 'Rejected');
             setShowRejectModal(false);
+            onClose();
+          }}
+        />
+      )}
+
+      {showApproveModal && (
+        <ApproveModal
+          tester={tester}
+          accessRequest={accessRequest}
+          adminKey={adminKey}
+          onClose={() => setShowApproveModal(false)}
+          onApproved={() => {
+            onStatusChange(tester.id, 'Approved');
+            setShowApproveModal(false);
             onClose();
           }}
         />
