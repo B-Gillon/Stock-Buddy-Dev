@@ -71,7 +71,6 @@ export default function RequestAccessIntro() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
-      {/* Header + cards share the same horizontal container so widths match exactly */}
       <div className="w-full max-w-6xl mx-auto px-4 pt-4">
         <InstallHeader />
       </div>
@@ -79,9 +78,10 @@ export default function RequestAccessIntro() {
       <div className="flex-1 flex items-center justify-center py-12">
         <div className="w-full max-w-6xl px-4 flex flex-col lg:flex-row gap-6 items-stretch">
 
-          {/* ── Left card — about + CTA ─────────────────────────── */}
-          <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm p-10 flex flex-col">
-            <div className="space-y-4 text-sm text-gray-700 mb-8 flex-1">
+          {/* ── Left card ───────────────────────────────────────── */}
+          {/* pt-5 aligns first line of text with mini card icon/title row */}
+          <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm px-10 pt-5 pb-10 flex flex-col">
+            <div className="space-y-4 text-sm text-gray-700 flex-1">
               <p>
                 <strong className="text-gray-900">Stock Buddy</strong> is a Shopify-embedded inventory and purchase order management app built for merchants who need more than Shopify's built-in tools. It lets you create and manage purchase orders, track incoming inventory, sync stock levels to Shopify in real time, and coordinate with suppliers — all from inside your Shopify Admin.
               </p>
@@ -95,23 +95,27 @@ export default function RequestAccessIntro() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => router.push('/request-access/form')}
-              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md transition-colors"
-            >
-              Request Access →
-            </button>
+            {/* mt-4 = tighter gap between yellow box and button */}
+            <div className="mt-4">
+              <button
+                onClick={() => router.push('/request-access/form')}
+                className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md transition-colors"
+              >
+                Request Access
+              </button>
+            </div>
           </div>
 
           {/* ── Right side — 2x2 mini cards ─────────────────────── */}
-          <div className="flex-1 grid grid-cols-2 gap-4">
+          {/* flex-1 removed from ul so cards don't stretch vertically */}
+          <div className="flex-1 grid grid-cols-2 gap-4 content-start">
             {MINI_CARDS.map((card) => (
-              <div key={card.title} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 flex flex-col">
+              <div key={card.title} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-base">{card.icon}</span>
                   <h3 className="text-sm font-semibold text-gray-900">{card.title}</h3>
                 </div>
-                <ul className="space-y-1.5 flex-1">
+                <ul className="space-y-1.5">
                   {card.items.map((item) => (
                     <li key={item} className="flex items-start gap-2 text-xs text-gray-600">
                       <span className="text-green-500 mt-0.5 shrink-0">✓</span>
