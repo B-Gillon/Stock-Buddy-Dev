@@ -1,10 +1,8 @@
 "use client";
 
 // src/app/request-access/form/components/RequestAccessForm.jsx
-// Page 2 of the request-access flow.
-// Collects applicant info and submits to /api/request-access.
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
@@ -46,6 +44,50 @@ function InstallHeader() {
   );
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function Toast({ message, color = 'blue', onDismiss }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(t);
+  }, [onDismiss]);
+
+  const bg = color === 'red' ? 'bg-red-600' : 'bg-blue-600';
+
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-lg shadow-lg text-white text-sm font-medium ${bg}`}>
+      <span>{message}</span>
+      <button onClick={onDismiss} className="ml-1 opacity-70 hover:opacity-100 text-lg leading-none">&times;</button>
+    </div>
+  );
+}
+
+// ── Success Modal ─────────────────────────────────────────────────────────────
+
+function SuccessModal({ email, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-8 text-center">
+        <div className="text-5xl mb-4">✅</div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">Request Submitted!</h2>
+        <p className="text-sm text-gray-600 mb-6">
+          Thanks for your interest in Stock Buddy. We'll review your application and send a response to{' '}
+          <strong>{email}</strong> indicating whether your request has been approved or rejected.
+        </p>
+        <button
+          onClick={onClose}
+          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
 const INVENTORY_METHOD_OPTIONS = [
   'Shopify only',
   'Spreadsheets (Excel / Google Sheets)',
@@ -74,6 +116,8 @@ const INITIAL_FORM = {
   understands_private_beta: false,
   agrees_no_share_link: false,
 };
+
+// ── Small helpers ─────────────────────────────────────────────────────────────
 
 function Label({ children, required }) {
   return (
@@ -111,12 +155,36 @@ function CardTitle({ children }) {
   );
 }
 
+function isFormComplete(form) {
+  return Boolean(
+    form.store_url.trim() &&
+    form.contact_name.trim() &&
+    form.contact_email.trim() &&
+    form.company_size &&
+    form.monthly_order_volume &&
+    form.num_skus_variants &&
+    form.current_inventory_methods.length > 0 &&
+    form.has_supplier_requirements !== '' &&
+    form.how_create_pos_today.trim() &&
+    form.biggest_challenge.trim() &&
+    form.why_interested.trim() &&
+    form.willing_to_provide_feedback !== '' &&
+    form.open_to_onboarding_calls !== '' &&
+    form.how_soon_to_start &&
+    form.understands_private_beta &&
+    form.agrees_no_share_link
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
+
 export default function RequestAccessForm() {
   const router = useRouter();
-  const [form, setForm]             = useState(INITIAL_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError]           = useState(null);
-  const [submitted, setSubmitted]   = useState(false);
+  const [form, setForm]               = useState(INITIAL_FORM);
+  const [submitting, setSubmitting]   = useState(false);
+  const [error, setError]             = useState(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [toast, setToast]             = useState(null);
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }));
@@ -148,16 +216,18 @@ export default function RequestAccessForm() {
       const res = await fetch('/api/request-access', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          has_supplier_requirements:   form.has_supplier_requirements === 'yes' ? true : form.has_supplier_requirements === 'no' ? false : null,
-          willing_to_provide_feedback: form.willing_to_provide_feedback === 'yes' ? true : form.willing_to_provide_feedback === 'no' ? false : null,
-          open_to_onboarding_calls:    form.open_to_onboarding_calls === 'yes' ? true : form.open_to_onboarding_calls === 'no' ? false : null,
-        }),
+        body: JSON.stringify(form),
       });
       const data = await res.json();
+
       if (!res.ok) throw new Error(data.error || 'Submission failed.');
-      setSubmitted(true);
+
+      if (data.duplicate) {
+        setToast({ message: 'A request for this Shopify store has already been submitted.', color: 'blue' });
+        return;
+      }
+
+      setShowSuccess(true);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -165,34 +235,15 @@ export default function RequestAccessForm() {
     }
   }
 
-  if (submitted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
-          <InstallHeader />
-        </div>
-        <div className="flex-1 flex items-center justify-center px-4 py-12">
-          <div className="w-full max-w-xl bg-white border border-gray-200 rounded-xl shadow-sm p-10 text-center">
-            <div className="text-4xl mb-4">✅</div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Request Submitted</h2>
-            <p className="text-sm text-gray-600">
-              Thanks for your interest in Stock Buddy. We'll review your application and reach out to you at <strong>{form.contact_email}</strong> if approved.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const canSubmit = !submitting && isFormComplete(form);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
-      {/* Header */}
       <div className="px-4 pt-4 max-w-6xl mx-auto w-full">
         <InstallHeader />
       </div>
 
-      {/* Cards */}
       <form onSubmit={handleSubmit}>
         <div className="px-4 py-8 max-w-6xl mx-auto w-full flex flex-col gap-6">
 
@@ -202,15 +253,15 @@ export default function RequestAccessForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
                 <Label required>Shopify Store URL</Label>
-                <input className={inputCls()} type="text" placeholder="my-store.myshopify.com" value={form.store_url} onChange={e => set('store_url', e.target.value)} disabled={submitting} required />
+                <input className={inputCls()} type="text" placeholder="my-store.myshopify.com" value={form.store_url} onChange={e => set('store_url', e.target.value)} disabled={submitting} />
               </div>
               <div>
                 <Label required>Contact Name</Label>
-                <input className={inputCls()} type="text" placeholder="Jane Smith" value={form.contact_name} onChange={e => set('contact_name', e.target.value)} disabled={submitting} required />
+                <input className={inputCls()} type="text" placeholder="Jane Smith" value={form.contact_name} onChange={e => set('contact_name', e.target.value)} disabled={submitting} />
               </div>
               <div>
                 <Label required>Contact Email</Label>
-                <input className={inputCls()} type="email" placeholder="jane@mystore.com" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} disabled={submitting} required />
+                <input className={inputCls()} type="email" placeholder="jane@mystore.com" value={form.contact_email} onChange={e => set('contact_email', e.target.value)} disabled={submitting} />
               </div>
             </div>
           </Card>
@@ -221,7 +272,7 @@ export default function RequestAccessForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
               <div>
-                <Label>Company Size</Label>
+                <Label required>Company Size</Label>
                 <select className={selectCls()} value={form.company_size} onChange={e => set('company_size', e.target.value)} disabled={submitting}>
                   <option value="">Select…</option>
                   <option>Just me</option>
@@ -233,7 +284,7 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label>Monthly Order Volume</Label>
+                <Label required>Monthly Order Volume</Label>
                 <select className={selectCls()} value={form.monthly_order_volume} onChange={e => set('monthly_order_volume', e.target.value)} disabled={submitting}>
                   <option value="">Select…</option>
                   <option>Under 100 orders/month</option>
@@ -245,7 +296,7 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label>Number of SKUs / Variants</Label>
+                <Label required>Number of SKUs / Variants</Label>
                 <select className={selectCls()} value={form.num_skus_variants} onChange={e => set('num_skus_variants', e.target.value)} disabled={submitting}>
                   <option value="">Select…</option>
                   <option>Under 100</option>
@@ -257,7 +308,7 @@ export default function RequestAccessForm() {
               </div>
 
               <div className="md:col-span-2">
-                <Label>Current Inventory Management Method</Label>
+                <Label required>Current Inventory Management Method</Label>
                 <p className="text-xs text-gray-500 mb-2">Select all that apply.</p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2">
                   {INVENTORY_METHOD_OPTIONS.map(method => (
@@ -276,7 +327,7 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label>Specific supplier requirements? <span className="font-normal text-gray-500">(e.g. EDI, dropship)</span></Label>
+                <Label required>Specific supplier requirements? <span className="font-normal text-gray-500">(e.g. EDI, dropship)</span></Label>
                 <div className="flex gap-4 mt-2">
                   {['yes', 'no'].map(v => (
                     <label key={v} className="flex items-center gap-2 cursor-pointer">
@@ -295,15 +346,15 @@ export default function RequestAccessForm() {
             <CardTitle>Current Process</CardTitle>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
-                <Label>How do you create purchase orders today?</Label>
+                <Label required>How do you create purchase orders today?</Label>
                 <textarea className={textareaCls()} rows={4} placeholder="e.g. manually in Excel, emailing suppliers directly, using a separate app…" value={form.how_create_pos_today} onChange={e => set('how_create_pos_today', e.target.value)} disabled={submitting} />
               </div>
               <div>
-                <Label>What is your biggest inventory or purchasing challenge?</Label>
+                <Label required>What is your biggest inventory or purchasing challenge?</Label>
                 <textarea className={textareaCls()} rows={4} placeholder="e.g. tracking what's on order, reconciling received goods, stock-outs…" value={form.biggest_challenge} onChange={e => set('biggest_challenge', e.target.value)} disabled={submitting} />
               </div>
               <div>
-                <Label>Why are you interested in Stock Buddy?</Label>
+                <Label required>Why are you interested in Stock Buddy?</Label>
                 <textarea className={textareaCls()} rows={4} placeholder="What problem are you hoping it solves for you?" value={form.why_interested} onChange={e => set('why_interested', e.target.value)} disabled={submitting} />
               </div>
             </div>
@@ -315,7 +366,7 @@ export default function RequestAccessForm() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
               <div>
-                <Label>Are you willing to provide feedback during the beta?</Label>
+                <Label required>Are you willing to provide feedback during the beta?</Label>
                 <div className="flex gap-4 mt-2">
                   {['yes', 'no'].map(v => (
                     <label key={v} className="flex items-center gap-2 cursor-pointer">
@@ -327,7 +378,7 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label>Are you open to onboarding calls or periodic check-ins?</Label>
+                <Label required>Are you open to onboarding calls or periodic check-ins?</Label>
                 <div className="flex gap-4 mt-2">
                   {['yes', 'no'].map(v => (
                     <label key={v} className="flex items-center gap-2 cursor-pointer">
@@ -339,7 +390,7 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label>How soon are you looking to get started?</Label>
+                <Label required>How soon are you looking to get started?</Label>
                 <select className={selectCls()} value={form.how_soon_to_start} onChange={e => set('how_soon_to_start', e.target.value)} disabled={submitting}>
                   <option value="">Select…</option>
                   <option>Immediately</option>
@@ -357,7 +408,7 @@ export default function RequestAccessForm() {
 
             </div>
 
-            {/* Acknowledgements — within same card, separated by a rule */}
+            {/* Acknowledgements */}
             <div className="mt-6 pt-5 border-t border-gray-200">
               <p className="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-4">Acknowledgements</p>
               <div className="space-y-3 mb-6">
@@ -388,9 +439,7 @@ export default function RequestAccessForm() {
                 </label>
               </div>
 
-              {error && (
-                <p className="text-sm text-red-600 mb-4">{error}</p>
-              )}
+              {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
 
               <div className="flex gap-3">
                 <button
@@ -403,7 +452,7 @@ export default function RequestAccessForm() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting || !form.understands_private_beta || !form.agrees_no_share_link || !form.store_url.trim() || !form.contact_name.trim() || !form.contact_email.trim()}
+                  disabled={!canSubmit}
                   className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-md transition-colors"
                 >
                   {submitting ? 'Submitting…' : 'Submit Request'}
@@ -415,6 +464,21 @@ export default function RequestAccessForm() {
 
         </div>
       </form>
+
+      {showSuccess && (
+        <SuccessModal
+          email={form.contact_email}
+          onClose={() => router.push('/request-access')}
+        />
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          color={toast.color}
+          onDismiss={() => setToast(null)}
+        />
+      )}
 
     </div>
   );

@@ -14,20 +14,6 @@ function formatDate(ts) {
   });
 }
 
-function StatusPill({ value, trueLabel = 'Yes', falseLabel = 'No' }) {
-  return value
-    ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{trueLabel}</span>
-    : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">{falseLabel}</span>;
-}
-
-function SectionHeader({ children }) {
-  return (
-    <h2 className="text-base font-semibold text-gray-800 mt-8 mb-3 pb-2 border-b border-gray-200">
-      {children}
-    </h2>
-  );
-}
-
 function n(val) {
   return typeof val === 'number' ? val.toLocaleString() : '—';
 }
@@ -39,33 +25,51 @@ const gradientStyle = {
   backgroundClip: 'text',
 };
 
-// ── Admin Header (no nav) ─────────────────────────────────────────────────────
+// ── Status pill ───────────────────────────────────────────────────────────────
+
+const STATUS_STYLES = {
+  'Active':         'bg-green-100 text-green-700',
+  'Inactive':       'bg-gray-100 text-gray-500',
+  'Invited':        'bg-purple-100 text-purple-700',
+  'Form Submitted': 'bg-blue-100 text-blue-700',
+  'Rejected':       'bg-red-100 text-red-600',
+};
+
+function StatusPill({ status }) {
+  const cls = STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-500';
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
+      {status ?? '—'}
+    </span>
+  );
+}
+
+/** Derive a display status from a beta_tester row. */
+function testerStatus(t) {
+  const note = t.notes ?? '';
+  if (note === 'Form Submitted') return 'Form Submitted';
+  if (note === 'Approved' || note === 'Rejected') return note;
+  if (!t.is_active) return 'Inactive';
+  if (t.invited_at && !t.installed_at) return 'Invited';
+  return 'Active';
+}
+
+// ── Admin Header ──────────────────────────────────────────────────────────────
 
 function AdminHeader({ loadedAt }) {
   return (
     <header className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg shadow">
       <div className="flex items-end justify-between gap-4 min-w-0">
-        {/* Left: logo + brand */}
         <div className="shrink-0 flex items-center gap-3 self-end pb-0.5">
-          <Image
-            src="/STOCK_BUDDY_LOGO__1_.png"
-            alt="Stock Buddy logo"
-            width={88}
-            height={88}
-            className="h-16 w-auto object-contain"
-          />
+          <Image src="/STOCK_BUDDY_LOGO__1_.png" alt="Stock Buddy logo" width={88} height={88} className="h-16 w-auto object-contain" />
           <div className="min-w-0">
             <div className="flex items-baseline gap-2">
               <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
               <span className="text-xs text-gray-400">v1.0</span>
             </div>
-            <p className="text-xs mt-0.5" style={gradientStyle}>
-              Inventory Management for the Modern Age
-            </p>
+            <p className="text-xs mt-0.5" style={gradientStyle}>Inventory Management for the Modern Age</p>
           </div>
         </div>
-
-        {/* Right: admin label + loaded time */}
         <div className="flex flex-col items-end justify-end gap-1 pb-0.5">
           <span className="text-sm font-semibold text-white tracking-wide">Admin — Activity & System Health</span>
           <span className="text-xs text-gray-400">Loaded: {formatDate(loadedAt)}</span>
@@ -118,10 +122,10 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
         <div className="px-6 py-5 space-y-4">
           {error && <p className="text-sm text-red-600">{error}</p>}
           {[
-            { name: 'contact_name', label: 'Contact Name', required: true, placeholder: 'Jane Smith' },
-            { name: 'contact_email', label: 'Contact Email', placeholder: 'jane@company.com' },
-            { name: 'contact_phone', label: 'Contact Phone', placeholder: '704-555-1234' },
-            { name: 'shopify_domain', label: 'Expected Shopify Domain', placeholder: 'their-store.myshopify.com' },
+            { name: 'contact_name',  label: 'Contact Name',            required: true, placeholder: 'Jane Smith' },
+            { name: 'contact_email', label: 'Contact Email',           placeholder: 'jane@company.com' },
+            { name: 'contact_phone', label: 'Contact Phone',           placeholder: '704-555-1234' },
+            { name: 'shopify_domain',label: 'Expected Shopify Domain', placeholder: 'their-store.myshopify.com' },
           ].map(({ name, label, required, placeholder }) => (
             <div key={name}>
               <label className="block text-sm font-medium text-gray-700 mb-1">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</label>
@@ -138,6 +142,192 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
           <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50">{saving ? 'Adding…' : 'Add Tester'}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Tester Detail Modal ───────────────────────────────────────────────────────
+
+function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
+  const [accessRequest, setAccessRequest] = useState(null);
+  const [loading, setLoading]             = useState(true);
+  const [actioning, setActioning]         = useState(null); // 'approved' | 'rejected'
+  const [actionError, setActionError]     = useState(null);
+
+  const status = testerStatus(tester);
+
+  // Fetch the matching access_request row by store domain
+  useState(() => {
+    async function load() {
+      try {
+        const res = await fetch(`/api/admin/access-requests?key=${adminKey}`);
+        if (!res.ok) throw new Error('Failed to load');
+        const { data } = await res.json();
+        const match = (data ?? []).find(r =>
+          r.store_url?.replace(/^https?:\/\//i, '').replace(/\/+$/, '').toLowerCase() ===
+          (tester.shopify_domain ?? '').toLowerCase()
+        );
+        setAccessRequest(match ?? null);
+      } catch {
+        setAccessRequest(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  async function handleAction(newStatus) {
+    setActioning(newStatus);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/admin/access-requests/${accessRequest.id}?key=${adminKey}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) throw new Error('Action failed');
+      onStatusChange(tester.id, newStatus === 'approved' ? 'Approved' : 'Rejected');
+      onClose();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  const yesNo = v => v === true ? 'Yes' : v === false ? 'No' : '—';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{tester.contact_name}</h3>
+            <p className="text-xs text-gray-500 mt-0.5">{tester.shopify_domain ?? '—'}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {status === 'Form Submitted' && accessRequest && (
+              <>
+                <button
+                  onClick={() => handleAction('rejected')}
+                  disabled={!!actioning}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-md transition-colors"
+                >
+                  {actioning === 'rejected' ? 'Rejecting…' : 'Reject'}
+                </button>
+                <button
+                  onClick={() => handleAction('approved')}
+                  disabled={!!actioning}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-md transition-colors"
+                >
+                  {actioning === 'approved' ? 'Approving…' : 'Approve'}
+                </button>
+              </>
+            )}
+            <StatusPill status={status} />
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 ml-1">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Modal body */}
+        <div className="overflow-y-auto px-6 py-5 space-y-6 flex-1">
+
+          {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+
+          {/* Tester record */}
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Tester Record</p>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <Row label="Email"       value={tester.contact_email ?? '—'} />
+              <Row label="Phone"       value={tester.contact_phone ?? '—'} />
+              <Row label="Invited"     value={formatDate(tester.invited_at)} />
+              <Row label="Installed"   value={tester.installed_at ? formatDate(tester.installed_at) : '—'} />
+              <Row label="Connected"   value={tester.connected_at ? formatDate(tester.connected_at) : '—'} />
+            </div>
+          </div>
+
+          {/* Access request form responses */}
+          {loading ? (
+            <p className="text-sm text-gray-400 italic">Loading form responses…</p>
+          ) : !accessRequest ? (
+            <p className="text-sm text-gray-400 italic">No form submission found for this tester.</p>
+          ) : (
+            <>
+              <hr className="border-gray-200" />
+
+              <Section title="Contact Info">
+                <Row label="Store URL"     value={accessRequest.store_url} />
+                <Row label="Contact Name"  value={accessRequest.contact_name} />
+                <Row label="Email"         value={accessRequest.contact_email} />
+              </Section>
+
+              <Section title="Business Profile">
+                <Row label="Company Size"          value={accessRequest.company_size ?? '—'} />
+                <Row label="Monthly Order Volume"  value={accessRequest.monthly_order_volume ?? '—'} />
+                <Row label="SKUs / Variants"       value={accessRequest.num_skus_variants ?? '—'} />
+                <Row label="Inventory Methods"     value={(accessRequest.current_inventory_methods ?? []).join(', ') || '—'} />
+                <Row label="Supplier Requirements" value={yesNo(accessRequest.has_supplier_requirements)} />
+              </Section>
+
+              <Section title="Current Process">
+                <LongRow label="How they create POs today"    value={accessRequest.how_create_pos_today} />
+                <LongRow label="Biggest challenge"            value={accessRequest.biggest_challenge} />
+                <LongRow label="Why interested in Stock Buddy" value={accessRequest.why_interested} />
+              </Section>
+
+              <Section title="Beta Participation">
+                <Row label="Willing to provide feedback" value={yesNo(accessRequest.willing_to_provide_feedback)} />
+                <Row label="Open to onboarding calls"   value={yesNo(accessRequest.open_to_onboarding_calls)} />
+                <Row label="How soon to start"          value={accessRequest.how_soon_to_start ?? '—'} />
+                {accessRequest.anything_else && (
+                  <LongRow label="Anything else" value={accessRequest.anything_else} />
+                )}
+              </Section>
+
+              <Section title="Submission">
+                <Row label="Submitted"       value={formatDate(accessRequest.created_at)} />
+                <Row label="Request Status"  value={accessRequest.status} />
+                {accessRequest.reviewed_at && <Row label="Reviewed"  value={formatDate(accessRequest.reviewed_at)} />}
+                {accessRequest.reviewer_notes && <LongRow label="Reviewer Notes" value={accessRequest.reviewer_notes} />}
+              </Section>
+            </>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function Section({ title, children }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</p>
+      <div className="grid grid-cols-1 gap-y-2 text-sm">{children}</div>
+    </div>
+  );
+}
+
+function Row({ label, value }) {
+  return (
+    <div className="flex gap-2">
+      <span className="text-gray-500 shrink-0 w-48">{label}</span>
+      <span className="text-gray-900">{value ?? '—'}</span>
+    </div>
+  );
+}
+
+function LongRow({ label, value }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-gray-500">{label}</span>
+      <span className="text-gray-900 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm whitespace-pre-wrap">{value ?? '—'}</span>
     </div>
   );
 }
@@ -169,7 +359,7 @@ function CombinedStatsTable({ testers, tenantStats, globalTotals }) {
         </thead>
         <tbody className="divide-y divide-gray-100">
           {testers.map((t) => {
-            const stats = t.tenant_id ? tenantStats[t.tenant_id] : null;
+            const stats    = t.tenant_id ? tenantStats[t.tenant_id] : null;
             const hasErrors = (stats?.errorCount ?? 0) > 0;
             return (
               <tr key={t.id} className="hover:bg-gray-50">
@@ -178,9 +368,7 @@ function CombinedStatsTable({ testers, tenantStats, globalTotals }) {
                   {!stats && <span className="ml-2 text-xs text-gray-400 italic">not connected</span>}
                 </td>
                 {STAT_COLS.map(col => (
-                  <td key={col.key} className="px-4 py-1.5 text-xs text-gray-700">
-                    {stats ? n(stats[col.key]) : '—'}
-                  </td>
+                  <td key={col.key} className="px-4 py-1.5 text-xs text-gray-700">{stats ? n(stats[col.key]) : '—'}</td>
                 ))}
                 <td className="px-4 py-1.5">
                   {stats
@@ -193,13 +381,10 @@ function CombinedStatsTable({ testers, tenantStats, globalTotals }) {
               </tr>
             );
           })}
-          {/* Totals row */}
           <tr className="bg-gray-50 border-t-2 border-gray-300">
             <td className="px-4 py-1.5 text-xs font-semibold text-gray-700 uppercase tracking-wide">Totals</td>
             {STAT_COLS.map(col => (
-              <td key={col.key} className="px-4 py-1.5 text-xs font-semibold text-gray-900">
-                {n(globalTotals[col.key])}
-              </td>
+              <td key={col.key} className="px-4 py-1.5 text-xs font-semibold text-gray-900">{n(globalTotals[col.key])}</td>
             ))}
             <td className="px-4 py-1.5 text-xs text-gray-400">—</td>
           </tr>
@@ -209,14 +394,19 @@ function CombinedStatsTable({ testers, tenantStats, globalTotals }) {
   );
 }
 
+// ── Tab definitions ───────────────────────────────────────────────────────────
+
+const ALL_TABS = ['All', 'Active', 'Inactive', 'Invited', 'Form Submitted', 'Rejected'];
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AdminActivityClient({
   adminKey, betaTesters, lastSessionMap, tenantStats, globalTotals,
-  errors: initialErrors, errorCount: initialErrorCount,
-  tenantNameMap,
+  errors: initialErrors, errorCount: initialErrorCount, tenantNameMap,
 }) {
   const [testers, setTesters]                 = useState(betaTesters);
+  const [activeTab, setActiveTab]             = useState('All');
+  const [selectedTester, setSelectedTester]   = useState(null);
   const [showAddModal, setShowAddModal]        = useState(false);
   const [expandedError, setExpandedError]     = useState(null);
   const [errors, setErrors]                   = useState(initialErrors);
@@ -227,7 +417,25 @@ export default function AdminActivityClient({
   const [bulkDeleting, setBulkDeleting]       = useState(false);
   const [loadedAt]                            = useState(() => new Date().toISOString());
 
-  // ── Single delete ─────────────────────────────────────────────────────────
+  // ── Filter testers by tab ─────────────────────────────────────────────────
+  const filteredTesters = activeTab === 'All'
+    ? testers
+    : testers.filter(t => testerStatus(t) === activeTab);
+
+  // ── Tab counts ────────────────────────────────────────────────────────────
+  function tabCount(tab) {
+    if (tab === 'All') return testers.length;
+    return testers.filter(t => testerStatus(t) === tab).length;
+  }
+
+  // ── Status change callback from detail modal ──────────────────────────────
+  function handleStatusChange(testerId, newNote) {
+    setTesters(prev => prev.map(t =>
+      t.id === testerId ? { ...t, notes: newNote, is_active: newNote === 'Approved' } : t
+    ));
+  }
+
+  // ── Single error delete ───────────────────────────────────────────────────
   async function handleDeleteError(id) {
     setDeletingId(id);
     try {
@@ -261,7 +469,6 @@ export default function AdminActivityClient({
     setBulkDeleting(false);
   }
 
-  // ── Checkbox helpers ──────────────────────────────────────────────────────
   function toggleOne(id) {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -278,13 +485,12 @@ export default function AdminActivityClient({
     }
   }
 
-  const allSelected = errors.length > 0 && selectedIds.size === errors.length;
+  const allSelected  = errors.length > 0 && selectedIds.size === errors.length;
   const someSelected = selectedIds.size > 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
 
-      {/* Standard Stock Buddy header, no nav */}
       <div className="px-4 pt-4 pb-0 max-w-6xl mx-auto">
         <AdminHeader loadedAt={loadedAt} />
       </div>
@@ -298,27 +504,61 @@ export default function AdminActivityClient({
           </div>
         )}
 
-        {/* Beta Tester Registry */}
+        {/* ── Beta Tester Registry ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-gray-800">Beta Tester Registry</h2>
           <button onClick={() => setShowAddModal(true)} className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">+ Add Tester</button>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 mb-3 border-b border-gray-200">
+          {ALL_TABS.map(tab => {
+            const count   = tabCount(tab);
+            const active  = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-2 text-xs font-medium rounded-t-md border-b-2 transition-colors flex items-center gap-1.5 ${
+                  active
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {tab}
+                {count > 0 && (
+                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-8">
-          {testers.length === 0 ? (
-            <div className="px-6 py-8 text-center"><p className="text-sm text-gray-400 italic">No beta testers added yet. Click "Add Tester" to invite someone.</p></div>
+          {filteredTesters.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <p className="text-sm text-gray-400 italic">
+                {testers.length === 0 ? 'No beta testers added yet. Click "Add Tester" to invite someone.' : `No testers with status "${activeTab}".`}
+              </p>
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {['Contact', 'Shopify Domain', 'Invited', 'Installed', 'Connected', 'Last Accessed', 'Active'].map(h => (
+                  {['Contact', 'Shopify Domain', 'Invited', 'Installed', 'Connected', 'Last Accessed', 'Status'].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {testers.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50">
+                {filteredTesters.map((t) => (
+                  <tr
+                    key={t.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => setSelectedTester(t)}
+                  >
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{t.contact_name}</p>
                       {t.contact_email && <p className="text-xs text-gray-500">{t.contact_email}</p>}
@@ -326,10 +566,10 @@ export default function AdminActivityClient({
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-blue-600">{t.shopify_domain ?? '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(t.invited_at)}</td>
-                    <td className="px-4 py-3"><StatusPill value={!!t.installed_at} /></td>
-                    <td className="px-4 py-3"><StatusPill value={!!t.connected_at} /></td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{t.installed_at ? formatDate(t.installed_at) : '—'}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{t.connected_at ? formatDate(t.connected_at) : '—'}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{t.tenant_id ? formatDate(lastSessionMap[t.tenant_id]) : '—'}</td>
-                    <td className="px-4 py-3"><StatusPill value={t.is_active} trueLabel="Active" falseLabel="Inactive" /></td>
+                    <td className="px-4 py-3"><StatusPill status={testerStatus(t)} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -337,15 +577,19 @@ export default function AdminActivityClient({
           )}
         </div>
 
-        {/* Combined Stats Table */}
-        {testers.length > 0 && (
+        {/* Combined Stats Table — only show testers who are actually connected */}
+        {testers.filter(t => t.tenant_id).length > 0 && (
           <>
-            <SectionHeader>Tester Activity</SectionHeader>
-            <CombinedStatsTable testers={testers} tenantStats={tenantStats} globalTotals={globalTotals} />
+            <h2 className="text-base font-semibold text-gray-800 mt-8 mb-3 pb-2 border-b border-gray-200">Tester Activity</h2>
+            <CombinedStatsTable
+              testers={testers.filter(t => t.tenant_id)}
+              tenantStats={tenantStats}
+              globalTotals={globalTotals}
+            />
           </>
         )}
 
-        {/* Error Log */}
+        {/* ── Error Log ────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mt-8 mb-3 pb-2 border-b border-gray-200">
           <h2 className="text-base font-semibold text-gray-800">
             Error Log
@@ -374,14 +618,8 @@ export default function AdminActivityClient({
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  {/* Select-all checkbox */}
                   <th className="px-4 py-3 w-8">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={toggleAll}
-                      className="h-3.5 w-3.5 rounded border-gray-300 text-red-600 cursor-pointer"
-                    />
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="h-3.5 w-3.5 rounded border-gray-300 text-red-600 cursor-pointer" />
                   </th>
                   {['Account', 'When', 'Source', 'Message', 'Context', ''].map((h, i) => (
                     <th key={i} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
@@ -393,40 +631,28 @@ export default function AdminActivityClient({
                   const isSelected = selectedIds.has(e.id);
                   return (
                     <tr key={e.id} className={`${isSelected ? 'bg-red-50' : 'hover:bg-red-50'}`}>
-                      {/* Row checkbox */}
                       <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleOne(e.id)}
-                          className="h-3.5 w-3.5 rounded border-gray-300 text-red-600 cursor-pointer"
-                        />
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleOne(e.id)} className="h-3.5 w-3.5 rounded border-gray-300 text-red-600 cursor-pointer" />
                       </td>
-                      {/* Account */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         {e.tenant_id && tenantNameMap?.[e.tenant_id]
                           ? <span className="text-xs font-medium text-gray-700">{tenantNameMap[e.tenant_id]}</span>
                           : <span className="text-xs text-gray-400">—</span>
                         }
                       </td>
-                      {/* When */}
                       <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">{formatDate(e.created_at)}</td>
-                      {/* Source */}
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{e.source}</span>
                       </td>
-                      {/* Message */}
                       <td className="px-4 py-3 text-red-700 cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
                         <div>{e.message}</div>
                         {expandedError === e.id && e.context && (
                           <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded p-2 text-gray-600 whitespace-pre-wrap">{JSON.stringify(e.context, null, 2)}</pre>
                         )}
                       </td>
-                      {/* Context hint */}
                       <td className="px-4 py-3 text-gray-400 text-xs cursor-pointer" onClick={() => setExpandedError(expandedError === e.id ? null : e.id)}>
                         {e.context ? (expandedError === e.id ? 'Collapse' : 'Click to expand') : '—'}
                       </td>
-                      {/* Single delete */}
                       <td className="px-4 py-3">
                         {confirmDeleteId === e.id ? (
                           <div className="flex items-center gap-2">
@@ -453,7 +679,19 @@ export default function AdminActivityClient({
 
       </div>
 
-      {showAddModal && <AddTesterModal adminKey={adminKey} onClose={() => setShowAddModal(false)} onAdded={(t) => setTesters(prev => [t, ...prev])} />}
+      {showAddModal && (
+        <AddTesterModal adminKey={adminKey} onClose={() => setShowAddModal(false)} onAdded={(t) => setTesters(prev => [t, ...prev])} />
+      )}
+
+      {selectedTester && (
+        <TesterDetailModal
+          tester={selectedTester}
+          adminKey={adminKey}
+          onClose={() => setSelectedTester(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
+
     </div>
   );
 }
