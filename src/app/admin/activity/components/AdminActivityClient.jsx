@@ -201,7 +201,7 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-5xl mx-4 overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Modal header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
@@ -215,14 +215,14 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
                 <button
                   onClick={() => handleAction('rejected')}
                   disabled={!!actioning}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm font-medium text-blue-600 border border-blue-500 hover:bg-blue-50 disabled:opacity-50 rounded-md transition-colors"
                 >
                   {actioning === 'rejected' ? 'Rejecting…' : 'Reject'}
                 </button>
                 <button
                   onClick={() => handleAction('approved')}
                   disabled={!!actioning}
-                  className="px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-md transition-colors"
                 >
                   {actioning === 'approved' ? 'Approving…' : 'Approve'}
                 </button>
@@ -236,67 +236,76 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
         </div>
 
         {/* Modal body */}
-        <div className="overflow-y-auto px-6 py-5 space-y-6 flex-1">
+        <div className="overflow-y-auto px-6 py-5 flex-1">
 
-          {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+          {actionError && <p className="text-sm text-red-600 mb-4">{actionError}</p>}
 
-          {/* Tester record */}
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Tester Record</p>
-            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              <Row label="Email"       value={tester.contact_email ?? '—'} />
-              <Row label="Phone"       value={tester.contact_phone ?? '—'} />
-              <Row label="Invited"     value={formatDate(tester.invited_at)} />
-              <Row label="Installed"   value={tester.installed_at ? formatDate(tester.installed_at) : '—'} />
-              <Row label="Connected"   value={tester.connected_at ? formatDate(tester.connected_at) : '—'} />
-            </div>
-          </div>
-
-          {/* Access request form responses */}
           {loading ? (
             <p className="text-sm text-gray-400 italic">Loading form responses…</p>
-          ) : !accessRequest ? (
-            <p className="text-sm text-gray-400 italic">No form submission found for this tester.</p>
           ) : (
-            <>
-              <hr className="border-gray-200" />
+            <div className="flex gap-0 divide-x divide-gray-200">
 
-              <Section title="Contact Info">
-                <Row label="Store URL"     value={accessRequest.store_url} />
-                <Row label="Contact Name"  value={accessRequest.contact_name} />
-                <Row label="Email"         value={accessRequest.contact_email} />
-              </Section>
+              {/* ── Left column ─────────────────────────────────── */}
+              <div className="flex-1 pr-6 space-y-5">
 
-              <Section title="Business Profile">
-                <Row label="Company Size"          value={accessRequest.company_size ?? '—'} />
-                <Row label="Monthly Order Volume"  value={accessRequest.monthly_order_volume ?? '—'} />
-                <Row label="SKUs / Variants"       value={accessRequest.num_skus_variants ?? '—'} />
-                <Row label="Inventory Methods"     value={(accessRequest.current_inventory_methods ?? []).join(', ') || '—'} />
-                <Row label="Supplier Requirements" value={yesNo(accessRequest.has_supplier_requirements)} />
-              </Section>
+                <ModalSection title="Tester Record">
+                  <Row label="Email"     value={tester.contact_email ?? '—'} />
+                  <Row label="Phone"     value={tester.contact_phone ?? '—'} />
+                  <Row label="Invited"   value={formatDate(tester.invited_at)} />
+                  <Row label="Installed" value={tester.installed_at ? formatDate(tester.installed_at) : '—'} />
+                  <Row label="Connected" value={tester.connected_at ? formatDate(tester.connected_at) : '—'} />
+                </ModalSection>
 
-              <Section title="Current Process">
-                <LongRow label="How they create POs today"    value={accessRequest.how_create_pos_today} />
-                <LongRow label="Biggest challenge"            value={accessRequest.biggest_challenge} />
-                <LongRow label="Why interested in Stock Buddy" value={accessRequest.why_interested} />
-              </Section>
+                {accessRequest && (
+                  <>
+                    <ModalSection title="Business Profile">
+                      <Row label="Company Size"         value={accessRequest.company_size ?? '—'} />
+                      <Row label="Monthly Order Volume" value={accessRequest.monthly_order_volume ?? '—'} />
+                      <Row label="SKUs / Variants"      value={accessRequest.num_skus_variants ?? '—'} />
+                      <Row label="Inventory Methods"    value={(accessRequest.current_inventory_methods ?? []).join(', ') || '—'} />
+                    </ModalSection>
 
-              <Section title="Beta Participation">
-                <Row label="Willing to provide feedback" value={yesNo(accessRequest.willing_to_provide_feedback)} />
-                <Row label="Open to onboarding calls"   value={yesNo(accessRequest.open_to_onboarding_calls)} />
-                <Row label="How soon to start"          value={accessRequest.how_soon_to_start ?? '—'} />
-                {accessRequest.anything_else && (
-                  <LongRow label="Anything else" value={accessRequest.anything_else} />
+                    <ModalSection title="Submission">
+                      <Row label="Submitted"      value={formatDate(accessRequest.created_at)} />
+                      <Row label="Status"         value={accessRequest.status} />
+                      {accessRequest.reviewed_at && <Row label="Reviewed" value={formatDate(accessRequest.reviewed_at)} />}
+                    </ModalSection>
+                  </>
                 )}
-              </Section>
 
-              <Section title="Submission">
-                <Row label="Submitted"       value={formatDate(accessRequest.created_at)} />
-                <Row label="Request Status"  value={accessRequest.status} />
-                {accessRequest.reviewed_at && <Row label="Reviewed"  value={formatDate(accessRequest.reviewed_at)} />}
-                {accessRequest.reviewer_notes && <LongRow label="Reviewer Notes" value={accessRequest.reviewer_notes} />}
-              </Section>
-            </>
+                {!accessRequest && (
+                  <p className="text-sm text-gray-400 italic">No form submission found for this tester.</p>
+                )}
+
+              </div>
+
+              {/* ── Right column ─────────────────────────────────── */}
+              {accessRequest && (
+                <div className="flex-1 pl-6 space-y-5">
+
+                  <ModalSection title="Current Process">
+                    <LongRow label="How they create POs today"      value={accessRequest.how_create_pos_today} />
+                    <LongRow label="How they send POs to suppliers"  value={accessRequest.how_send_pos_to_suppliers} />
+                    <LongRow label="Biggest challenge"               value={accessRequest.biggest_challenge} />
+                    <LongRow label="Why interested in Stock Buddy"   value={accessRequest.why_interested} />
+                  </ModalSection>
+
+                  <ModalSection title="Beta Participation">
+                    <Row label="Willing to provide feedback" value={yesNo(accessRequest.willing_to_provide_feedback)} />
+                    <Row label="Open to onboarding calls"   value={yesNo(accessRequest.open_to_onboarding_calls)} />
+                    <Row label="How soon to start"          value={accessRequest.how_soon_to_start ?? '—'} />
+                    {accessRequest.anything_else && (
+                      <LongRow label="Anything else" value={accessRequest.anything_else} />
+                    )}
+                    {accessRequest.reviewer_notes && (
+                      <LongRow label="Reviewer Notes" value={accessRequest.reviewer_notes} />
+                    )}
+                  </ModalSection>
+
+                </div>
+              )}
+
+            </div>
           )}
         </div>
 
@@ -305,7 +314,7 @@ function TesterDetailModal({ tester, adminKey, onClose, onStatusChange }) {
   );
 }
 
-function Section({ title, children }) {
+function ModalSection({ title, children }) {
   return (
     <div>
       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">{title}</p>

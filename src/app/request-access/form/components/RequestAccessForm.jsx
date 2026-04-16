@@ -105,7 +105,7 @@ const INITIAL_FORM = {
   monthly_order_volume: '',
   num_skus_variants: '',
   current_inventory_methods: [],
-  has_supplier_requirements: '',
+  how_send_pos_to_suppliers: '',
   how_create_pos_today: '',
   biggest_challenge: '',
   why_interested: '',
@@ -164,7 +164,7 @@ function isFormComplete(form) {
     form.monthly_order_volume &&
     form.num_skus_variants &&
     form.current_inventory_methods.length > 0 &&
-    form.has_supplier_requirements !== '' &&
+    form.how_send_pos_to_suppliers.trim() &&
     form.how_create_pos_today.trim() &&
     form.biggest_challenge.trim() &&
     form.why_interested.trim() &&
@@ -327,15 +327,8 @@ export default function RequestAccessForm() {
               </div>
 
               <div>
-                <Label required>Specific supplier requirements? <span className="font-normal text-gray-500">(e.g. EDI, dropship)</span></Label>
-                <div className="flex gap-4 mt-2">
-                  {['yes', 'no'].map(v => (
-                    <label key={v} className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="has_supplier_requirements" value={v} checked={form.has_supplier_requirements === v} onChange={() => set('has_supplier_requirements', v)} disabled={submitting} className="h-4 w-4 border-gray-300 text-blue-600" />
-                      <span className="text-sm text-gray-700 capitalize">{v}</span>
-                    </label>
-                  ))}
-                </div>
+                <Label required>How do you send Purchase Orders to your suppliers today?</Label>
+                <textarea className={textareaCls()} rows={4} placeholder="e.g. email, fax, supplier portal, EDI…" value={form.how_send_pos_to_suppliers} onChange={e => set('how_send_pos_to_suppliers', e.target.value)} disabled={submitting} />
               </div>
 
             </div>

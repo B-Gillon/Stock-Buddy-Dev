@@ -29,7 +29,7 @@ export async function POST(request) {
     monthly_order_volume,
     num_skus_variants,
     current_inventory_methods,
-    has_supplier_requirements,
+    how_send_pos_to_suppliers,
     how_create_pos_today,
     biggest_challenge,
     why_interested,
@@ -50,8 +50,7 @@ export async function POST(request) {
   if (!num_skus_variants?.trim())       return NextResponse.json({ error: 'Number of SKUs / Variants is required.' }, { status: 400 });
   if (!Array.isArray(current_inventory_methods) || current_inventory_methods.length === 0)
     return NextResponse.json({ error: 'Please select at least one inventory management method.' }, { status: 400 });
-  if (has_supplier_requirements === '' || has_supplier_requirements === null || has_supplier_requirements === undefined)
-    return NextResponse.json({ error: 'Please answer the supplier requirements question.' }, { status: 400 });
+  if (!how_send_pos_to_suppliers?.trim())   return NextResponse.json({ error: 'Please describe how you send purchase orders to suppliers.' }, { status: 400 });
   if (!how_create_pos_today?.trim())    return NextResponse.json({ error: 'Please describe how you create purchase orders today.' }, { status: 400 });
   if (!biggest_challenge?.trim())       return NextResponse.json({ error: 'Please describe your biggest challenge.' }, { status: 400 });
   if (!why_interested?.trim())          return NextResponse.json({ error: 'Please tell us why you are interested in Stock Buddy.' }, { status: 400 });
@@ -88,7 +87,7 @@ export async function POST(request) {
     monthly_order_volume:       monthly_order_volume || null,
     num_skus_variants:          num_skus_variants || null,
     current_inventory_methods:  current_inventory_methods,
-    has_supplier_requirements:  has_supplier_requirements === 'yes' ? true : has_supplier_requirements === 'no' ? false : null,
+    how_send_pos_to_suppliers:  how_send_pos_to_suppliers?.trim() || null,
     how_create_pos_today:       how_create_pos_today?.trim() || null,
     biggest_challenge:          biggest_challenge?.trim() || null,
     why_interested:             why_interested?.trim() || null,
@@ -131,7 +130,6 @@ export async function POST(request) {
     });
 
     const yesNo = v => v === true ? 'Yes' : v === false ? 'No' : '—';
-    const hasSupplier = has_supplier_requirements === 'yes' ? 'Yes' : has_supplier_requirements === 'no' ? 'No' : '—';
     const willingFeedback = willing_to_provide_feedback === 'yes' ? 'Yes' : willing_to_provide_feedback === 'no' ? 'No' : '—';
     const openCalls = open_to_onboarding_calls === 'yes' ? 'Yes' : open_to_onboarding_calls === 'no' ? 'No' : '—';
 
@@ -151,7 +149,8 @@ export async function POST(request) {
         `Monthly Order Volume:  ${monthly_order_volume || '—'}`,
         `SKUs / Variants:       ${num_skus_variants || '—'}`,
         `Inventory Methods:     ${(current_inventory_methods ?? []).join(', ') || '—'}`,
-        `Supplier Requirements: ${hasSupplier}`,
+        `How they send POs to suppliers:`,
+        how_send_pos_to_suppliers?.trim() || '—',
         '',
         '── Current Process ───────────────────────────',
         `How they create POs today:`,
