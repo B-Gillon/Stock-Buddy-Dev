@@ -113,6 +113,7 @@ export async function POST(request) {
     shopify_domain: normalizedDomain,
     notes:          'Form Submitted',
     is_active:      false,
+    invited_at:     null,
   });
 
   if (testerError) {

@@ -452,7 +452,7 @@ export default function RequestAccessForm() {
                     checked={form.understands_private_beta}
                     onChange={e => set('understands_private_beta', e.target.checked)}
                     disabled={submitting}
-                    className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
+                    className="h-4 w-4 mt-1 rounded border-gray-300 text-blue-600 shrink-0 cursor-pointer"
                   />
                   <span className="text-sm text-gray-700">
                     <strong>Required:</strong> I understand this is a private beta and approval is not guaranteed.
@@ -465,7 +465,7 @@ export default function RequestAccessForm() {
                     checked={form.agrees_no_share_link}
                     onChange={e => set('agrees_no_share_link', e.target.checked)}
                     disabled={submitting}
-                    className="h-4 w-4 mt-0.5 rounded border-gray-300 text-blue-600 shrink-0"
+                    className="h-4 w-4 mt-1 rounded border-gray-300 text-blue-600 shrink-0 cursor-pointer"
                   />
                   <span className="text-sm text-gray-700">
                     <strong>Required:</strong> I agree not to share the install link with anyone outside my organization.

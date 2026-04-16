@@ -67,7 +67,7 @@ export async function POST(request) {
 
   await supabase
     .from('beta_testers')
-    .update({ notes: 'Rejected', is_active: false })
+    .update({ notes: 'Rejected', is_active: false, invited_at: null })
     .eq('contact_email', to_email.trim().toLowerCase());
 
   return NextResponse.json({ success: true }, { status: 200 });
