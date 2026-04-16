@@ -64,6 +64,7 @@ export async function POST(request) {
     await transporter.sendMail({
       from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
       to:      to_email.trim(),
+      bcc:     process.env.SMTP_USER,
       replyTo: process.env.SMTP_USER,
       subject: subject.trim(),
       text:    textEmail,
