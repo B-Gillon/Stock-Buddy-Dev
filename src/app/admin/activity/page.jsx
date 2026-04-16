@@ -27,8 +27,6 @@ export default async function AdminActivityPage({ searchParams }) {
   }
 
   const betaTesters = (betaTestersRaw ?? []).map((bt) => {
-    // If tenant_id is already set, keep it.
-    // Otherwise, try to match by shopify_domain.
     if (bt.tenant_id) return bt;
     const matched = bt.shopify_domain ? tenantByDomain[bt.shopify_domain] : null;
     return matched ? { ...bt, tenant_id: matched.id } : bt;
@@ -50,61 +48,53 @@ export default async function AdminActivityPage({ searchParams }) {
 
   for (const tenantId of connectedTenantIds) {
     const [
-      { count: productCount }, { count: variantCount }, { count: vendorCount },
-      { count: supplierCount }, { count: supplierVariantCount },
-      { count: poCreated }, { count: poReleased }, { count: poReceived },
-      { count: errorCount }, { data: productSync }, { data: inventorySync },
+      { count: productCount },
+      { count: variantCount },
+      { count: vendorCount },
+      { count: supplierCount },
+      { count: supplierVariantCount },
+      { count: locationVariantCount },
+      { count: poTotal },
+      { count: errorCount },
     ] = await Promise.all([
       supabase.from('products').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
       supabase.from('variants').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
       supabase.from('vendors').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
       supabase.from('suppliers').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
       supabase.from('supplier_variants').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+      supabase.from('variant_location_bins').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
       supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
-      supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'released'),
-      supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'received'),
       supabase.from('error_log').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
-      supabase.from('sync_status').select('last_synced_at').eq('tenant_id', tenantId).eq('sync_type', 'products').single(),
-      supabase.from('sync_status').select('last_synced_at').eq('tenant_id', tenantId).eq('sync_type', 'all').single(),
     ]);
 
     tenantStats[tenantId] = {
-      productCount: productCount ?? 0, variantCount: variantCount ?? 0,
-      vendorCount: vendorCount ?? 0, supplierCount: supplierCount ?? 0,
-      supplierVariantCount: supplierVariantCount ?? 0, poCreated: poCreated ?? 0,
-      poReleased: poReleased ?? 0, poReceived: poReceived ?? 0, errorCount: errorCount ?? 0,
-      productLastSync: productSync?.last_synced_at ?? null,
-      inventoryLastSync: inventorySync?.last_synced_at ?? null,
+      productCount:         productCount ?? 0,
+      variantCount:         variantCount ?? 0,
+      vendorCount:          vendorCount ?? 0,
+      supplierCount:        supplierCount ?? 0,
+      supplierVariantCount: supplierVariantCount ?? 0,
+      locationVariantCount: locationVariantCount ?? 0,
+      poTotal:              poTotal ?? 0,
+      errorCount:           errorCount ?? 0,
     };
   }
 
-  // ── Global stats ─────────────────────────────────────────────────────────
+  // ── Global totals (across all tenants) ───────────────────────────────────
   const { count: productCount }         = await supabase.from('products').select('*', { count: 'exact', head: true });
   const { count: variantCount }         = await supabase.from('variants').select('*', { count: 'exact', head: true });
-  const { data: productSyncStatus }     = await supabase.from('sync_status').select('last_synced_at').eq('sync_type', 'products').single();
-  const { data: variantSyncStatus }     = await supabase.from('sync_status').select('last_synced_at').eq('sync_type', 'variants').single();
   const { count: vendorCount }          = await supabase.from('vendors').select('*', { count: 'exact', head: true });
-  const { data: vendorSyncStatus }      = await supabase.from('sync_status').select('last_synced_at').eq('sync_type', 'vendors').single();
-  const { data: inventorySyncStatus }   = await supabase.from('sync_status').select('last_synced_at').eq('sync_type', 'all').single();
   const { count: supplierCount }        = await supabase.from('suppliers').select('*', { count: 'exact', head: true });
-  const { data: latestSupplier }        = await supabase.from('suppliers').select('created_at').order('created_at', { ascending: false }).limit(1).single();
   const { count: supplierVariantCount } = await supabase.from('supplier_variants').select('*', { count: 'exact', head: true });
-  const { data: latestSupplierVariant } = await supabase.from('supplier_variants').select('created_at').order('created_at', { ascending: false }).limit(1).single();
+  const { count: locationVariantCount } = await supabase.from('variant_location_bins').select('*', { count: 'exact', head: true });
   const { count: poTotal }              = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true });
-  const { count: poDraft }              = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'draft');
-  const { count: poReleased }           = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'released');
-  const { count: poPartiallyReceived }  = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'partially_received');
-  const { count: poReceived }           = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'received');
-  const { count: poCancelled }          = await supabase.from('purchase_orders').select('*', { count: 'exact', head: true }).eq('status', 'cancelled');
-  const { data: latestPO }              = await supabase.from('purchase_orders').select('created_at').order('created_at', { ascending: false }).limit(1).single();
+  const { count: errorCount }           = await supabase.from('error_log').select('*', { count: 'exact', head: true });
 
   // Fetch errors with tenant_id so the client can show Account Name
-  const { data: errors }  = await supabase
+  const { data: errors } = await supabase
     .from('error_log')
     .select('id, source, message, context, created_at, tenant_id')
     .order('created_at', { ascending: false })
     .limit(50);
-  const { count: errorCount } = await supabase.from('error_log').select('*', { count: 'exact', head: true });
 
   // Build tenantId → contact_name map for error log Account Name column
   const tenantNameMap = {};
@@ -118,24 +108,15 @@ export default async function AdminActivityPage({ searchParams }) {
       betaTesters={betaTesters}
       lastSessionMap={lastSessionMap}
       tenantStats={tenantStats}
-      productCount={productCount ?? 0}
-      variantCount={variantCount ?? 0}
-      productLastSync={productSyncStatus?.last_synced_at ?? null}
-      variantLastSync={variantSyncStatus?.last_synced_at ?? null}
-      vendorCount={vendorCount ?? 0}
-      vendorLastSync={vendorSyncStatus?.last_synced_at ?? null}
-      inventoryLastSync={inventorySyncStatus?.last_synced_at ?? null}
-      supplierCount={supplierCount ?? 0}
-      supplierLastCreated={latestSupplier?.created_at ?? null}
-      supplierVariantCount={supplierVariantCount ?? 0}
-      supplierVariantLastCreated={latestSupplierVariant?.created_at ?? null}
-      poTotal={poTotal ?? 0}
-      poDraft={poDraft ?? 0}
-      poReleased={poReleased ?? 0}
-      poPartiallyReceived={poPartiallyReceived ?? 0}
-      poReceived={poReceived ?? 0}
-      poCancelled={poCancelled ?? 0}
-      poLastCreated={latestPO?.created_at ?? null}
+      globalTotals={{
+        productCount:         productCount ?? 0,
+        variantCount:         variantCount ?? 0,
+        vendorCount:          vendorCount ?? 0,
+        supplierCount:        supplierCount ?? 0,
+        supplierVariantCount: supplierVariantCount ?? 0,
+        locationVariantCount: locationVariantCount ?? 0,
+        poTotal:              poTotal ?? 0,
+      }}
       errors={errors ?? []}
       errorCount={errorCount ?? 0}
       tenantNameMap={tenantNameMap}
