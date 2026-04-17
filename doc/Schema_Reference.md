@@ -24,6 +24,7 @@ Columns:
 • 	contact_phone — text — nullable
 • 	shopify_domain — text — nullable
 • 	notes — text — nullable — tracks registry status: 'Form Submitted' (auto-set on form submission), 'Approved', 'Rejected' (set via admin detail modal), or freeform admin notes for manually added testers
+• 	invited_at — timestamptz — nullable — written on approval; null until then
 • 	installed_at — timestamptz — nullable
 • 	connected_at — timestamptz — nullable
 • 	is_active — boolean — not null — default: true
@@ -36,6 +37,10 @@ Notes:
 • 	shopify_domain must be stored as bare domain (e.g. store.myshopify.com), not a full URL.
 • 	tenant_id may be null if the tester has not yet completed OAuth. The admin page resolves
   tenant_id at render time by matching shopify_domain against tenants.shop_domain.
+• 	On form submission, a row is auto-inserted via POST /api/request-access with notes = 'Form
+  Submitted', is_active = false, and invited_at = null.
+• 	On approval, notes → 'Approved', is_active → true, invited_at → timestamp of approval action.
+• 	On rejection, notes → 'Rejected', is_active → false, invited_at remains null.
 
 ============================================================
 TABLE: beta_tester_sessions
@@ -58,7 +63,7 @@ TABLE: access_requests
 Columns:
 • 	id — uuid — not null — default: gen_random_uuid()
 • 	created_at — timestamptz — not null — default: now()
-• 	store_url — text — not null
+• 	store_url — text — not null — stored as bare domain (protocol and trailing slash stripped)
 • 	contact_name — text — not null
 • 	contact_email — text — not null
 • 	company_size — text — nullable
@@ -92,11 +97,13 @@ Relationships:
 Notes:
 • 	Populated by the /request-access/form page via POST /api/request-access.
 • 	store_url is normalized on insert (protocol and trailing slash stripped).
-• 	On successful insert, a matching row is automatically added to beta_testers
+• 	On successful insert, a matching row is upserted into beta_testers (on contact_email)
   with notes = 'Form Submitted' and is_active = false.
-• 	Approved applicants should be sent the direct OAuth install URL for their shop domain.
-• 	Approving/rejecting via the admin detail modal PATCHes this table and syncs
-  beta_testers.notes to 'Approved' or 'Rejected'.
+• 	Duplicate store URLs (normalized) are rejected before insert with a { duplicate: true } response.
+• 	Approving via admin detail modal: PATCHes status → 'approved', reviewed_at → now(),
+  then updates beta_testers.notes → 'Approved', is_active → true, invited_at → now().
+• 	Rejecting via admin detail modal: sends rejection email, PATCHes status → 'rejected',
+  reviewed_at → now(), then updates beta_testers.notes → 'Rejected', is_active → false.
 
 ============================================================
 TABLE: inventory_items
