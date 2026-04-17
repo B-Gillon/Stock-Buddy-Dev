@@ -3,15 +3,22 @@ import { NextResponse } from "next/server";
 /**
  * src/proxy.js
  *
- * Runs on every request. Resolves the shop domain and attaches it
- * to the x-shop-domain header so API routes and server components
- * can call getTenantId(request) without re-parsing the session.
+ * Runs on every request. Does two things:
+ *
+ * 1. MOBILE REDIRECT — If the request is from a mobile device and is
+ *    targeting a desktop route, redirect to /mobile (preserving shop/host
+ *    query params so the sb-shop cookie can still be set).
+ *
+ * 2. SHOP DOMAIN RESOLUTION — Resolves the shop domain and attaches it
+ *    to the x-shop-domain header so API routes and server components
+ *    can call getTenantId(request) without re-parsing the session.
  *
  * Shop domain resolution order:
  *   1. x-shop-domain header (set by upstream or prior middleware)
  *   2. ?shop query param (present on initial Shopify embed load)
- *   3. sb-shop cookie (persisted from a prior resolution this session)
- *   4. NEXT_PUBLIC_DEV_SHOP_DOMAIN env var (local dev fallback — remove before production)
+ *   3. ?shop extracted from Referer header (RSC and client nav requests)
+ *   4. sb-shop cookie (persisted from a prior resolution this session)
+ *   5. NEXT_PUBLIC_DEV_SHOP_DOMAIN env var (local dev fallback — remove before production)
  *
  * When the shop is resolved from ?shop or the header, it is written
  * into the sb-shop cookie so subsequent navigations (which don't carry
@@ -22,6 +29,36 @@ import { NextResponse } from "next/server";
  * - Enforce rejection of requests with no shop domain
  * - Replace cookie-based resolution with full session token verification (TECH_DEBT #6)
  */
+
+/**
+ * Returns true if the User-Agent string belongs to a mobile device.
+ * Checks for phones and tablets — both should use the mobile UI since
+ * the desktop app is embedded in the Shopify Admin iframe on desktop.
+ */
+function isMobileUserAgent(userAgent) {
+  if (!userAgent) return false;
+  return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|tablet/i.test(
+    userAgent
+  );
+}
+
+/**
+ * Desktop routes that should redirect to /mobile when accessed from a
+ * mobile device. Matches the top-level app routes only — /mobile itself,
+ * public routes, admin routes, and API routes are excluded.
+ */
+const DESKTOP_ROUTE_PREFIXES = [
+  "/dashboard",
+  "/products",
+  "/product",
+  "/inventory",
+  "/purchase-orders",
+  "/suppliers",
+  "/vendors",
+  "/locations",
+  "/settings",
+];
+
 export function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -34,7 +71,7 @@ export function proxy(request) {
     return NextResponse.next();
   }
 
-  // Public routes that don't need tenant context — skip shop resolution
+  // Public and admin routes that don't need tenant context — skip entirely
   const isPublicRoute =
     pathname.startsWith("/request-access") ||
     pathname.startsWith("/api/request-access") ||
@@ -45,6 +82,37 @@ export function proxy(request) {
 
   if (isPublicRoute) {
     return NextResponse.next();
+  }
+
+  // ── Mobile redirect ────────────────────────────────────────────────────────
+  // If the request is from a mobile device and targets a desktop route,
+  // redirect to /mobile. We preserve ?shop and ?host so AppBridgeProvider
+  // can still initialize and the sb-shop cookie can be set.
+  //
+  // We deliberately do NOT redirect:
+  //   - /mobile/* routes (already mobile)
+  //   - /api/* routes (not pages)
+  //   - / root (handled by page.jsx redirect logic)
+
+  const userAgent = request.headers.get("user-agent") ?? "";
+  const isMobile = isMobileUserAgent(userAgent);
+  const isDesktopRoute = DESKTOP_ROUTE_PREFIXES.some((prefix) =>
+    pathname.startsWith(prefix)
+  );
+  const isAlreadyMobile = pathname.startsWith("/mobile");
+  const isApiRoute = pathname.startsWith("/api");
+
+  if (isMobile && isDesktopRoute && !isAlreadyMobile && !isApiRoute) {
+    const mobileUrl = new URL("/mobile", request.url);
+
+    // Forward shop and host params so AppBridgeProvider can initialize
+    // and the proxy's shop resolution below can persist the sb-shop cookie.
+    const shop = request.nextUrl.searchParams.get("shop");
+    const host = request.nextUrl.searchParams.get("host");
+    if (shop) mobileUrl.searchParams.set("shop", shop);
+    if (host) mobileUrl.searchParams.set("host", host);
+
+    return NextResponse.redirect(mobileUrl);
   }
 
   // ── Resolve shop domain ────────────────────────────────────────────────────
@@ -62,10 +130,15 @@ export function proxy(request) {
     try {
       const refererUrl = new URL(referer);
       const shopParam = refererUrl.searchParams.get("shop");
-      if (shopParam && /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shopParam)) {
+      if (
+        shopParam &&
+        /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shopParam)
+      ) {
         refererShop = shopParam;
       }
-    } catch { /* ignore malformed referer */ }
+    } catch {
+      /* ignore malformed referer */
+    }
   }
 
   // 4. Cookie (persisted from a prior resolution)
@@ -74,7 +147,8 @@ export function proxy(request) {
   // 5. Dev fallback
   const devShop = process.env.NEXT_PUBLIC_DEV_SHOP_DOMAIN;
 
-  const shopDomain = headerShop || queryShop || refererShop || cookieShop || devShop;
+  const shopDomain =
+    headerShop || queryShop || refererShop || cookieShop || devShop;
 
   // Read host param — App Bridge needs this to initialize in the iframe
   const host =
@@ -104,10 +178,10 @@ export function proxy(request) {
   if (headerShop || queryShop || refererShop) {
     response.cookies.set("sb-shop", shopDomain, {
       httpOnly: true,
-      secure:   true,
-      sameSite: "none",   // required for Shopify iframe context
-      path:     "/",
-      maxAge:   60 * 60 * 8, // 8 hours — matches a typical work session
+      secure: true,
+      sameSite: "none", // required for Shopify iframe context
+      path: "/",
+      maxAge: 60 * 60 * 8, // 8 hours — matches a typical work session
     });
   }
 
@@ -115,7 +189,5 @@ export function proxy(request) {
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

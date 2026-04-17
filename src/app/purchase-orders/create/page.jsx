@@ -1,100 +1,85 @@
-// /src/app/purchase-orders/create/page.jsx
-import { headers } from 'next/headers';
-import { supabase } from '@/lib/supabaseClient';
-import { getTenantIdFromHeaders } from '@/lib/tenants';
-import PurchaseOrderCreatePage from '@/app/purchase-orders/create/components/PurchaseOrderCreatePage';
+// /src/app/vendors/[slug]/page.jsx
 
-export default async function Page() {
+import { headers } from "next/headers";
+import { supabase, setTenantContext } from "@/lib/supabaseClient";
+import { getTenantFromHeaders } from "@/lib/tenants";
+import { notFound } from "next/navigation";
+import { getStoreSettings } from "@/shared/utils/getStoreSettings";
+import ClientVendorDetailPage from "./components/ClientVendorDetailPage";
+
+function toSlug(name) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
+export const dynamic = "force-dynamic";
+
+export default async function VendorDetailPage({ params }) {
+  const { slug } = await params;
+
   const headersList = await headers();
-  const tenantId = await getTenantIdFromHeaders(headersList);
+  const { tenantId, shopDomain } = await getTenantFromHeaders(headersList);
+  await setTenantContext(supabase, tenantId);
 
-  const [
-    { data: settingsRows },
-    { data: suppliers },
-    { data: locations },
-    { data: variants },
-    { data: supplierVariants },
-    { data: inventoryLevels },
-  ] = await Promise.all([
+  const { data: vendors } = await supabase
+    .from("vendors")
+    .select("id, name")
+    .eq("tenant_id", tenantId);
+
+  const vendor = (vendors ?? []).find((v) => toSlug(v.name) === slug);
+  if (!vendor) notFound();
+
+  const [productsRes, variantsRes, syncRes, settings] = await Promise.all([
     supabase
-      .from('settings')
-      .select('key, value')
-      .eq('tenant_id', tenantId)
-      .eq('key', 'po_next_number'),
+      .from("products")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .eq("vendor", vendor.name)
+      .order("title", { ascending: true })
+      .limit(500),
     supabase
-      .from('suppliers')
-      .select('id, supplier_name, supplier_number, lead_days')
-      .eq('tenant_id', tenantId)
-      .order('supplier_name'),
+      .from("variants")
+      .select("product_id")
+      .eq("tenant_id", tenantId)
+      .limit(2000),
     supabase
-      .from('locations')
-      .select('id, name')
-      .eq('tenant_id', tenantId)
-      .eq('active', true)
-      .order('name'),
-    supabase
-      .from('variants')
-      .select(`
-        id,
-        sku,
-        barcode,
-        display_title,
-        image_src,
-        inventory_quantity,
-        cost,
-        products (
-          id,
-          title
-        )
-      `)
-      .eq('tenant_id', tenantId)
-      .order('display_title'),
-    supabase
-      .from('supplier_variants')
-      .select('id, supplier_id, variant_id, supplier_sku, cost, case_pack, inner_pack, order_increment, moq, lead_days')
-      .eq('tenant_id', tenantId),
-    supabase
-      .from('inventory_levels')
-      .select(`
-        available,
-        incoming,
-        location_id,
-        inventory_items ( variant_id )
-      `)
-      .eq('tenant_id', tenantId),
+      .from("sync_status")
+      .select("last_synced_at")
+      .eq("tenant_id", tenantId)
+      .eq("sync_type", "products")
+      .maybeSingle(),
+    getStoreSettings(tenantId),
   ]);
 
-  const flatVariants = (variants ?? []).map((v) => ({
-    id:                 v.id,
-    sku:                v.sku,
-    barcode:            v.barcode,
-    display_title:      v.display_title,
-    image_src:          v.image_src,
-    inventory_quantity: v.inventory_quantity,
-    cost:               v.cost ?? null,
-    product_title:      v.products?.title ?? null,
-    product_id:         v.products?.id ?? null,
+  const products     = productsRes.data ?? [];
+  const variants     = variantsRes.data ?? [];
+  const lastSyncedAt = syncRes.data?.last_synced_at ?? null;
+  const storeName    = settings.store_name;
+
+  const variantCountMap = new Map();
+  for (const variant of variants) {
+    if (!variant.product_id) continue;
+    variantCountMap.set(
+      variant.product_id,
+      (variantCountMap.get(variant.product_id) ?? 0) + 1
+    );
+  }
+
+  const enrichedProducts = products.map((p) => ({
+    ...p,
+    variant_count: variantCountMap.get(p.id) ?? 0,
   }));
 
-  const flatInventoryLevels = (inventoryLevels ?? [])
-    .filter((il) => il.inventory_items?.variant_id)
-    .map((il) => ({
-      variant_id:  il.inventory_items.variant_id,
-      location_id: il.location_id,
-      available:   il.available ?? 0,
-      incoming:    il.incoming ?? 0,
-    }));
-
-  const poNextNumber = (settingsRows ?? []).find((r) => r.key === 'po_next_number')?.value ?? null;
-
   return (
-    <PurchaseOrderCreatePage
-      suppliers={suppliers ?? []}
-      locations={locations ?? []}
-      variants={flatVariants}
-      supplierVariants={supplierVariants ?? []}
-      inventoryLevels={flatInventoryLevels}
-      poNextNumber={poNextNumber}
+    <ClientVendorDetailPage
+      vendor={vendor}
+      initialProducts={enrichedProducts}
+      initialLastSyncedAt={lastSyncedAt}
+      storeName={storeName}
+      shopDomain={`https://${shopDomain}`}
     />
   );
 }

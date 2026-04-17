@@ -46,24 +46,24 @@ environment variables in Vercel.
 ---
 
 ### 3. Shopify OAuth — Wire Per-Tenant Credentials into All Sync Routes
-**Status:** Partially complete — locations sync fixed, other sync routes still use env vars
-**Risk:** Sync routes for products, inventory, variants, etc. still read from hardcoded
-SHOPIFY_STORE_DOMAIN and SHOPIFY_ADMIN_API_TOKEN env vars instead of the tenant record.
-This means syncs will fail for any tenant other than the dev store.
+**Status:** Complete for products and inventory — PO sync files remain
+**Risk:** PO sync files in `src/lib/sync/po/` still use env var credentials.
+This means PO syncs will fail for any tenant other than the dev store.
 
 **What was done (2026-04-13):**
 - `shopifyHelpers.js` updated to accept credentials as parameters (falls back to env vars)
 - `fetchLocations.js`, `syncLocations.js`, and `src/app/api/sync/locations/route.js`
   updated to look up tenant credentials from the `tenants` table and pass them through
-- `supabaseHelpers.js` env var corrected: `SUPABASE_URL` → `NEXT_PUBLIC_SUPABASE_URL`
-- `inventory_levels` upsert conflict column fixed: was `shopify_inventory_level_id`
-  (does not exist), now correctly uses composite key `inventory_item_id,location_id`
+
+**What was done (2026-04-17):**
+- `processProducts.js`, `syncProducts.js`, `src/app/api/sync/products/route.js` updated
+- `processVariants.js`, `processInventoryItems.js`, `processInventoryLevels.js` updated
+- `syncInventoryItems.js`, `syncInventoryLevels.js`, `src/app/api/sync/inventory/route.js` updated
+- `supabaseHelpers.js` updated: `insertRows` now stamps `tenant_id` on every row
+- `sync_status` unique constraint updated to `(sync_type, tenant_id)`
 
 **What still needs to happen:**
-- Apply the same credentials pattern to all other sync routes:
-  - `src/app/api/sync/products/route.js` + `syncProducts.js` + `fetchProducts.js`
-  - `src/app/api/sync/inventory/route.js` + `syncInventory.js` + `fetchInventory.js`
-  - All PO sync files in `src/lib/sync/po/`
+- Apply the same credentials + tenant_id pattern to all PO sync files in `src/lib/sync/po/`
 - Remove `SHOPIFY_STORE_DOMAIN` and `SHOPIFY_ADMIN_API_TOKEN` from env vars once complete
 
 ---
@@ -94,23 +94,28 @@ but the architecture should be formally locked down
 
 ### 6. Session Token Verification — Wire into API Routes
 **Status:** Utility built (src/lib/shopify/sessionToken.js) but not yet called by API routes
-**Risk:** API routes currently rely on the dev fallback (DEV_SHOP_DOMAIN) for tenant resolution.
-In production, every API route must verify the App Bridge session token.
+**Risk:** API routes currently rely on a cookie-based shop resolution for tenant lookup.
+The cookie is shared across all tabs in the same browser, meaning two different stores
+open simultaneously in the same browser will interfere with each other.
 
-**Context (2026-04-13):** Investigated App Bridge v4 token exchange as a mechanism to
-keep tenant access tokens fresh without the legacy OAuth callback. Found that
-`window.shopify.idToken()` is unavailable because the App Bridge CDN script is not
-loading in the iframe context. Token exchange route was built
-(`src/app/api/shopify/token-exchange/route.js`) and `src/lib/shopify/tokenExchange.js`
-created, but the flow is not yet functional. The OAuth callback correctly writes the
-initial access token on first install.
+**Context (2026-04-13):** Investigated App Bridge v4 token exchange. Found that
+`window.shopify.idToken()` is unavailable — App Bridge CDN script loads but idToken()
+returns nothing. Token exchange route was built but is not yet functional.
 
-**What needs to happen:**
-- Resolve App Bridge v4 script loading so `window.shopify` is available in the iframe
-- Wire `window.shopify.idToken()` → `/api/shopify/token-exchange` to keep tokens fresh
+**Context (2026-04-17):** Implemented cookie-based shop resolution as a beta interim.
+The proxy reads the shop domain from (in order): x-shop-domain header, ?shop query param,
+Referer header ?shop param, sb-shop cookie, dev fallback. AppBridgeProvider decodes the
+`host` param and calls `/api/shopify/set-shop-cookie` to persist it. This works correctly
+for single-store use but breaks when two stores are open in the same browser simultaneously
+because they share the same cookie. This is accepted as a known beta limitation — beta
+testers will only ever have one store, so they will never hit this issue.
+
+**What needs to happen before launch:**
+- Resolve App Bridge v4 `window.shopify.idToken()` returning null
+- Wire session token verification so each request carries its own signed JWT
 - Update all API routes to call `getShopFromSessionToken(request)` before `getTenantId()`
-- Remove DEV_SHOP_DOMAIN fallback from sessionToken.js
-- Verify session tokens are being sent correctly from App Bridge v4
+- Remove cookie-based shop resolution from proxy.js
+- Remove DEV_SHOP_DOMAIN fallback from sessionToken.js and tenants.js
 
 ---
 
@@ -219,6 +224,19 @@ git branch -d sandbox
 
 ---
 
+### 16. Multi-Tab Store Isolation — Cookie Limitation
+**Status:** Known beta limitation — accepted for now
+**Risk:** Opening two different Shopify stores in the same browser simultaneously causes
+the sb-shop cookie to be overwritten by whichever store loaded last, resulting in the
+wrong store's data being shown until the page is refreshed.
+**Why it's acceptable for beta:** Beta testers each have one store and will never need
+to have two stores open simultaneously. Only affects the developer during testing.
+**What needs to happen before launch:** Resolved automatically when session token
+verification (item #6) is implemented — session tokens are per-request and don't rely
+on a shared cookie.
+
+---
+
 ## Completed Items
 
 | Item | Resolved | Notes |
@@ -249,6 +267,11 @@ git branch -d sandbox
 | Schema_Reference.md updated | 2026-04-16 | Added beta_testers, beta_tester_sessions, access_requests |
 | shopify_domain normalization on beta tester add | 2026-04-16 | Strips protocol and trailing slash in AddTesterModal |
 
+| Product/inventory/variant sync tenant isolation | 2026-04-17 | tenant_id stamped through full sync chain; supabaseHelpers insertRows updated |
+| sync_status unique constraint updated | 2026-04-17 | Now unique on (sync_type, tenant_id) |
+| Cookie-based shop resolution | 2026-04-17 | proxy.js reads shop from Referer/?shop/cookie; AppBridgeProvider sets cookie via /api/shopify/set-shop-cookie |
+| Install route locked to approved beta testers | 2026-04-17 | Checks beta_testers.notes = 'Approved' before starting OAuth |
+
 ---
 
-*Last updated: 2026-04-16*
+*Last updated: 2026-04-17*
