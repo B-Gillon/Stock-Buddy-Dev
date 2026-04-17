@@ -11,22 +11,31 @@ if (!supabaseUrl || !serviceRoleKey) {
 
 export const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-// Insert or update rows into a table — throws on error so callers can handle it
+/**
+ * Insert or update rows into a table.
+ * Stamps tenant_id on every row if provided.
+ * Throws on error so callers can handle it.
+ */
 export async function insertRows(table, rows, tenantId) {
   if (!rows || rows.length === 0) return;
 
+  // Stamp tenant_id on every row
+  const stamped = tenantId
+    ? rows.map(row => ({ ...row, tenant_id: tenantId }))
+    : rows;
+
   let conflictColumn;
   switch (table) {
-    case "products":         conflictColumn = "shopify_product_id";        break;
-    case "variants":         conflictColumn = "shopify_variant_id";        break;
-    case "locations":        conflictColumn = "shopify_location_id";       break;
-    case "inventory_items":  conflictColumn = "shopify_inventory_item_id"; break;
+    case "products":         conflictColumn = "shopify_product_id";            break;
+    case "variants":         conflictColumn = "shopify_variant_id";            break;
+    case "locations":        conflictColumn = "shopify_location_id";           break;
+    case "inventory_items":  conflictColumn = "shopify_inventory_item_id";     break;
     case "inventory_levels": conflictColumn = "inventory_item_id,location_id"; break;
-    case "vendors":          conflictColumn = "name";                      break;
+    case "vendors":          conflictColumn = "name";                          break;
     default:                 conflictColumn = "id";
   }
 
-  const { error } = await supabase.from(table).upsert(rows, {
+  const { error } = await supabase.from(table).upsert(stamped, {
     onConflict: conflictColumn,
   });
 
@@ -36,7 +45,9 @@ export async function insertRows(table, rows, tenantId) {
   }
 }
 
-// Update sync_status for a given sync type
+/**
+ * Update sync_status for a given sync type, scoped to this tenant.
+ */
 export async function updateSyncStatus(syncType, tenantId) {
   const { error } = await supabase
     .from("sync_status")
@@ -46,7 +57,7 @@ export async function updateSyncStatus(syncType, tenantId) {
         last_synced_at: new Date().toISOString(),
         tenant_id:      tenantId,
       },
-      { onConflict: "sync_type" }
+      { onConflict: "sync_type,tenant_id" }
     );
 
   if (error) {

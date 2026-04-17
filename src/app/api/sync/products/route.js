@@ -8,8 +8,8 @@ import syncVendors  from "@/lib/sync/syncVendors";
 
 export async function POST(request) {
   const tenantId = await getTenantId(request);
-  const results = {};
-  const errors  = [];
+  const results  = {};
+  const errors   = [];
 
   // Resolve tenant Shopify credentials
   let credentials = {};
@@ -26,18 +26,32 @@ export async function POST(request) {
     await logError({ source: 'sync/products/tenantLookup', error: err, tenantId });
   }
 
-  try { await syncProducts(credentials); results.products = "ok"; }
-  catch (err) { errors.push(`products: ${err.message}`); results.products = "failed"; await logError({ source: 'sync/products/syncProducts', error: err, tenantId }); }
+  try {
+    await syncProducts(credentials, tenantId);
+    results.products = "ok";
+  } catch (err) {
+    errors.push(`products: ${err.message}`);
+    results.products = "failed";
+    await logError({ source: 'sync/products/syncProducts', error: err, tenantId });
+  }
 
-  try { await syncVendors(tenantId); results.vendors = "ok"; }
-  catch (err) { errors.push(`vendors: ${err.message}`); results.vendors = "failed"; await logError({ source: 'sync/products/syncVendors', error: err, tenantId }); }
+  try {
+    await syncVendors(tenantId);
+    results.vendors = "ok";
+  } catch (err) {
+    errors.push(`vendors: ${err.message}`);
+    results.vendors = "failed";
+    await logError({ source: 'sync/products/syncVendors', error: err, tenantId });
+  }
 
   const last_synced_at = new Date().toISOString();
   await supabase.from("sync_status").upsert(
     { sync_type: "products", last_synced_at, tenant_id: tenantId },
-    { onConflict: "sync_type" }
+    { onConflict: "sync_type,tenant_id" }
   );
 
-  if (errors.length > 0) return NextResponse.json({ success: false, results, errors, last_synced_at }, { status: 207 });
+  if (errors.length > 0) {
+    return NextResponse.json({ success: false, results, errors, last_synced_at }, { status: 207 });
+  }
   return NextResponse.json({ success: true, results, last_synced_at });
 }
