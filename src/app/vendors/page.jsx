@@ -1,6 +1,8 @@
 // /src/app/vendors/page.jsx
 
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabaseClient";
+import { getTenantIdFromHeaders } from "@/lib/tenants";
 import ClientVendorsPage from "@/app/vendors/components/ClientVendorsPage";
 
 export const dynamic = "force-dynamic";
@@ -14,26 +16,33 @@ function toSlug(name) {
 }
 
 export default async function VendorsPage() {
+  const headersList = await headers();
+  const tenantId    = await getTenantIdFromHeaders(headersList);
+
   const { data: syncStatus } = await supabase
     .from("sync_status")
     .select("last_synced_at")
+    .eq("tenant_id", tenantId)
     .eq("sync_type", "vendors")
-    .single();
+    .maybeSingle();
 
   const { data: vendors } = await supabase
     .from("vendors")
     .select("id, name")
+    .eq("tenant_id", tenantId)
     .order("name", { ascending: true })
     .limit(500);
 
   const { data: products } = await supabase
     .from("products")
     .select("id, vendor_id, product_type, status, updated_at")
+    .eq("tenant_id", tenantId)
     .limit(500);
 
   const { data: variants } = await supabase
     .from("variants")
     .select("id, product_id")
+    .eq("tenant_id", tenantId)
     .limit(2000);
 
   const productsByVendor = new Map();
@@ -63,7 +72,6 @@ export default async function VendorsPage() {
       ...new Set(vendorProducts.map((p) => p.product_type).filter(Boolean)),
     ].join(", ") || "—";
 
-    // Shopify syncs status as uppercase "ACTIVE"
     const activeCount   = vendorProducts.filter((p) => p.status === "ACTIVE").length;
     const inactiveCount = vendorProducts.filter((p) => p.status !== "ACTIVE").length;
 
