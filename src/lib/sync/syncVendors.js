@@ -5,11 +5,14 @@
 
 import { supabase } from "@/lib/supabaseClient";
 
-export default async function syncVendors() {
-  // ── Fetch all products with a vendor value ─────────────────────────────────
+export default async function syncVendors(tenantId) {
+  if (!tenantId) throw new Error("syncVendors requires a tenantId");
+
+  // ── Fetch products for this tenant with a vendor value ────────────────────
   const { data: products, error: productsError } = await supabase
     .from("products")
     .select("id, vendor")
+    .eq("tenant_id", tenantId)
     .not("vendor", "is", null);
 
   if (productsError) throw new Error(`Failed to fetch products: ${productsError.message}`);
@@ -19,21 +22,30 @@ export default async function syncVendors() {
   if (distinctVendors.length === 0) {
     await supabase
       .from("sync_status")
-      .upsert({ sync_type: "vendors", last_synced_at: new Date().toISOString() }, { onConflict: "sync_type" });
+      .upsert(
+        { sync_type: "vendors", last_synced_at: new Date().toISOString(), tenant_id: tenantId },
+        { onConflict: "sync_type,tenant_id" }
+      );
     return { count: 0 };
   }
 
-  // ── Upsert vendor rows ─────────────────────────────────────────────────────
+  // ── Upsert vendor rows scoped to this tenant ──────────────────────────────
+  // vendors.name is not globally unique — same vendor name can exist across tenants.
+  // Upsert on (name, tenant_id) to avoid cross-tenant collisions.
   const { error: upsertError } = await supabase
     .from("vendors")
-    .upsert(distinctVendors.map((name) => ({ name })), { onConflict: "name", ignoreDuplicates: true });
+    .upsert(
+      distinctVendors.map((name) => ({ name, tenant_id: tenantId })),
+      { onConflict: "name,tenant_id", ignoreDuplicates: true }
+    );
 
   if (upsertError) throw new Error(`Failed to upsert vendors: ${upsertError.message}`);
 
-  // ── Fetch all vendors to build name → uuid map ────────────────────────────
+  // ── Fetch this tenant's vendors to build name → uuid map ──────────────────
   const { data: allVendors, error: vendorFetchError } = await supabase
     .from("vendors")
-    .select("id, name");
+    .select("id, name")
+    .eq("tenant_id", tenantId);
 
   if (vendorFetchError) throw new Error(`Failed to fetch vendors: ${vendorFetchError.message}`);
 
@@ -53,6 +65,7 @@ export default async function syncVendors() {
     const { error: updateError } = await supabase
       .from("products")
       .update({ vendor_id: vendorId })
+      .eq("tenant_id", tenantId)
       .in("id", productIds);
     if (updateError) throw new Error(`Failed to update product vendor_ids: ${updateError.message}`);
   }
@@ -60,7 +73,10 @@ export default async function syncVendors() {
   // ── Stamp sync_status ─────────────────────────────────────────────────────
   await supabase
     .from("sync_status")
-    .upsert({ sync_type: "vendors", last_synced_at: new Date().toISOString() }, { onConflict: "sync_type" });
+    .upsert(
+      { sync_type: "vendors", last_synced_at: new Date().toISOString(), tenant_id: tenantId },
+      { onConflict: "sync_type,tenant_id" }
+    );
 
   return { count: distinctVendors.length };
 }
