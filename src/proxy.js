@@ -40,6 +40,7 @@ export function proxy(request) {
     pathname.startsWith("/api/request-access") ||
     pathname.startsWith("/api/contact") ||
     pathname.startsWith("/api/admin") ||
+    pathname.startsWith("/api/shopify/set-shop-cookie") ||
     pathname.startsWith("/admin");
 
   if (isPublicRoute) {
