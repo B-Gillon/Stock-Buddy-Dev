@@ -224,6 +224,8 @@ Columns:
 • 	id — uuid — not null — default: gen_random_uuid()
 • 	sync_type — text — not null
 • 	last_synced_at — timestamptz — not null
+Constraints:
+• 	unique (sync_type, tenant_id)
 Relationships:
 • 	none
 
@@ -267,6 +269,8 @@ Columns:
 • 	name — text — not null
 • 	created_at — timestamptz — nullable — default: now()
 • 	updated_at — timestamptz — nullable — default: now()
+Constraints:
+• 	unique (name, tenant_id)
 Relationships:
 • 	Referenced by: products.vendor_id
 
