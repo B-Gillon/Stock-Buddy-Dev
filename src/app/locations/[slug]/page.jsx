@@ -1,6 +1,8 @@
 // /src/app/locations/[slug]/page.jsx
 
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabaseClient";
+import { getTenantIdFromHeaders } from "@/lib/tenants";
 import { notFound } from "next/navigation";
 import ClientLocationDetailPage from "./components/ClientLocationDetailPage";
 
@@ -17,9 +19,13 @@ export const dynamic = "force-dynamic";
 export default async function LocationDetailPage({ params }) {
   const { slug } = await params;
 
+  const headersList = await headers();
+  const tenantId    = await getTenantIdFromHeaders(headersList);
+
   const { data: locations } = await supabase
     .from("locations")
-    .select("id, shopify_location_id, name, active, location_type, address1, address2, city, province, country, zip, connected_to, inventory_controlled_by, provides_tracking, sku_sharing_allowed, orders_api_type, created_at, updated_at");
+    .select("id, shopify_location_id, name, active, location_type, address1, address2, city, province, country, zip, connected_to, inventory_controlled_by, provides_tracking, sku_sharing_allowed, orders_api_type, created_at, updated_at")
+    .eq("tenant_id", tenantId);
 
   const location = (locations ?? []).find((l) => toSlug(l.name) === slug);
   if (!location) notFound();
@@ -28,16 +34,19 @@ export default async function LocationDetailPage({ params }) {
     supabase
       .from("inventory_levels")
       .select("available")
+      .eq("tenant_id", tenantId)
       .eq("location_id", location.id),
     supabase
       .from("location_contacts")
       .select("*")
+      .eq("tenant_id", tenantId)
       .eq("location_id", location.id)
       .order("is_primary", { ascending: false })
       .order("name", { ascending: true }),
     supabase
       .from("sync_status")
       .select("last_synced_at")
+      .eq("tenant_id", tenantId)
       .eq("sync_type", "locations")
       .maybeSingle(),
   ]);

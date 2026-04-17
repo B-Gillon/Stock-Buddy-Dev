@@ -1,16 +1,21 @@
 // /src/app/products/supplier-variant-data/edit/page.jsx
 
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabaseClient";
+import { getTenantIdFromHeaders } from "@/lib/tenants";
 import ClientSupplierVariantEditPage from "./components/ClientSupplierVariantEditPage";
 
 export const dynamic = "force-dynamic";
 
 export default async function SupplierVariantDataEditPage() {
+  const headersList = await headers();
+  const tenantId    = await getTenantIdFromHeaders(headersList);
 
   const [suppliersRes, rowsRes, syncRes] = await Promise.all([
     supabase
       .from("suppliers")
       .select("id, supplier_name, currency")
+      .eq("tenant_id", tenantId)
       .order("supplier_name", { ascending: true }),
     supabase
       .from("supplier_variants")
@@ -23,13 +28,15 @@ export default async function SupplierVariantDataEditPage() {
           products ( category, collection )
         )
       `)
+      .eq("tenant_id", tenantId)
       .order("updated_at", { ascending: false })
       .limit(2000),
     supabase
       .from("sync_status")
       .select("last_synced_at")
+      .eq("tenant_id", tenantId)
       .eq("sync_type", "products")
-      .single(),
+      .maybeSingle(),
   ]);
 
   const suppliers = suppliersRes.data ?? [];
@@ -70,8 +77,7 @@ export default async function SupplierVariantDataEditPage() {
       initialRows={rows}
       categories={categories}
       collections={collections}
-      lastSyncedAt={syncRes.data?.last_synced_at ?? null}
+      lastSyncedAt={syncRes?.last_synced_at ?? null}
     />
   );
 }
-

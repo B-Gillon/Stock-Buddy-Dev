@@ -1,10 +1,18 @@
 // /src/app/suppliers/[slug]/edit/page.jsx
+
+import { headers } from "next/headers";
 import { supabase } from "@/lib/supabaseClient";
+import { getTenantIdFromHeaders } from "@/lib/tenants";
 import ClientSupplierEditPage from "./components/ClientSupplierEditPage";
 import { notFound } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function SupplierEditPage({ params }) {
   const { slug } = await params;
+
+  const headersList = await headers();
+  const tenantId    = await getTenantIdFromHeaders(headersList);
 
   const { data: supplier, error } = await supabase
     .from("suppliers")
@@ -32,22 +40,14 @@ export default async function SupplierEditPage({ params }) {
       supplier_notes,
       po_notes_template,
       supplier_addresses (
-        id,
-        address_type,
-        address1,
-        address2,
-        city,
-        state_province,
-        postal_code,
-        country
+        id, address_type, address1, address2, city, state_province, postal_code, country
       )
     `)
+    .eq("tenant_id", tenantId)
     .eq("supplier_number", slug)
     .single();
 
-  if (error || !supplier) {
-    notFound();
-  }
+  if (error || !supplier) notFound();
 
   return <ClientSupplierEditPage supplier={supplier} />;
 }

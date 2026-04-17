@@ -1,12 +1,18 @@
 // /src/app/purchase-orders/page.jsx
 
+import { headers } from "next/headers";
 import { supabase } from '@/lib/supabaseClient';
+import { getTenantIdFromHeaders } from "@/lib/tenants";
 import PurchaseOrdersLandingPage from './components/PurchaseOrdersLandingPage';
 
 export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }) {
   const params = await searchParams;
+
+  const headersList = await headers();
+  const tenantId    = await getTenantIdFromHeaders(headersList);
+
   const status      = params.status      ?? '';
   const supplierId  = params.supplier_id ?? '';
   const locationId  = params.location_id ?? '';
@@ -14,7 +20,6 @@ export default async function Page({ searchParams }) {
   const dateTo      = params.date_to     ?? '';
   const search      = params.search      ?? '';
 
-  // Build PO query
   let query = supabase
     .from('purchase_orders')
     .select(`
@@ -28,6 +33,7 @@ export default async function Page({ searchParams }) {
       suppliers ( supplier_name ),
       locations ( name )
     `)
+    .eq('tenant_id', tenantId)
     .order('po_date', { ascending: false });
 
   if (status === 'overdue') {
@@ -49,13 +55,13 @@ export default async function Page({ searchParams }) {
 
   const { data: posRaw } = await query;
 
-  // Fetch totals for all returned POs
   const poIds = (posRaw ?? []).map((p) => p.id);
   let totalsMap = {};
   if (poIds.length > 0) {
     const { data: lines } = await supabase
       .from('purchase_order_lines')
       .select('purchase_order_id, extended_cost')
+      .eq('tenant_id', tenantId)
       .in('purchase_order_id', poIds);
 
     (lines ?? []).forEach((l) => {
@@ -78,22 +84,17 @@ export default async function Page({ searchParams }) {
   const { data: suppliers } = await supabase
     .from('suppliers')
     .select('id, supplier_name')
+    .eq('tenant_id', tenantId)
     .order('supplier_name');
 
   const { data: locations } = await supabase
     .from('locations')
     .select('id, name')
+    .eq('tenant_id', tenantId)
     .eq('active', true)
     .order('name');
 
-  const currentFilters = {
-    status,
-    supplier_id: supplierId,
-    location_id: locationId,
-    date_from:   dateFrom,
-    date_to:     dateTo,
-    search,
-  };
+  const currentFilters = { status, supplier_id: supplierId, location_id: locationId, date_from: dateFrom, date_to: dateTo, search };
 
   return (
     <PurchaseOrdersLandingPage
