@@ -19,13 +19,23 @@ const SHOPIFY_API_KEY = process.env.NEXT_PUBLIC_SHOPIFY_API_KEY;
 
 /**
  * Decode the Shopify `host` param to extract the shop domain.
- * host is base64-encoded and has the format: "{shop}/admin"
- * e.g. "bXlzdG9yZS5teXNob3BpZnkuY29tL2FkbWlu" → "mystore.myshopify.com/admin"
+ *
+ * Shopify sends host as base64-encoded in one of two formats:
+ *   - "admin.shopify.com/store/{handle}" (newer format)
+ *   - "{shop}.myshopify.com/admin"       (older format)
+ *
+ * We handle both and always return a bare myshopify.com domain.
  */
 function shopFromHost(host) {
   try {
-    const decoded = atob(host);           // "mystore.myshopify.com/admin"
-    return decoded.split("/")[0];          // "mystore.myshopify.com"
+    const decoded = atob(host);
+    // Newer format: "admin.shopify.com/store/stockbuddy"
+    const newFormat = decoded.match(/admin\.shopify\.com\/store\/([a-zA-Z0-9\-]+)/);
+    if (newFormat) return `${newFormat[1]}.myshopify.com`;
+    // Older format: "mystore.myshopify.com/admin"
+    const oldFormat = decoded.match(/^([a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com)/);
+    if (oldFormat) return oldFormat[1];
+    return null;
   } catch {
     return null;
   }

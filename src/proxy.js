@@ -55,13 +55,26 @@ export function proxy(request) {
   // 2. ?shop query param (Shopify sets this on initial iframe load)
   const queryShop = request.nextUrl.searchParams.get("shop");
 
-  // 3. Cookie (persisted from a prior resolution)
+  // 3. Extract ?shop from Referer header (present on RSC and client nav requests)
+  let refererShop = null;
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const refererUrl = new URL(referer);
+      const shopParam = refererUrl.searchParams.get("shop");
+      if (shopParam && /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shopParam)) {
+        refererShop = shopParam;
+      }
+    } catch { /* ignore malformed referer */ }
+  }
+
+  // 4. Cookie (persisted from a prior resolution)
   const cookieShop = request.cookies.get("sb-shop")?.value;
 
-  // 4. Dev fallback
+  // 5. Dev fallback
   const devShop = process.env.NEXT_PUBLIC_DEV_SHOP_DOMAIN;
 
-  const shopDomain = headerShop || queryShop || cookieShop || devShop;
+  const shopDomain = headerShop || queryShop || refererShop || cookieShop || devShop;
 
   // Read host param — App Bridge needs this to initialize in the iframe
   const host =
@@ -88,7 +101,7 @@ export function proxy(request) {
   // (header or query param), so subsequent navigations resolve correctly.
   // Cookie-based resolution alone is not secure — replace with session
   // token verification before public launch (TECH_DEBT #6).
-  if (headerShop || queryShop) {
+  if (headerShop || queryShop || refererShop) {
     response.cookies.set("sb-shop", shopDomain, {
       httpOnly: true,
       secure:   true,
