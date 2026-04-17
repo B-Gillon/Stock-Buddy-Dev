@@ -10,11 +10,11 @@ function normalizeOptionValue(variant, index) {
   return value;
 }
 
-export default function processVariants(gqlProducts, productIdMap) {
+export default function processVariants(gqlProducts, productIdMap, tenantId) {
   const variants = [];
 
   for (const p of gqlProducts) {
-    const shopifyProductId = gidToId(p.id);
+    const shopifyProductId  = gidToId(p.id);
     const supabaseProductId = productIdMap[shopifyProductId];
     if (!supabaseProductId) continue;
 
@@ -34,12 +34,12 @@ export default function processVariants(gqlProducts, productIdMap) {
           ? productTitle
           : `${productTitle} — ${optionValues.join(" / ")}`;
 
-      // Weight comes from inventoryItem.measurement.weight
-      const weightData = v.inventoryItem?.measurement?.weight;
+      const weightData  = v.inventoryItem?.measurement?.weight;
       const weightValue = weightData?.value != null ? parseFloat(weightData.value) : null;
-      const weightUnit  = weightData?.unit  ?? null;
+      const weightUnit  = weightData?.unit ?? null;
 
       variants.push({
+        tenant_id:           tenantId,
         product_id:          supabaseProductId,
         shopify_product_id:  shopifyProductId,
         shopify_variant_id:  shopifyVariantId,
@@ -57,7 +57,7 @@ export default function processVariants(gqlProducts, productIdMap) {
                                : null,
         taxable:             typeof v.taxable === "boolean" ? v.taxable : null,
         inventory_policy:    v.inventoryPolicy || null,
-        inventory_quantity:  null, // populated separately via inventory sync
+        inventory_quantity:  null,
         weight_value:        weightValue,
         weight_unit:         weightUnit,
         image_src:           v.image?.url || p.featuredImage?.url || null,

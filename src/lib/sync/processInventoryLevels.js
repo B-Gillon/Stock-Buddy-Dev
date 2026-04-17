@@ -3,7 +3,8 @@ import { gidToId } from "@/lib/sync/shopifyHelpers";
 export default function processInventoryLevels(
   rawLevels,
   inventoryItemMap,
-  locationMap
+  locationMap,
+  tenantId
 ) {
   const processed = [];
 
@@ -15,7 +16,8 @@ export default function processInventoryLevels(
     const locationUuid      = locationMap.get(shopifyLocationId)           ?? null;
 
     if (!locationUuid) {
-      console.warn(`No matching location found for shopify_location_id: ${shopifyLocationId} — inserting with null location_id`);
+      console.warn(`No matching location found for shopify_location_id: ${shopifyLocationId} — skipping row`);
+      continue;
     }
 
     if (!inventoryItemUuid) {
@@ -24,6 +26,7 @@ export default function processInventoryLevels(
     }
 
     processed.push({
+      tenant_id:          tenantId,
       inventory_item_id:  inventoryItemUuid,
       location_id:        locationUuid,
       available:          level.available          ?? null,

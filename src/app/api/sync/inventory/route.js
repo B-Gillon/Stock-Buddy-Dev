@@ -13,7 +13,6 @@ export async function POST(request) {
   const results  = {};
   const errors   = [];
 
-  // Look up tenant credentials from the tenants table
   const { data: tenant, error: tenantError } = await supabaseAdmin
     .from("tenants")
     .select("shop_domain, access_token")
@@ -32,14 +31,14 @@ export async function POST(request) {
     accessToken: tenant.access_token,
   };
 
-  try { await syncLocations(tenantId, credentials);       results.locations      = "ok"; }
-  catch (err) { errors.push(`locations: ${err.message}`);       results.locations      = "failed"; await logError({ source: 'sync/inventory/syncLocations',       error: err, tenantId }); }
+  try { await syncLocations(tenantId, credentials);                  results.locations       = "ok"; }
+  catch (err) { errors.push(`locations: ${err.message}`);            results.locations       = "failed"; await logError({ source: 'sync/inventory/syncLocations',       error: err, tenantId }); }
 
-  try { await syncInventoryItems(credentials);             results.inventoryItems  = "ok"; }
-  catch (err) { errors.push(`inventoryItems: ${err.message}`);  results.inventoryItems  = "failed"; await logError({ source: 'sync/inventory/syncInventoryItems',  error: err, tenantId }); }
+  try { await syncInventoryItems(credentials, tenantId);             results.inventoryItems  = "ok"; }
+  catch (err) { errors.push(`inventoryItems: ${err.message}`);       results.inventoryItems  = "failed"; await logError({ source: 'sync/inventory/syncInventoryItems',  error: err, tenantId }); }
 
-  try { await syncInventoryLevels(credentials);            results.inventoryLevels = "ok"; }
-  catch (err) { errors.push(`inventoryLevels: ${err.message}`); results.inventoryLevels = "failed"; await logError({ source: 'sync/inventory/syncInventoryLevels', error: err, tenantId }); }
+  try { await syncInventoryLevels(credentials, tenantId);            results.inventoryLevels = "ok"; }
+  catch (err) { errors.push(`inventoryLevels: ${err.message}`);      results.inventoryLevels = "failed"; await logError({ source: 'sync/inventory/syncInventoryLevels', error: err, tenantId }); }
 
   const last_synced_at = new Date().toISOString();
   await supabase.from("sync_status").upsert(
