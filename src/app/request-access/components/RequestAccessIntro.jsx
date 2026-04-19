@@ -228,7 +228,7 @@ export default function RequestAccessIntro() {
         <InstallHeader />
       </div>
 
-      <div className="flex-1 flex items-center justify-center py-3">
+      <div className="flex-1 flex items-start justify-center pt-3 pb-6">
         <div className="w-full max-w-6xl px-4 flex flex-col lg:flex-row gap-6 items-stretch">
 
           {/* ── Left card ───────────────────────────────────────── */}
