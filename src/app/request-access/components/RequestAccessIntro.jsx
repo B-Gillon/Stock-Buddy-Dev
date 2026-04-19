@@ -17,7 +17,13 @@ const MINI_CARDS = [
   {
     title: 'Setup',
     icon: '⚙️',
-    items: ['Assign suppliers', 'Set case packs', 'Set MOQs & lead times', 'Configure workflows'],
+    items: [
+      'Easy migration from Stocky',
+      'Assign suppliers',
+      'Set case packs',
+      'Set MOQs & lead times',
+      'Configure workflows',
+    ],
   },
   {
     title: 'Purchase Orders',
@@ -39,10 +45,10 @@ const MINI_CARDS = [
 // ── Contact Modal ─────────────────────────────────────────────────────────────
 
 function ContactModal({ onClose }) {
-  const [form, setForm]       = useState({ name: '', email: '', message: '' });
+  const [form, setForm]             = useState({ name: '', email: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]     = useState(null);
-  const [submitted, setSubmitted] = useState(false);
+  const [error, setError]           = useState(null);
+  const [submitted, setSubmitted]   = useState(false);
 
   function set(field, value) {
     setForm(f => ({ ...f, [field]: value }));
@@ -74,7 +80,7 @@ function ContactModal({ onClose }) {
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h3 className="text-base font-semibold text-gray-900">Have Questions?</h3>
+          <h3 className="text-base font-semibold text-gray-900">Ask a Question</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -150,6 +156,26 @@ function ContactModal({ onClose }) {
   );
 }
 
+// ── Stocky Migration Bar ──────────────────────────────────────────────────────
+
+function MigrationBar({ onJoinBeta }) {
+  return (
+    <div
+      className="w-full text-white text-sm font-medium text-center px-4 py-2.5"
+      style={{ backgroundColor: '#2563eb' }}
+    >
+      ⚡ Planning your Stocky migration?{' '}
+      <span className="font-semibold">Stock Buddy is your drop-in replacement.</span>{' '}
+      <button
+        onClick={onJoinBeta}
+        className="underline underline-offset-2 font-bold hover:opacity-80 transition-opacity"
+      >
+        Apply for the Beta →
+      </button>
+    </div>
+  );
+}
+
 // ── Header ────────────────────────────────────────────────────────────────────
 
 function InstallHeader() {
@@ -169,8 +195,8 @@ function InstallHeader() {
               <h1 className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</h1>
               <span className="text-xs text-gray-400">v1.0</span>
             </div>
-            <p className="text-xs mt-0.5" style={gradientStyle}>
-              Inventory Management for the Modern Age
+            <p className="text-xs mt-0.5 text-gray-300">
+              The reliable inventory and PO replacement for Shopify merchants.
             </p>
           </div>
         </div>
@@ -188,8 +214,15 @@ export default function RequestAccessIntro() {
   const router = useRouter();
   const [showContact, setShowContact] = useState(false);
 
+  function goToForm() {
+    router.push('/request-access/form');
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+
+      {/* Migration bar — flush to very top, full width */}
+      <MigrationBar onJoinBeta={goToForm} />
 
       <div className="w-full max-w-6xl mx-auto px-4 pt-4">
         <InstallHeader />
@@ -202,7 +235,7 @@ export default function RequestAccessIntro() {
           <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm px-10 pt-5 pb-5 flex flex-col">
             <div className="space-y-4 text-sm text-gray-700 flex-1">
               <p>
-                <strong className="text-gray-900">Stock Buddy</strong> is a Shopify-embedded inventory and purchase order management app built for merchants who need more than Shopify's built-in tools. It lets you create and manage purchase orders, track incoming inventory, sync stock levels to Shopify in real time, and coordinate with suppliers — all within Shopify Admin.
+                <strong className="text-gray-900">Stock Buddy</strong> is a Shopify-embedded inventory and purchase order management app built for merchants who need more than Shopify's built-in tools. It lets you create and manage <strong className="text-gray-900">Purchase Orders</strong>, track incoming inventory through <strong className="text-gray-900">Receiving</strong>, perform <strong className="text-gray-900">Reconciliation</strong> against what was ordered, sync stock levels to Shopify in real time, and coordinate with suppliers — all within Shopify Admin.
               </p>
               <p>
                 Stock Buddy is designed for <strong className="text-gray-900">independent Shopify merchants</strong> who manage physical inventory, work with one or more suppliers, and need a structured process for purchasing and receiving goods.
@@ -210,22 +243,22 @@ export default function RequestAccessIntro() {
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
                 <p className="text-amber-800 font-medium text-sm">Private Beta — Limited Access</p>
                 <p className="text-amber-700 text-sm mt-1">
-                  Stock Buddy is currently in private beta. Access is limited and granted on a case-by-case basis. Submitting a request does not guarantee approval. If approved, you will receive an install link directly.
+                  Stock Buddy is currently in private beta. We are onboarding a limited group of merchants to ensure the tool perfectly fits your specific inventory workflow. If approved, you'll receive an invite link directly.
                 </p>
               </div>
             </div>
             <div className="mt-4 flex gap-3">
               <button
-                onClick={() => router.push('/request-access/form')}
+                onClick={goToForm}
                 className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-md transition-colors"
               >
-                Request Access
+                Join the Beta
               </button>
               <button
                 onClick={() => setShowContact(true)}
                 className="flex-1 py-2.5 px-4 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-md border border-gray-300 transition-colors"
               >
-                Have Questions?
+                Ask a Question
               </button>
             </div>
           </div>
