@@ -9,8 +9,11 @@
  */
 
 import { Suspense } from "react";
+import Script from "next/script";
 import "./globals.css";
 import AppBridgeProvider from "./components/AppBridgeProvider";
+
+const GA_ID = "G-92VPVTJDC4";
 
 export const metadata = {
   title: "Stock Buddy",
@@ -21,6 +24,21 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className="bg-gray-100">
+
+        {/* Google Analytics */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+          strategy="afterInteractive"
+        />
+        <Script id="ga-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', '${GA_ID}');
+          `}
+        </Script>
+
         <div id="app-root" className="min-h-screen flex flex-col">
           <Suspense fallback={null}>
             <AppBridgeProvider>
@@ -28,6 +46,7 @@ export default function RootLayout({ children }) {
             </AppBridgeProvider>
           </Suspense>
         </div>
+
       </body>
     </html>
   );
