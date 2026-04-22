@@ -461,31 +461,18 @@ export default function MobileReceiveScreen({ po, initialLines }) {
 
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#e5e7eb" }}>
 
-        {/* Full header */}
-        <div className="px-4 pt-5">
-          <div style={{ backgroundColor: "#1f2937", borderRadius: "16px" }} className="text-white px-5 pt-4 pb-5">
-            <div className="flex items-center justify-between mb-4">
-              <button onClick={() => router.push(`/mobile/pos/${po.poNumber}`)} className="flex items-center gap-1.5 text-gray-400 text-sm active:text-white transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-                </svg>
-                {po.poNumber}
-              </button>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold" style={{ background: "linear-gradient(to right, #11E0FC, #0099FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>Stock Buddy</span>
-                <span className="text-xs text-gray-400">v1.0</span>
-              </div>
-            </div>
-            <div className="flex justify-center mb-4">
-              <div className="flex flex-col items-start">
-                <h1 className="text-4xl font-bold" style={{ background: "linear-gradient(to right, #11E0FC, #0099FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{po.poNumber}</h1>
-                <p className="text-sm text-gray-400 mt-1">{po.supplierName}</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <button onClick={() => router.push(`/mobile/pos/${po.poNumber}`)} className="text-xs font-semibold border rounded-full px-3 py-1 active:opacity-70 transition-all" style={{ color: "#ffffff", borderColor: "rgba(255,255,255,0.4)" }}>Pause</button>
-              <span className="text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Receiving</span>
-            </div>
+        {/* Slim header — matches expanded item view exactly */}
+        <div className="px-4 pt-2">
+          <div className="flex items-center justify-center" style={{ backgroundColor: "#1f2937", borderRadius: "12px", padding: "8px 20px" }}>
+            <span className="font-bold" style={{
+              fontSize: "22px",
+              background: "linear-gradient(to right, #11E0FC, #0099FF)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>
+              {po.poNumber}
+            </span>
           </div>
         </div>
 
@@ -511,10 +498,21 @@ export default function MobileReceiveScreen({ po, initialLines }) {
         </div>
 
         {/* Item cards */}
-        <div className="px-4 pt-2 pb-8 space-y-2">
+        <div className="px-4 pt-2 pb-4 space-y-2">
           {filteredLines.map((line) => (
             <ItemRow key={line.id} line={line} onSelect={setSelectedLine} />
           ))}
+        </div>
+
+        {/* Return to PO List — matches Return to Item List button */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={() => router.push("/mobile/pos")}
+            className="w-full flex items-center justify-center font-bold text-white active:opacity-80 transition-all"
+            style={{ backgroundColor: "#1f2937", borderRadius: "12px", padding: "12px 20px", fontSize: "20px" }}
+          >
+            ← Return to PO List
+          </button>
         </div>
 
       </div>

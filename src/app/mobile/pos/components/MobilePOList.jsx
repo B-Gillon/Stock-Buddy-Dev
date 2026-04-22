@@ -204,7 +204,7 @@ export default function MobilePOList({ pos }) {
           </div>
 
           {/* Centered title */}
-          <p className="text-center text-white font-bold text-2xl mb-4">POs Ready to be Received</p>
+          <p className="text-center font-bold text-2xl mb-4" style={{ background: "linear-gradient(to right, #11E0FC, #0099FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>POs Ready to be Received</p>
 
           {/* Bottom row: X Open Orders pill on right */}
           <div className="flex justify-end">
