@@ -316,34 +316,30 @@ function ItemRow({ line, onSelect }) {
 
   return (
     <button
-      className="w-full text-left"
+      className="flex items-center gap-4 w-full text-left"
       style={{ backgroundColor: "#4b5563", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 16px" }}
       onClick={() => onSelect(line)}
     >
-      {/* Title — full width at top */}
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="flex-1 text-2xl font-medium text-white leading-snug">{line.displayTitle || line.productTitle}</p>
-        {done && (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="flex-shrink-0 mt-1" style={{ width: "36px", height: "36px", color: "#4ade80" }}>
-            <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
-          </svg>
+      <div className="rounded-lg flex-shrink-0 overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
+        {(line.variantImageSrc || line.productImageSrc) ? (
+          <img src={line.variantImageSrc || line.productImageSrc} alt={line.displayTitle || line.productTitle} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+            </svg>
+          </div>
         )}
       </div>
-      {/* Bottom row — image left, SKU to its right */}
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg flex-shrink-0 overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
-          {(line.variantImageSrc || line.productImageSrc) ? (
-            <img src={line.variantImageSrc || line.productImageSrc} alt={line.displayTitle || line.productTitle} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
-                <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-              </svg>
-            </div>
-          )}
-        </div>
-        {line.sku && <p className="text-xl text-white opacity-70">{line.sku}</p>}
+      <div className="flex-1 min-w-0">
+        <p className="text-2xl font-medium text-white">{line.displayTitle || line.productTitle}</p>
+        {line.sku && <p className="text-xl text-white mt-0.5">{line.sku}</p>}
       </div>
+      {done && (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="flex-shrink-0" style={{ width: "44px", height: "44px", color: "#4ade80" }}>
+          <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
+        </svg>
+      )}
     </button>
   );
 }
