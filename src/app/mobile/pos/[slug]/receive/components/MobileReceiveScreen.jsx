@@ -167,22 +167,22 @@ function ReceiveForm({ line, onSave, onScan }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col gap-3 overflow-y-auto px-4 py-4">
-      {/* Stats row — Received and Remaining only, full width */}
+    <div className="flex-1 flex flex-col gap-2 px-4 py-3">
+      {/* Stats row */}
       <div className="grid grid-cols-2 gap-2">
         {[
           { label: "Received", value: line.receivedQtyUnits },
           { label: "Remaining", value: remaining },
         ].map(({ label, value }) => (
-          <div key={label} className="text-center rounded-xl py-3 flex flex-col justify-center" style={{ backgroundColor: "#e5e7eb", minHeight: "90px" }}>
-            <p className="font-bold leading-none text-gray-800" style={{ fontSize: "48px" }}>{value}</p>
-            <p className="font-semibold text-gray-600 mt-1" style={{ fontSize: "15px" }}>{label}</p>
+          <div key={label} className="text-center rounded-xl py-2 flex flex-col justify-center" style={{ backgroundColor: "#e5e7eb", minHeight: "64px" }}>
+            <p className="font-bold leading-none text-gray-800" style={{ fontSize: "32px" }}>{value}</p>
+            <p className="font-semibold text-gray-600 mt-0.5" style={{ fontSize: "13px" }}>{label}</p>
           </div>
         ))}
       </div>
 
       {/* Qty input */}
-      <style>{`#qty-input::placeholder { font-size: 24px; }`}</style>
+      <style>{`#qty-input::placeholder { font-size: 18px; }`}</style>
       <input
         id="qty-input"
         ref={inputRef}
@@ -193,37 +193,35 @@ function ReceiveForm({ line, onSave, onScan }) {
         max={remaining}
         value={qty}
         onChange={handleQtyChange}
-        placeholder="Enter Quantity Here"
+        placeholder="Enter Quantity"
         className={`w-full text-center font-bold focus:outline-none transition-colors ${error ? "border-red-400 text-red-500 bg-red-50" : "border-gray-300 text-gray-800 bg-gray-50 focus:border-blue-400"}`}
-        style={{ fontSize: "80px", lineHeight: "1", paddingTop: "38px", paddingBottom: "42px", borderRadius: "16px", border: "2px solid" }}
+        style={{ fontSize: "52px", lineHeight: "1", paddingTop: "20px", paddingBottom: "22px", borderRadius: "16px", border: "2px solid" }}
       />
       {error && <p className="text-sm text-red-500 text-center -mt-1">{error}</p>}
 
-      {/* +1 / +5 */}
+      {/* +1 / +5 / All — always on one row */}
       <div className="flex gap-2">
-        <button onClick={() => handleQuickAdd(1)} className="flex-1 font-bold active:opacity-70 text-gray-700" style={{ backgroundColor: "#e5e7eb", fontSize: "48px", padding: "20px 0", borderRadius: "16px" }}>+1</button>
+        <button onClick={() => handleQuickAdd(1)} className="flex-1 font-bold active:opacity-70 text-gray-700" style={{ backgroundColor: "#e5e7eb", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>+1</button>
         {remaining >= 5 && (
-          <button onClick={() => handleQuickAdd(5)} className="flex-1 font-bold active:opacity-70 text-gray-700" style={{ backgroundColor: "#e5e7eb", fontSize: "48px", padding: "20px 0", borderRadius: "16px" }}>+5</button>
+          <button onClick={() => handleQuickAdd(5)} className="flex-1 font-bold active:opacity-70 text-gray-700" style={{ backgroundColor: "#e5e7eb", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>+5</button>
+        )}
+        {remaining > 1 && (
+          <button onClick={() => { setQty(String(remaining)); setError(null); }} className="flex-1 font-bold active:opacity-70" style={{ backgroundColor: "#dbeafe", color: "#1d4ed8", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>
+            All ({remaining})
+          </button>
         )}
       </div>
-
-      {/* All (N) */}
-      {remaining > 1 && (
-        <button onClick={() => { setQty(String(remaining)); setError(null); }} className="w-full font-bold active:opacity-70" style={{ backgroundColor: "#dbeafe", color: "#1d4ed8", fontSize: "48px", padding: "20px 0", borderRadius: "16px" }}>
-          All ({remaining})
-        </button>
-      )}
 
       {/* Save / Scan */}
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={!isValid}
           className={`flex-1 font-bold transition-all ${isValid ? "active:opacity-80" : "opacity-40 cursor-not-allowed"}`}
-          style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "36px", padding: "24px 0", borderRadius: "16px" }}>
+          style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "24px", padding: "14px 0", borderRadius: "14px" }}>
           Save
         </button>
         <button onClick={handleScan}
           className="flex-1 font-bold transition-all active:opacity-80"
-          style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "36px", padding: "24px 0", borderRadius: "16px" }}>
+          style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "24px", padding: "14px 0", borderRadius: "14px" }}>
           Scan
         </button>
       </div>
@@ -354,10 +352,10 @@ export default function MobileReceiveScreen({ po, initialLines }) {
         <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "#e5e7eb" }}>
 
           {/* Slim header — PO# same size as normal header */}
-          <div className="px-4 pt-4">
-            <div className="flex items-center justify-center" style={{ backgroundColor: "#1f2937", borderRadius: "16px", padding: "14px 20px" }}>
+          <div className="px-4 pt-2">
+            <div className="flex items-center justify-center" style={{ backgroundColor: "#1f2937", borderRadius: "12px", padding: "8px 20px" }}>
               <span className="font-bold" style={{
-                fontSize: "36px",
+                fontSize: "22px",
                 background: "linear-gradient(to right, #11E0FC, #0099FF)",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -370,7 +368,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
 
           {/* White card — item title + form — takes all space between header and footer */}
           <div className="flex-1 flex flex-col overflow-hidden px-4 py-3">
-            <div className="flex-1 flex flex-col overflow-y-auto bg-white rounded-2xl px-4 py-4 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
+            <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl px-4 py-3 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
               {/* Item title bar */}
               <div className="flex items-center gap-3 mb-3">
                 <div className="rounded-xl flex-shrink-0 overflow-hidden" style={{ width: "64px", height: "64px", backgroundColor: "#e5e7eb" }}>
@@ -402,7 +400,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
             <button
               onClick={() => setSelectedLine(null)}
               className="w-full flex items-center justify-center font-bold text-white active:opacity-80 transition-all"
-              style={{ backgroundColor: "#1f2937", borderRadius: "16px", padding: "18px 20px", fontSize: "28px" }}
+              style={{ backgroundColor: "#1f2937", borderRadius: "12px", padding: "12px 20px", fontSize: "20px" }}
             >
               ← Return to Item List
             </button>
