@@ -112,7 +112,7 @@ function ReceiveForm({ line, onSave, onScan }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (!alreadyDone) setTimeout(() => inputRef.current?.focus(), 150);
+    // Auto-focus removed — user must tap the field to trigger the number pad
   }, [alreadyDone]);
 
   const parsedQty = parseInt(qty, 10);
@@ -199,18 +199,20 @@ function ReceiveForm({ line, onSave, onScan }) {
       />
       {error && <p className="text-sm text-red-500 text-center -mt-1">{error}</p>}
 
-      {/* +1 / +5 / All — always on one row */}
+      {/* +1 / +5 */}
       <div className="flex gap-2">
         <button onClick={() => handleQuickAdd(1)} className="flex-1 font-bold active:opacity-70 text-gray-700" style={{ backgroundColor: "#e5e7eb", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>+1</button>
         {remaining >= 5 && (
           <button onClick={() => handleQuickAdd(5)} className="flex-1 font-bold active:opacity-70 text-gray-700" style={{ backgroundColor: "#e5e7eb", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>+5</button>
         )}
-        {remaining > 1 && (
-          <button onClick={() => { setQty(String(remaining)); setError(null); }} className="flex-1 font-bold active:opacity-70" style={{ backgroundColor: "#dbeafe", color: "#1d4ed8", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>
-            All ({remaining})
-          </button>
-        )}
       </div>
+
+      {/* All — own row */}
+      {remaining > 1 && (
+        <button onClick={() => { setQty(String(remaining)); setError(null); }} className="w-full font-bold active:opacity-70" style={{ backgroundColor: "#dbeafe", color: "#1d4ed8", fontSize: "28px", padding: "12px 0", borderRadius: "14px" }}>
+          All ({remaining})
+        </button>
+      )}
 
       {/* Save / Scan */}
       <div className="flex gap-2">
