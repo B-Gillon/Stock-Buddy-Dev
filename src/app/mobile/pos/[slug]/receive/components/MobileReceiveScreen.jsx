@@ -40,7 +40,6 @@ function ScannerView({ onDetected, onClose }) {
   const readerRef = useRef(null);
   const [cameraError, setCameraError] = useState(null);
   const [torchOn, setTorchOn] = useState(false);
-  const streamRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -49,26 +48,60 @@ function ScannerView({ onDetected, onClose }) {
         const { BrowserMultiFormatReader } = await import("@zxing/library");
         const reader = new BrowserMultiFormatReader();
         readerRef.current = reader;
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } });
-        streamRef.current = stream;
-        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        const video = videoRef.current;
-        video.srcObject = stream;
-        // iOS Safari requires waiting for loadedmetadata before play() —
-        // calling play() immediately after setting srcObject silently fails.
-        await new Promise((resolve) => {
-          video.onloadedmetadata = () => resolve();
-        });
-        await video.play();
-        reader.decodeFromStream(stream, video, (result) => { if (result && active) onDetected(result.getText()); });
-      } catch (err) { if (active) setCameraError(err.message || "Camera unavailable"); }
+
+        // Step 1: Request camera permission via facingMode constraint first.
+        // On Android Chrome, device labels are empty until permission is granted,
+        // so we must trigger the permission prompt before enumerating devices.
+        // On iOS Safari, facingMode alone is sufficient and most reliable.
+        let deviceId = null;
+        try {
+          const permStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: "environment" } },
+          });
+          // Permission granted — stop this stream immediately, we just needed the grant
+          permStream.getTracks().forEach((t) => t.stop());
+
+          // Step 2: Now enumerate — labels will be populated on Android
+          const devices = await BrowserMultiFormatReader.listVideoInputDevices();
+          const rear = devices.find((d) =>
+            /back|rear|environment/i.test(d.label)
+          ) ?? devices[devices.length - 1] ?? null;
+          deviceId = rear?.deviceId ?? null;
+        } catch {
+          // exact "environment" not supported (some devices) — fall back to
+          // ideal constraint; decodeFromVideoDevice will handle it
+          deviceId = null;
+        }
+
+        if (!active) return;
+
+        // Step 3: Start decoding. decodeFromVideoDevice manages the stream
+        // lifecycle internally, which avoids manual play() timing issues.
+        await reader.decodeFromVideoDevice(
+          deviceId,
+          videoRef.current,
+          (result, err) => {
+            if (!active) return;
+            if (result) onDetected(result.getText());
+            // err fires every frame when no barcode found — expected, ignore it
+          }
+        );
+      } catch (err) {
+        if (active) setCameraError(err.message || "Camera unavailable");
+      }
     }
     startScanner();
-    return () => { active = false; readerRef.current?.reset(); streamRef.current?.getTracks().forEach((t) => t.stop()); };
+    return () => {
+      active = false;
+      readerRef.current?.reset();
+    };
   }, [onDetected]);
 
   async function toggleTorch() {
-    const track = streamRef.current?.getVideoTracks()[0];
+    const video = videoRef.current;
+    if (!video) return;
+    const stream = video.srcObject;
+    const track = stream?.getVideoTracks?.()?.[0];
     if (!track) return;
     try { await track.applyConstraints({ advanced: [{ torch: !torchOn }] }); setTorchOn((v) => !v); } catch {}
   }
@@ -262,8 +295,8 @@ function ProgressRing({ received, total }) {
         </div>
       </div>
       <div>
-        <p className="text-white font-semibold" style={{ fontSize: "16px" }}>{received} of {total} units received</p>
-        <p className="text-gray-400" style={{ fontSize: "13px" }}>
+        <p className="text-white font-semibold" style={{ fontSize: "20px" }}>{received} of {total} units received</p>
+        <p className="text-gray-400" style={{ fontSize: "16px" }}>
           {pct === 100 ? "Fully received" : `${total - received} remaining`}
         </p>
       </div>
@@ -279,11 +312,24 @@ function ItemRow({ line, onSelect }) {
 
   return (
     <button
-      className="flex items-center gap-4 w-full text-left"
+      className="w-full text-left"
       style={{ backgroundColor: "#4b5563", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 16px" }}
       onClick={() => onSelect(line)}
     >
-      <div className="rounded-lg flex-shrink-0 overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
+      {/* Title row — full width at top */}
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-2xl font-medium text-white leading-snug">{line.displayTitle || line.productTitle}</p>
+          {line.sku && <p className="text-xl text-white mt-0.5 opacity-70">{line.sku}</p>}
+        </div>
+        {done && (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="flex-shrink-0 mt-1" style={{ width: "36px", height: "36px", color: "#4ade80" }}>
+            <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
+          </svg>
+        )}
+      </div>
+      {/* Image — bottom left */}
+      <div className="rounded-lg overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
         {(line.variantImageSrc || line.productImageSrc) ? (
           <img src={line.variantImageSrc || line.productImageSrc} alt={line.displayTitle || line.productTitle} className="w-full h-full object-cover" />
         ) : (
@@ -294,15 +340,6 @@ function ItemRow({ line, onSelect }) {
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-2xl font-medium text-white">{line.displayTitle || line.productTitle}</p>
-        {line.sku && <p className="text-xl text-white mt-0.5">{line.sku}</p>}
-      </div>
-      {done && (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="flex-shrink-0" style={{ width: "44px", height: "44px", color: "#4ade80" }}>
-          <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
-        </svg>
-      )}
     </button>
   );
 }
