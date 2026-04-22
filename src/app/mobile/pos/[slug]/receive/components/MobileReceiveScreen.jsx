@@ -38,70 +38,74 @@ function Toast({ message, type = "info", onDone }) {
 function ScannerView({ onDetected, onClose }) {
   const videoRef = useRef(null);
   const readerRef = useRef(null);
+  const animFrameRef = useRef(null);
+  const streamRef = useRef(null);
   const [cameraError, setCameraError] = useState(null);
   const [torchOn, setTorchOn] = useState(false);
 
   useEffect(() => {
     let active = true;
+
     async function startScanner() {
       try {
-        const { BrowserMultiFormatReader } = await import("@zxing/library");
-        const reader = new BrowserMultiFormatReader();
-        readerRef.current = reader;
+        // Always request rear camera via facingMode first — this also triggers
+        // the Android permission prompt before any enumeration happens.
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
+        streamRef.current = stream;
 
-        // Step 1: Request camera permission via facingMode constraint first.
-        // On Android Chrome, device labels are empty until permission is granted,
-        // so we must trigger the permission prompt before enumerating devices.
-        // On iOS Safari, facingMode alone is sufficient and most reliable.
-        let deviceId = null;
-        try {
-          const permStream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { exact: "environment" } },
+        const video = videoRef.current;
+        video.srcObject = stream;
+        video.setAttribute("playsinline", "true");
+        await video.play();
+
+        // Use native BarcodeDetector API if available (Android Chrome, Samsung Internet).
+        // Fall back to @zxing for iOS Safari which doesn't support BarcodeDetector.
+        if ("BarcodeDetector" in window) {
+          const detector = new window.BarcodeDetector({
+            formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code", "data_matrix"],
           });
-          // Permission granted — stop this stream immediately, we just needed the grant
-          permStream.getTracks().forEach((t) => t.stop());
-
-          // Step 2: Now enumerate — labels will be populated on Android
-          const devices = await BrowserMultiFormatReader.listVideoInputDevices();
-          const rear = devices.find((d) =>
-            /back|rear|environment/i.test(d.label)
-          ) ?? devices[devices.length - 1] ?? null;
-          deviceId = rear?.deviceId ?? null;
-        } catch {
-          // exact "environment" not supported (some devices) — fall back to
-          // ideal constraint; decodeFromVideoDevice will handle it
-          deviceId = null;
-        }
-
-        if (!active) return;
-
-        // Step 3: Start decoding. decodeFromVideoDevice manages the stream
-        // lifecycle internally, which avoids manual play() timing issues.
-        await reader.decodeFromVideoDevice(
-          deviceId,
-          videoRef.current,
-          (result, err) => {
+          async function tick() {
+            if (!active) return;
+            try {
+              const barcodes = await detector.detect(video);
+              if (barcodes.length > 0 && active) {
+                onDetected(barcodes[0].rawValue);
+                return; // stop scanning after first hit
+              }
+            } catch { /* frame not ready yet */ }
+            animFrameRef.current = requestAnimationFrame(tick);
+          }
+          animFrameRef.current = requestAnimationFrame(tick);
+        } else {
+          // iOS Safari fallback — @zxing
+          const { BrowserMultiFormatReader } = await import("@zxing/library");
+          const reader = new BrowserMultiFormatReader();
+          readerRef.current = reader;
+          reader.decodeFromStream(stream, video, (result, err) => {
             if (!active) return;
             if (result) onDetected(result.getText());
-            // err fires every frame when no barcode found — expected, ignore it
-          }
-        );
+          });
+        }
       } catch (err) {
         if (active) setCameraError(err.message || "Camera unavailable");
       }
     }
+
     startScanner();
+
     return () => {
       active = false;
+      cancelAnimationFrame(animFrameRef.current);
       readerRef.current?.reset();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [onDetected]);
 
   async function toggleTorch() {
-    const video = videoRef.current;
-    if (!video) return;
-    const stream = video.srcObject;
-    const track = stream?.getVideoTracks?.()?.[0];
+    const track = streamRef.current?.getVideoTracks?.()?.[0];
     if (!track) return;
     try { await track.applyConstraints({ advanced: [{ torch: !torchOn }] }); setTorchOn((v) => !v); } catch {}
   }
@@ -116,7 +120,7 @@ function ScannerView({ onDetected, onClose }) {
           </div>
         ) : (
           <>
-            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
+            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="relative w-64 h-40">
                 {["top-0 left-0", "top-0 right-0", "bottom-0 left-0", "bottom-0 right-0"].map((pos, i) => (
@@ -316,29 +320,29 @@ function ItemRow({ line, onSelect }) {
       style={{ backgroundColor: "#4b5563", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 16px" }}
       onClick={() => onSelect(line)}
     >
-      {/* Title row — full width at top */}
+      {/* Title — full width at top */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-2xl font-medium text-white leading-snug">{line.displayTitle || line.productTitle}</p>
-          {line.sku && <p className="text-xl text-white mt-0.5 opacity-70">{line.sku}</p>}
-        </div>
+        <p className="flex-1 text-2xl font-medium text-white leading-snug">{line.displayTitle || line.productTitle}</p>
         {done && (
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="flex-shrink-0 mt-1" style={{ width: "36px", height: "36px", color: "#4ade80" }}>
             <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
           </svg>
         )}
       </div>
-      {/* Image — bottom left */}
-      <div className="rounded-lg overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
-        {(line.variantImageSrc || line.productImageSrc) ? (
-          <img src={line.variantImageSrc || line.productImageSrc} alt={line.displayTitle || line.productTitle} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-            </svg>
-          </div>
-        )}
+      {/* Bottom row — image left, SKU to its right */}
+      <div className="flex items-center gap-3">
+        <div className="rounded-lg flex-shrink-0 overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
+          {(line.variantImageSrc || line.productImageSrc) ? (
+            <img src={line.variantImageSrc || line.productImageSrc} alt={line.displayTitle || line.productTitle} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+              </svg>
+            </div>
+          )}
+        </div>
+        {line.sku && <p className="text-xl text-white opacity-70">{line.sku}</p>}
       </div>
     </button>
   );
