@@ -112,7 +112,7 @@ function ReceiveForm({ line, onSave, onScan }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    // Auto-focus removed — user must tap the field to trigger the number pad
+    // Auto-focus removed — user must tap the field to trigger the number pad (v2)
   }, [alreadyDone]);
 
   const parsedQty = parseInt(qty, 10);
