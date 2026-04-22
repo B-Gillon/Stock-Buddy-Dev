@@ -118,7 +118,7 @@ function ReceiveForm({ line, onSave }) {
         onChange={handleQtyChange}
         placeholder="Enter Quantity"
         className={`w-full text-center font-bold focus:outline-none transition-colors ${error ? "border-red-400 text-red-500 bg-red-50" : "border-gray-300 text-gray-800 bg-gray-50 focus:border-blue-400"}`}
-        style={{ fontSize: "52px", lineHeight: "1", paddingTop: "20px", paddingBottom: "22px", borderRadius: "16px", border: "2px solid" }}
+        style={{ fontSize: "52px", lineHeight: "1", height: "120px", borderRadius: "16px", border: "2px solid", display: "flex", alignItems: "center", textAlign: "center" }}
       />
       {error && <p className="text-sm text-red-500 text-center -mt-1">{error}</p>}
 
