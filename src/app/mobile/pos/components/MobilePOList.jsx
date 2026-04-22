@@ -151,7 +151,7 @@ export default function MobilePOList({ pos }) {
     );
     // Exact match → auto-navigate (barcode scan)
     if (results.length === 1 && results[0].poNumber.toLowerCase() === q) {
-      router.push(`/mobile/pos/${results[0].poNumber}`);
+      router.push(`/mobile/pos/${results[0].poNumber}/receive`);
     }
     return results;
   }, [pos, search]);
@@ -160,7 +160,7 @@ export default function MobilePOList({ pos }) {
     setShowScanner(false);
     const match = pos.find(p => p.poNumber.toLowerCase() === value.toLowerCase());
     if (match) {
-      router.push(`/mobile/pos/${match.poNumber}`);
+      router.push(`/mobile/pos/${match.poNumber}/receive`);
     } else {
       setSearch(value);
     }
@@ -232,6 +232,7 @@ export default function MobilePOList({ pos }) {
           placeholder="Search or scan a PO number…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          autoFocus
           className="flex-1 bg-white border border-gray-200 text-gray-900 placeholder-gray-400 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
         />
         <button
@@ -265,7 +266,7 @@ export default function MobilePOList({ pos }) {
             return (
               <button
                 key={po.id}
-                onClick={() => router.push(`/mobile/pos/${po.poNumber}`)}
+                onClick={() => router.push(`/mobile/pos/${po.poNumber}/receive`)}
                 className="w-full rounded-2xl text-left active:scale-98 active:brightness-90 transition-all"
                 style={{
                   backgroundColor: "#4b5563",

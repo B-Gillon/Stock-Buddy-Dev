@@ -52,9 +52,15 @@ function ScannerView({ onDetected, onClose }) {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } });
         streamRef.current = stream;
         if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        reader.decodeFromStream(stream, videoRef.current, (result) => { if (result && active) onDetected(result.getText()); });
+        const video = videoRef.current;
+        video.srcObject = stream;
+        // iOS Safari requires waiting for loadedmetadata before play() —
+        // calling play() immediately after setting srcObject silently fails.
+        await new Promise((resolve) => {
+          video.onloadedmetadata = () => resolve();
+        });
+        await video.play();
+        reader.decodeFromStream(stream, video, (result) => { if (result && active) onDetected(result.getText()); });
       } catch (err) { if (active) setCameraError(err.message || "Camera unavailable"); }
     }
     startScanner();
@@ -226,6 +232,40 @@ function ReceiveForm({ line, onSave, onScan }) {
           style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "24px", padding: "14px 0", borderRadius: "14px" }}>
           Scan
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Progress ring ────────────────────────────────────────────────────────────
+
+function ProgressRing({ received, total }) {
+  const pct = total > 0 ? Math.min((received / total) * 100, 100) : 0;
+  const radius = 28;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="relative" style={{ width: "72px", height: "72px" }}>
+        <svg width="72" height="72" style={{ transform: "rotate(-90deg)" }} viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r={radius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
+          <circle
+            cx="32" cy="32" r={radius} fill="none"
+            stroke={pct === 100 ? "#4ade80" : "#ffffff"}
+            strokeWidth="6" strokeLinecap="round"
+            strokeDasharray={circumference} strokeDashoffset={offset}
+            style={{ transition: "stroke-dashoffset 0.5s ease" }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="font-bold text-white" style={{ fontSize: "14px" }}>{Math.round(pct)}%</span>
+        </div>
+      </div>
+      <div>
+        <p className="text-white font-semibold" style={{ fontSize: "16px" }}>{received} of {total} units received</p>
+        <p className="text-gray-400" style={{ fontSize: "13px" }}>
+          {pct === 100 ? "Fully received" : `${total - received} remaining`}
+        </p>
       </div>
     </div>
   );
@@ -446,6 +486,13 @@ export default function MobileReceiveScreen({ po, initialLines }) {
               <button onClick={() => router.push(`/mobile/pos/${po.poNumber}`)} className="text-xs font-semibold border rounded-full px-3 py-1 active:opacity-70 transition-all" style={{ color: "#ffffff", borderColor: "rgba(255,255,255,0.4)" }}>Pause</button>
               <span className="text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">Receiving</span>
             </div>
+          </div>
+        </div>
+
+        {/* Progress ring tile */}
+        <div className="px-4 pt-3">
+          <div className="px-4 py-3" style={{ backgroundColor: "#374151", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.08)" }}>
+            <ProgressRing received={po.receivedUnits ?? 0} total={po.totalUnits ?? 0} />
           </div>
         </div>
 

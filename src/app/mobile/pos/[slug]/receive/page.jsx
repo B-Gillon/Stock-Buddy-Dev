@@ -97,12 +97,17 @@ export default async function MobileReceivePage({ params }) {
     variantId: line.variant_id,
   }));
 
+  const totalUnits = flatLines.reduce((sum, l) => sum + l.orderQtyUnits, 0);
+  const receivedUnits = flatLines.reduce((sum, l) => sum + l.receivedQtyUnits, 0);
+
   const flatPO = {
     id: po.id,
     poNumber: po.po_number,
     status: po.status,
     supplierName: po.suppliers?.supplier_name ?? "—",
     locationName: po.locations?.name ?? "—",
+    totalUnits,
+    receivedUnits,
   };
 
   return <MobileReceiveScreen po={flatPO} initialLines={flatLines} />;
