@@ -194,10 +194,10 @@ function ItemRow({ line, onSelect }) {
       onClick={() => onSelect(line)}
     >
       {/* Title — top, full width, wraps freely */}
-      <p className="text-2xl font-medium text-white leading-snug flex-1">{line.displayTitle || line.productTitle}</p>
+      <p className="text-2xl font-medium leading-snug flex-1" style={{ background: "linear-gradient(to right, #11E0FC, #0099FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{line.displayTitle || line.productTitle}</p>
       {/* Bottom row — SKU left, qty/check right */}
       <div className="flex items-end justify-between mt-2">
-        <span className="text-xl text-white opacity-70">{line.sku ?? ""}</span>
+        <span className="text-xl opacity-70" style={{ background: "linear-gradient(to right, #11E0FC, #0099FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>{line.sku ?? ""}</span>
         {done ? (
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ width: "32px", height: "32px", color: "#4ade80", flexShrink: 0 }}>
             <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />

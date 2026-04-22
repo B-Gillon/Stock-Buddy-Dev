@@ -172,56 +172,18 @@ export default function MobilePOList({ pos }) {
         <ScannerView onDetected={handleScan} onClose={() => setShowScanner(false)} />
       )}
 
-      {/* Header */}
-      <div className="px-4 pt-5">
-        <div style={{ backgroundColor: "#1f2937", borderRadius: "16px", position: "relative" }} className="text-white px-5 pt-4 pb-5">
-
-          {/* Top row: Dashboard left, Stock Buddy v1.0 right */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => router.push("/mobile")}
-              className="flex items-center gap-1.5 text-gray-400 text-sm active:text-white transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
-              </svg>
-              Dashboard
-            </button>
-            <div className="flex items-center gap-1.5">
-              <span
-                className="text-sm font-semibold"
-                style={{
-                  background: "linear-gradient(to right, #11E0FC, #0099FF)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Stock Buddy
-              </span>
-              <span className="text-xs text-gray-400">v1.0</span>
-            </div>
-          </div>
-
-          {/* Centered title */}
-          <p className="text-center font-bold text-2xl mb-4" style={{ background: "linear-gradient(to right, #11E0FC, #0099FF)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>POs Ready to be Received</p>
-
-          {/* Bottom row: X Open Orders pill on right */}
-          <div className="flex justify-end">
-            <span
-              className="text-xs font-bold"
-              style={{
-                backgroundColor: "#ffffff",
-                color: "#000000",
-                borderRadius: "999px",
-                padding: "5px 12px",
-                letterSpacing: "0.03em",
-              }}
-            >
-              {pos.length} Open {pos.length === 1 ? "Order" : "Orders"}
-            </span>
-          </div>
-
+      {/* Slim header — matches receive screen */}
+      <div className="px-4 pt-2">
+        <div className="flex items-center justify-center" style={{ backgroundColor: "#1f2937", borderRadius: "12px", padding: "8px 20px" }}>
+          <span className="font-bold" style={{
+            fontSize: "22px",
+            background: "linear-gradient(to right, #11E0FC, #0099FF)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>
+            POs Ready to be Received
+          </span>
         </div>
       </div>
 
@@ -243,8 +205,8 @@ export default function MobilePOList({ pos }) {
         </button>
       </div>
 
-      {/* PO cards */}
-      <div className="flex-1 px-4 pt-3 pb-8 space-y-3">
+      {/* PO cards — pb-20 so content clears the fixed button */}
+      <div className="flex-1 px-4 pt-3 pb-20 space-y-3">
         {filtered.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 mx-auto mb-3 opacity-40">
@@ -306,6 +268,18 @@ export default function MobilePOList({ pos }) {
           })
         )}
       </div>
+
+      {/* Return to Dashboard — fixed at bottom */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-4 pt-2" style={{ backgroundColor: "#e5e7eb" }}>
+        <button
+          onClick={() => router.push("/mobile")}
+          className="w-full flex items-center justify-center font-bold text-white active:opacity-80 transition-all"
+          style={{ backgroundColor: "#1f2937", borderRadius: "12px", padding: "12px 20px", fontSize: "20px" }}
+        >
+          ← Return to Dashboard
+        </button>
+      </div>
+
     </div>
   );
 }
