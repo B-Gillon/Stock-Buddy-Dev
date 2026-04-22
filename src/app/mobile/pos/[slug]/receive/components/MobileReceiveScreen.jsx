@@ -2,7 +2,7 @@
 
 // src/app/mobile/pos/[slug]/receive/components/MobileReceiveScreen.jsx
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
@@ -33,121 +33,9 @@ function Toast({ message, type = "info", onDone }) {
   );
 }
 
-// ─── Scanner overlay ──────────────────────────────────────────────────────────
-
-function ScannerView({ onDetected, onClose }) {
-  const videoRef = useRef(null);
-  const readerRef = useRef(null);
-  const animFrameRef = useRef(null);
-  const streamRef = useRef(null);
-  const [cameraError, setCameraError] = useState(null);
-  const [torchOn, setTorchOn] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    async function startScanner() {
-      try {
-        // Always request rear camera via facingMode first — this also triggers
-        // the Android permission prompt before any enumeration happens.
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        });
-        if (!active) { stream.getTracks().forEach((t) => t.stop()); return; }
-        streamRef.current = stream;
-
-        const video = videoRef.current;
-        video.srcObject = stream;
-        video.setAttribute("playsinline", "true");
-        await video.play();
-
-        // Use native BarcodeDetector API if available (Android Chrome, Samsung Internet).
-        // Fall back to @zxing for iOS Safari which doesn't support BarcodeDetector.
-        if ("BarcodeDetector" in window) {
-          const detector = new window.BarcodeDetector({
-            formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39", "qr_code", "data_matrix"],
-          });
-          async function tick() {
-            if (!active) return;
-            try {
-              const barcodes = await detector.detect(video);
-              if (barcodes.length > 0 && active) {
-                onDetected(barcodes[0].rawValue);
-                return; // stop scanning after first hit
-              }
-            } catch { /* frame not ready yet */ }
-            animFrameRef.current = requestAnimationFrame(tick);
-          }
-          animFrameRef.current = requestAnimationFrame(tick);
-        } else {
-          // iOS Safari fallback — @zxing
-          const { BrowserMultiFormatReader } = await import("@zxing/library");
-          const reader = new BrowserMultiFormatReader();
-          readerRef.current = reader;
-          reader.decodeFromStream(stream, video, (result, err) => {
-            if (!active) return;
-            if (result) onDetected(result.getText());
-          });
-        }
-      } catch (err) {
-        if (active) setCameraError(err.message || "Camera unavailable");
-      }
-    }
-
-    startScanner();
-
-    return () => {
-      active = false;
-      cancelAnimationFrame(animFrameRef.current);
-      readerRef.current?.reset();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    };
-  }, [onDetected]);
-
-  async function toggleTorch() {
-    const track = streamRef.current?.getVideoTracks?.()?.[0];
-    if (!track) return;
-    try { await track.applyConstraints({ advanced: [{ torch: !torchOn }] }); setTorchOn((v) => !v); } catch {}
-  }
-
-  return (
-    <div className="fixed inset-0 z-40 bg-black flex flex-col">
-      <div className="relative flex-1 overflow-hidden">
-        {cameraError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white gap-4 px-8 text-center">
-            <p className="text-sm opacity-70">Camera unavailable</p>
-            <p className="text-xs opacity-50">{cameraError}</p>
-          </div>
-        ) : (
-          <>
-            <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted autoPlay />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="relative w-64 h-40">
-                {["top-0 left-0", "top-0 right-0", "bottom-0 left-0", "bottom-0 right-0"].map((pos, i) => (
-                  <div key={i} className={`absolute w-8 h-8 border-white border-opacity-80 ${pos} ${i===0?"border-t-2 border-l-2 rounded-tl-md":i===1?"border-t-2 border-r-2 rounded-tr-md":i===2?"border-b-2 border-l-2 rounded-bl-md":"border-b-2 border-r-2 rounded-br-md"}`} />
-                ))}
-              </div>
-            </div>
-            <div className="absolute inset-0 bg-black/40 pointer-events-none" style={{ maskImage: "radial-gradient(ellipse 280px 180px at center, transparent 0%, black 100%)", WebkitMaskImage: "radial-gradient(ellipse 280px 180px at center, transparent 0%, black 100%)" }} />
-          </>
-        )}
-      </div>
-      <div className="bg-black px-5 py-5 flex items-center justify-between safe-area-bottom">
-        <button onClick={onClose} className="text-white text-sm font-medium opacity-70 active:opacity-100">Cancel</button>
-        <p className="text-white text-xs opacity-50">Point camera at barcode</p>
-        <button onClick={toggleTorch} className="text-white opacity-70 active:opacity-100">
-          <svg xmlns="http://www.w3.org/2000/svg" fill={torchOn ? "currentColor" : "none"} viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" className="w-6 h-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ─── Receive form (full-screen when expanded) ─────────────────────────────────
 
-function ReceiveForm({ line, onSave, onScan }) {
+function ReceiveForm({ line, onSave }) {
   const remaining = line.orderQtyUnits - line.receivedQtyUnits;
   const alreadyDone = remaining <= 0;
   const [qty, setQty] = useState(remaining === 1 ? "1" : "");
@@ -187,14 +75,6 @@ function ReceiveForm({ line, onSave, onScan }) {
     onSave({ line, qty: parsedQty, notes: "", andNext: false });
     setQty("");
     setError(null);
-  }
-
-  function handleScan() {
-    if (isValid) {
-      onSave({ line, qty: parsedQty, notes: "", andNext: false, thenScan: true });
-    } else {
-      onScan();
-    }
   }
 
   if (alreadyDone) {
@@ -257,19 +137,12 @@ function ReceiveForm({ line, onSave, onScan }) {
         </button>
       )}
 
-      {/* Save / Scan */}
-      <div className="flex gap-2">
-        <button onClick={handleSave} disabled={!isValid}
-          className={`flex-1 font-bold transition-all ${isValid ? "active:opacity-80" : "opacity-40 cursor-not-allowed"}`}
-          style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "24px", padding: "14px 0", borderRadius: "14px" }}>
-          Save
-        </button>
-        <button onClick={handleScan}
-          className="flex-1 font-bold transition-all active:opacity-80"
-          style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "24px", padding: "14px 0", borderRadius: "14px" }}>
-          Scan
-        </button>
-      </div>
+      {/* Save */}
+      <button onClick={handleSave} disabled={!isValid}
+        className={`w-full font-bold transition-all ${isValid ? "active:opacity-80" : "opacity-40 cursor-not-allowed"}`}
+        style={{ backgroundColor: "#e5e7eb", color: "#1f2937", fontSize: "24px", padding: "14px 0", borderRadius: "14px" }}>
+        Save
+      </button>
     </div>
   );
 }
@@ -316,30 +189,27 @@ function ItemRow({ line, onSelect }) {
 
   return (
     <button
-      className="flex items-center gap-4 w-full text-left"
+      className="w-full text-left"
       style={{ backgroundColor: "#4b5563", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 16px" }}
       onClick={() => onSelect(line)}
     >
-      <div className="rounded-lg flex-shrink-0 overflow-hidden" style={{ width: "48px", height: "48px", backgroundColor: "rgba(255,255,255,0.1)" }}>
-        {(line.variantImageSrc || line.productImageSrc) ? (
-          <img src={line.variantImageSrc || line.productImageSrc} alt={line.displayTitle || line.productTitle} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-gray-400">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-2xl font-medium text-white">{line.displayTitle || line.productTitle}</p>
+          {line.sku && <p className="text-xl text-white mt-0.5 opacity-70">{line.sku}</p>}
+        </div>
+        <div className="flex-shrink-0 flex flex-col items-end gap-1">
+          {done ? (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ width: "36px", height: "36px", color: "#4ade80" }}>
+              <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
             </svg>
-          </div>
-        )}
+          ) : (
+            <span className="font-bold text-white" style={{ fontSize: "22px" }}>
+              {line.receivedQtyUnits}/{line.orderQtyUnits}
+            </span>
+          )}
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-2xl font-medium text-white">{line.displayTitle || line.productTitle}</p>
-        {line.sku && <p className="text-xl text-white mt-0.5">{line.sku}</p>}
-      </div>
-      {done && (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="flex-shrink-0" style={{ width: "44px", height: "44px", color: "#4ade80" }}>
-          <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
-        </svg>
-      )}
     </button>
   );
 }
@@ -350,32 +220,14 @@ export default function MobileReceiveScreen({ po, initialLines }) {
   const router = useRouter();
   const [lines, setLines] = useState(initialLines);
   const [selectedLine, setSelectedLine] = useState(null);
-  const [showScanner, setShowScanner] = useState(false);
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
-  const lastScanRef = useRef({ barcode: null, lineId: null, at: 0 });
 
   function showToast(message, type = "info") {
     setToast({ message, type, key: Date.now() });
   }
 
-  const handleBarcode = useCallback((barcode) => {
-    const match = lines.find((l) => l.barcode && l.barcode.toLowerCase() === barcode.toLowerCase());
-    if (!match) { showToast(`No item found for barcode: ${barcode}`, "error"); return; }
-    const remaining = match.orderQtyUnits - match.receivedQtyUnits;
-    const now = Date.now();
-    const last = lastScanRef.current;
-    if (last.barcode === barcode && last.lineId === match.id && now - last.at < 3000 && remaining > 0) {
-      lastScanRef.current = { barcode, lineId: match.id, at: now };
-      doSave({ line: match, qty: 1, notes: "", andNext: false, autoIncrement: true });
-      return;
-    }
-    lastScanRef.current = { barcode, lineId: match.id, at: now };
-    if (remaining <= 0) { showToast(`${match.productTitle} — already fully received`, "warning"); return; }
-    setShowScanner(false);
-    setSelectedLine(match);
-  }, [lines]);
 
   const filteredLines = search.trim()
     ? lines.filter((l) =>
@@ -385,7 +237,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
       )
     : lines;
 
-  async function doSave({ line, qty, notes, andNext, autoIncrement = false, thenScan = false }) {
+  async function doSave({ line, qty, notes, andNext, autoIncrement = false }) {
     setSaving(true);
     const newReceived = line.receivedQtyUnits + qty;
     const newRemaining = line.orderQtyUnits - newReceived;
@@ -412,7 +264,6 @@ export default function MobileReceiveScreen({ po, initialLines }) {
         return updatedLines;
       });
       setSelectedLine((prev) => prev && prev.id === line.id ? { ...prev, receivedQtyUnits: confirmedReceived } : prev);
-      if (thenScan) setShowScanner(true);
       if (andNext) setSelectedLine(null);
     } catch (err) {
       showToast(err.message || "Could not save — try again", "error");
@@ -426,8 +277,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
     return (
       <>
         {toast && <Toast key={toast.key} message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
-        {showScanner && <ScannerView onDetected={handleBarcode} onClose={() => setShowScanner(false)} />}
-
+        
         <div className="fixed inset-0 flex flex-col" style={{ backgroundColor: "#e5e7eb" }}>
 
           {/* Slim header — PO# same size as normal header */}
@@ -469,7 +319,6 @@ export default function MobileReceiveScreen({ po, initialLines }) {
               <ReceiveForm
                 line={selectedLine}
                 onSave={(args) => doSave(args)}
-                onScan={() => setShowScanner(true)}
               />
             </div>
           </div>
@@ -494,8 +343,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
   return (
     <>
       {toast && <Toast key={toast.key} message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
-      {showScanner && <ScannerView onDetected={handleBarcode} onClose={() => setShowScanner(false)} />}
-
+      
       <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#e5e7eb" }}>
 
         {/* Slim header — matches expanded item view exactly */}
@@ -529,9 +377,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 bg-white border border-gray-200 text-gray-900 placeholder-gray-400 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           />
-          <button onClick={() => setShowScanner(true)} disabled={saving} className="text-white rounded-xl px-4 py-3 font-semibold text-base active:opacity-80 transition-all shadow-sm flex-shrink-0" style={{ backgroundColor: "#0099FF" }}>
-            Scan
-          </button>
+
         </div>
 
         {/* Item cards */}
