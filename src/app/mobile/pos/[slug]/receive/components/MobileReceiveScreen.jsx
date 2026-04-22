@@ -158,22 +158,22 @@ function ProgressRing({ received, total }) {
     <div className="flex items-center gap-3">
       <div className="relative" style={{ width: "72px", height: "72px" }}>
         <svg width="72" height="72" style={{ transform: "rotate(-90deg)" }} viewBox="0 0 64 64">
-          <circle cx="32" cy="32" r={radius} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="6" />
+          <circle cx="32" cy="32" r={radius} fill="none" stroke="#e5e7eb" strokeWidth="6" />
           <circle
             cx="32" cy="32" r={radius} fill="none"
-            stroke={pct === 100 ? "#4ade80" : "#ffffff"}
+            stroke={pct === 100 ? "#16a34a" : "#4b5563"}
             strokeWidth="6" strokeLinecap="round"
             strokeDasharray={circumference} strokeDashoffset={offset}
             style={{ transition: "stroke-dashoffset 0.5s ease" }}
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="font-bold text-white" style={{ fontSize: "14px" }}>{Math.round(pct)}%</span>
+          <span className="font-bold text-gray-700" style={{ fontSize: "14px" }}>{Math.round(pct)}%</span>
         </div>
       </div>
       <div>
-        <p className="text-white font-semibold" style={{ fontSize: "20px" }}>{received} of {total} units received</p>
-        <p className="text-gray-400" style={{ fontSize: "16px" }}>
+        <p className="text-gray-800 font-semibold" style={{ fontSize: "20px" }}>{received} of {total} units received</p>
+        <p className="text-gray-500" style={{ fontSize: "16px" }}>
           {pct === 100 ? "Fully received" : `${total - received} remaining`}
         </p>
       </div>
@@ -189,26 +189,24 @@ function ItemRow({ line, onSelect }) {
 
   return (
     <button
-      className="w-full text-left"
-      style={{ backgroundColor: "#4b5563", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 16px" }}
+      className="w-full text-left flex flex-col"
+      style={{ backgroundColor: "#4b5563", border: "1px solid rgba(255,255,255,0.08)", boxShadow: "0 2px 8px rgba(0,0,0,0.3)", borderRadius: "12px", padding: "12px 16px", minHeight: "80px" }}
       onClick={() => onSelect(line)}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-2xl font-medium text-white">{line.displayTitle || line.productTitle}</p>
-          {line.sku && <p className="text-xl text-white mt-0.5 opacity-70">{line.sku}</p>}
-        </div>
-        <div className="flex-shrink-0 flex flex-col items-end gap-1">
-          {done ? (
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ width: "36px", height: "36px", color: "#4ade80" }}>
-              <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
-            </svg>
-          ) : (
-            <span className="font-bold text-white" style={{ fontSize: "22px" }}>
-              {line.receivedQtyUnits}/{line.orderQtyUnits}
-            </span>
-          )}
-        </div>
+      {/* Title — top, full width, wraps freely */}
+      <p className="text-2xl font-medium text-white leading-snug flex-1">{line.displayTitle || line.productTitle}</p>
+      {/* Bottom row — SKU left, qty/check right */}
+      <div className="flex items-end justify-between mt-2">
+        <span className="text-xl text-white opacity-70">{line.sku ?? ""}</span>
+        {done ? (
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style={{ width: "32px", height: "32px", color: "#4ade80", flexShrink: 0 }}>
+            <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
+          </svg>
+        ) : (
+          <span className="font-bold text-white flex-shrink-0" style={{ fontSize: "22px" }}>
+            {line.receivedQtyUnits}/{line.orderQtyUnits}
+          </span>
+        )}
       </div>
     </button>
   );
@@ -296,7 +294,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
           </div>
 
           {/* White card — item title + form — takes all space between header and footer */}
-          <div className="flex-1 flex flex-col overflow-hidden px-4 py-3">
+          <div className="flex-1 flex flex-col overflow-hidden px-4 py-3 pb-20">
             <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-2xl px-4 py-3 shadow-sm" style={{ border: "1px solid #e5e7eb" }}>
               {/* Item title bar */}
               <div className="flex items-center gap-3 mb-3">
@@ -323,8 +321,8 @@ export default function MobileReceiveScreen({ po, initialLines }) {
             </div>
           </div>
 
-          {/* Bottom card — Return to Item List */}
-          <div className="px-4 pb-4">
+          {/* Return to Item List — fixed at bottom */}
+          <div className="fixed bottom-0 left-0 right-0 px-4 pb-4 pt-2" style={{ backgroundColor: "#e5e7eb" }}>
             <button
               onClick={() => setSelectedLine(null)}
               className="w-full flex items-center justify-center font-bold text-white active:opacity-80 transition-all"
@@ -363,7 +361,7 @@ export default function MobileReceiveScreen({ po, initialLines }) {
 
         {/* Progress ring tile */}
         <div className="px-4 pt-3">
-          <div className="px-4 py-3" style={{ backgroundColor: "#374151", borderRadius: "14px", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div className="px-4 py-3" style={{ backgroundColor: "#ffffff", borderRadius: "14px", border: "1px solid #e5e7eb", boxShadow: "0 1px 4px rgba(0,0,0,0.08)" }}>
             <ProgressRing received={po.receivedUnits ?? 0} total={po.totalUnits ?? 0} />
           </div>
         </div>
@@ -380,15 +378,15 @@ export default function MobileReceiveScreen({ po, initialLines }) {
 
         </div>
 
-        {/* Item cards */}
-        <div className="px-4 pt-2 pb-4 space-y-2">
+        {/* Item cards — pb-20 so content clears the fixed button */}
+        <div className="px-4 pt-2 pb-20 space-y-2">
           {filteredLines.map((line) => (
             <ItemRow key={line.id} line={line} onSelect={setSelectedLine} />
           ))}
         </div>
 
-        {/* Return to PO List — matches Return to Item List button */}
-        <div className="px-4 pb-4">
+        {/* Return to PO List — fixed at bottom */}
+        <div className="fixed bottom-0 left-0 right-0 px-4 pb-4 pt-2" style={{ backgroundColor: "#e5e7eb" }}>
           <button
             onClick={() => router.push("/mobile/pos")}
             className="w-full flex items-center justify-center font-bold text-white active:opacity-80 transition-all"
