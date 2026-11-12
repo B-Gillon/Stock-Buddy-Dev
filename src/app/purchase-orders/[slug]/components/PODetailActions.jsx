@@ -22,7 +22,7 @@ function ReleaseConfirmModal({ isOpen, onClose, onConfirm, po, isReleasing }) {
           <h2 className="text-base font-semibold text-gray-900">Release Purchase Order</h2>
           <p className="mt-1 text-sm text-gray-500">
             This will mark <span className="font-medium text-gray-800">{po.po_number}</span> as
-            released and push incoming inventory quantities to Shopify.
+            released and track its incoming inventory quantities in Stock Buddy.
           </p>
         </div>
         <div className="px-6 py-4">
@@ -30,7 +30,7 @@ function ReleaseConfirmModal({ isOpen, onClose, onConfirm, po, isReleasing }) {
             <p className="font-medium">What happens when you release:</p>
             <ul className="mt-1.5 list-inside list-disc space-y-1 text-blue-700">
               <li>PO status changes from Draft → Released</li>
-              <li>Incoming quantities are sent to Shopify for each line item</li>
+              <li>Incoming quantities are tracked in Stock Buddy for each line item (Shopify is updated when you receive)</li>
               <li>PO email is sent to the supplier</li>
             </ul>
           </div>
@@ -71,7 +71,7 @@ function CancelConfirmModal({ isOpen, onClose, onConfirm, po, isCancelling }) {
             <p className="font-medium">What happens when you cancel:</p>
             <ul className="mt-1.5 list-inside list-disc space-y-1 text-red-700">
               <li>PO status changes to Cancelled</li>
-              <li>Any incoming quantities pushed to Shopify will be zeroed out</li>
+              <li>Any remaining incoming quantities will no longer count toward incoming inventory</li>
               <li>This action cannot be undone</li>
             </ul>
           </div>
