@@ -82,7 +82,7 @@ function EditableCell({ colKey, value, onChange, currencySymbol }) {
         value={value ?? ""}
         onChange={(e) => onChange(colKey, e.target.value)}
         className={`w-full border border-indigo-300 rounded py-0.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white ${isCurrency ? "pl-5 pr-2" : "px-2"}`}
-        style={{ minWidth: "70px" }}
+        style={{ minWidth: "70px", ...(isCurrency ? { paddingLeft: "20px" } : {}) }}
       />
     </div>
   );
