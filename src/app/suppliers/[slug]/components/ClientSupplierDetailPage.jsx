@@ -386,7 +386,7 @@ function ProductDataTab({ supplier, products, router, copyToClipboard, shopDomai
               </td>
             </tr>
           ) : products.map((p) => (
-            <tr key={p.id} onClick={() => router.push(`/products/${p.id}`)}
+            <tr key={p.id} onClick={() => router.push(`/product/${p.shopify_product_id}`)}
               className="border-b border-gray-300 hover:bg-gray-50 cursor-pointer" style={{ height: "44px" }}>
               {visibleCols.map((col) => {
                 if (col.key === "image") return (
