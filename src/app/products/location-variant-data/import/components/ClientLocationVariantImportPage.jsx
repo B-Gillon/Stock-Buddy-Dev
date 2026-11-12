@@ -164,7 +164,7 @@ export default function ClientLocationVariantImportPage({ locations }) {
       const parsed = parseLocationImportCSV(text);
       if (parsed.rows.length === 0) throw new Error("The CSV file contains no data rows.");
       setImportData(parsed, unknownHandling, locationId, selectedLocation?.name ?? "");
-      router.push("/products/location-variant-data/import/review");
+      router.push("/products/location-variant-data/review");
     } catch (err) {
       setError(err.message);
       setProcessing(false);
