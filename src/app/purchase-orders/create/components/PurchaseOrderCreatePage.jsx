@@ -339,7 +339,7 @@ export default function PurchaseOrderCreatePage({
   }
 
   async function handleSaveDraft() {
-    if (!validateAll()) { showToast("Please fix validation errors before saving.", "error"); return; }
+    if (!validateAll()) { showToast("Please fix the highlighted fields before saving.", "error"); return; }
     setSaving(true);
     try {
       const payload = {
@@ -501,7 +501,7 @@ export default function PurchaseOrderCreatePage({
               )}
 
               {/* Ship-To Location */}
-              {fieldsLocked ? (
+              {editMode ? (
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ship-To Location</p>
                   <p className="text-sm text-gray-900 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">
