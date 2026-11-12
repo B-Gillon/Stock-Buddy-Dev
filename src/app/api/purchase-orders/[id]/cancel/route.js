@@ -74,8 +74,11 @@ export async function POST(request, { params }) {
   });
 
   // ── Send cancellation email (non-blocking — don't fail the cancel if email fails) ──
+  // Skip for drafts: the supplier never received the PO, so there is nothing to cancel.
   try {
-    await sendPOEmail(id, { isCancellation: true });
+    if (po.status !== 'draft') {
+      await sendPOEmail(id, { isCancellation: true });
+    }
   } catch (emailErr) {
     console.error('Cancellation email error (non-fatal):', emailErr.message);
     // Log to error_log but do not return an error to the client
