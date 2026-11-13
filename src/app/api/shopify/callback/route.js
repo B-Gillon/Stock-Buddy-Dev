@@ -31,8 +31,9 @@ const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
 
 // The app handle as it appears in the Shopify Admin URL.
 // Found at: admin.shopify.com/store/{shop}/apps/{APP_HANDLE}
-// Set SHOPIFY_APP_HANDLE to override (e.g. for a separate dev app); defaults to the existing app.
-const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE || "stock-buddy-1";
+// Required: SHOPIFY_APP_HANDLE must be set. There is deliberately no default, so this
+// deployment can never fall back to another app's handle.
+const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE;
 
 /**
  * Validate that the shop param looks like a legitimate Shopify domain.
@@ -137,6 +138,8 @@ export async function GET(request) {
 
   try {
     // 4. Exchange code for permanent access token
+    if (!APP_HANDLE) throw new Error("SHOPIFY_APP_HANDLE is not set.");
+
     console.log("[Callback] Exchanging code for token...");
     const accessToken = await exchangeCodeForToken(shop, code);
     console.log("[Callback] Token exchange successful.");
