@@ -9,17 +9,20 @@ import { usePathname } from "next/navigation";
 
 
 const NAV_ITEMS = [
-  { label: "Inventory",  href: "/inventory"       },
-  { label: "Locations",  href: "/locations"       },
-  { label: "Suppliers",  href: "/suppliers"       },
-  { label: "Vendors",    href: "/vendors"         },
-  { label: "POs",        href: "/purchase-orders" },
+  { label: "Inventory",       href: "/inventory"       },
+  { label: "Locations",       href: "/locations"       },
+  { label: "Purchase Orders", href: "/purchase-orders" },
 ];
 
 const PRODUCTS_DROPDOWN = [
   { label: "All Products",          href: "/products" },
   { label: "Supplier Product Data", href: "/products/supplier-variant-data" },
   { label: "Location Product Data", href: "/products/location-variant-data" },
+];
+
+const PARTNERS_DROPDOWN = [
+  { label: "Suppliers", href: "/suppliers" },
+  { label: "Vendors",   href: "/vendors"   },
 ];
 
 const gradientStyle = {
@@ -29,7 +32,7 @@ const gradientStyle = {
   backgroundClip: "text",
 };
 
-function ProductsDropdown() {
+function NavDropdown({ label, items, activePrefixes }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const pathname = usePathname();
@@ -46,19 +49,19 @@ function ProductsDropdown() {
     setOpen(false);
   }, [pathname]);
 
-  const isProductsActive = pathname?.startsWith("/products");
+  const isGroupActive = activePrefixes.some((p) => pathname?.startsWith(p));
 
   return (
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
         className={`flex items-center gap-1 px-2 py-1.5 text-sm font-medium rounded-md transition ${
-          isProductsActive
+          isGroupActive
             ? "text-white bg-white/20"
             : "text-gray-200 hover:text-white hover:bg-white/10"
         }`}
       >
-        Products
+        {label}
         <svg
           className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
           fill="none"
@@ -71,7 +74,7 @@ function ProductsDropdown() {
 
       {open && (
         <div className="absolute left-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1 overflow-hidden">
-          {PRODUCTS_DROPDOWN.map((item) => {
+          {items.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
@@ -152,7 +155,8 @@ export default function Header({
 
           {/* Nav — always hugs the bottom of the header */}
           <nav className="flex items-center gap-0.5">
-            <ProductsDropdown />
+            <NavDropdown label="Products" items={PRODUCTS_DROPDOWN} activePrefixes={["/products"]} />
+            <NavDropdown label="Partners" items={PARTNERS_DROPDOWN} activePrefixes={["/suppliers", "/vendors"]} />
 
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.href;

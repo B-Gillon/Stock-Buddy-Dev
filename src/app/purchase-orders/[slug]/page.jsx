@@ -11,6 +11,7 @@ import Badge from "@/shared/components/ui/Badge";
 import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import PODetailActions from "./components/PODetailActions";
+import POHistoryTable from "./components/POHistoryTable";
 
 function fmtDate(val) {
   if (!val) return "—";
@@ -21,9 +22,11 @@ function fmtDate(val) {
 
 export const dynamic = "force-dynamic";
 
-export default async function PurchaseOrderDetailPage({ params }) {
+export default async function PurchaseOrderDetailPage({ params, searchParams }) {
   const { slug } = await params;
   const poNumber = decodeURIComponent(slug);
+  const { view: viewParam } = (await searchParams) ?? {};
+  const view = viewParam === "history" ? "history" : "details";
 
   const headersList = await headers();
   const tenantId    = await getTenantIdFromHeaders(headersList);
@@ -106,6 +109,18 @@ export default async function PurchaseOrderDetailPage({ params }) {
     location_zip:       po.location?.zip ?? "",
   };
 
+  let history = [];
+  if (view === "history") {
+    const { data: historyRows, error: historyError } = await supabase
+      .from("po_activity_log")
+      .select("id, action, comments, user_name, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("po_id", po.id)
+      .order("created_at", { ascending: false });
+    if (historyError) throw new Error(historyError.message);
+    history = historyRows ?? [];
+  }
+
   const totalUnits = flatLines.reduce((sum, l) => sum + (l.order_qty_units ?? 0), 0);
   const totalCost  = flatLines.reduce((sum, l) => sum + (parseFloat(l.extended_cost) || 0), 0);
 
@@ -115,9 +130,8 @@ export default async function PurchaseOrderDetailPage({ params }) {
 
         <PageHeader
           backHref="/purchase-orders"
-          title={flatPO.po_number}
           badge={<Badge status={flatPO.status} />}
-          actions={<PODetailActions po={flatPO} slug={slug} />}
+          actions={<PODetailActions po={flatPO} slug={slug} view={view} />}
         />
 
         <div className="grid grid-cols-4 gap-4">
@@ -160,6 +174,9 @@ export default async function PurchaseOrderDetailPage({ params }) {
           </div>
         )}
 
+        {view === "history" ? (
+          <POHistoryTable rows={history} />
+        ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <h2 className="text-sm font-semibold text-gray-800">Line Items<span className="ml-2 text-xs font-normal text-gray-400">({flatLines.length})</span></h2>
@@ -219,6 +236,7 @@ export default async function PurchaseOrderDetailPage({ params }) {
             )}
           </table>
         </div>
+        )}
 
       </div>
     </AppLayout>

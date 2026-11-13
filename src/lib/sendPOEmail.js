@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabaseClient';
  *
  * @param {string} poId
  * @param {{ isResend?: boolean, isCancellation?: boolean }} options
- * @returns {{ success: boolean, error?: string }}
+ * @returns {{ success: boolean, error?: string, notes?: string }}  notes = who it was emailed to, and how
  */
 export async function sendPOEmail(poId, { isResend = false, isCancellation = false } = {}) {
 
@@ -141,7 +141,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
       return { success: false, error: `Email failed: ${err.message}` };
     }
 
-    return { success: true };
+    return { success: true, notes: describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments: false }) };
   }
 
   // ── Fetch lines (for normal / resend emails) ───────────────────────────────
@@ -327,5 +327,34 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     return { success: false, error: `Email failed: ${err.message}` };
   }
 
-  return { success: true };
+  return { success: true, notes: describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments: true }) };
+}
+
+/**
+ * Human-readable summary of who a PO email went to and how, for the PO History notes.
+ * e.g. "Emailed to buyer@acme.com (PDF + CSV); cc: ops@acme.com"
+ */
+function describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments }) {
+  const split = (s) => (s ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+
+  if (!hasRecipients) {
+    return `Emailed to ${fallbackEmail}${withAttachments ? ' (PDF + CSV)' : ''}`;
+  }
+
+  const parts = [];
+  for (const r of recipients) {
+    const to = split(r.to_emails);
+    if (to.length === 0) continue;
+    const cc  = split(r.cc_emails);
+    const bcc = split(r.bcc_emails);
+    let text = `Emailed to ${to.join(', ')}`;
+    if (withAttachments) {
+      const files = [r.send_pdf && 'PDF', r.send_csv && 'CSV'].filter(Boolean);
+      text += files.length ? ` (${files.join(' + ')})` : ' (no attachments)';
+    }
+    if (cc.length)  text += `; cc: ${cc.join(', ')}`;
+    if (bcc.length) text += `; bcc: ${bcc.join(', ')}`;
+    parts.push(text);
+  }
+  return parts.join(' | ');
 }

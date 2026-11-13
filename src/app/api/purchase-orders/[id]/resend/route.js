@@ -45,15 +45,15 @@ export async function POST(request, { params }) {
         context: { poId: id },
       });
       await logPOActivity({
-        poId: id, tenantId, action: 'error',
+        poId: id, tenantId, action: 'error', request,
         comments: `Email send failed: ${result.error}`,
       });
       return NextResponse.json({ success: false, error: result.error }, { status: 500 });
     }
 
     await logPOActivity({
-      poId: id, tenantId, action: 'resent',
-      comments: toComment || null,
+      poId: id, tenantId, action: 'resent', request,
+      comments: result.notes || toComment || null,
     });
 
     return NextResponse.json({ success: true });

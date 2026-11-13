@@ -75,7 +75,7 @@ export async function POST(request) {
       throw new Error(`Failed to save line items: ${linesError.message}`);
     }
 
-    await logPOActivity({ poId: po.id, tenantId, action: 'created' });
+    await logPOActivity({ poId: po.id, tenantId, action: 'created', request });
 
     await supabase.from('settings').upsert(
       { tenant_id: tenantId, key: 'po_next_number', value: String(poNextNumber + 1), updated_at: new Date().toISOString() },

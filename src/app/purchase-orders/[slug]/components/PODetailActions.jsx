@@ -87,7 +87,7 @@ function CancelConfirmModal({ isOpen, onClose, onConfirm, po, isCancelling }) {
   );
 }
 
-export default function PODetailActions({ po, slug }) {
+export default function PODetailActions({ po, slug, view = "details" }) {
   const router = useRouter();
   const { toast, showToast } = useToast();
   const [showReleaseModal, setShowReleaseModal] = useState(false);
@@ -168,6 +168,16 @@ export default function PODetailActions({ po, slug }) {
         isCancelling={isCancelling}
       />
       <div className="flex items-center gap-2">
+        <Button
+          variant="secondary"
+          onClick={() => router.push(
+            view === "history"
+              ? `/purchase-orders/${slug}`
+              : `/purchase-orders/${slug}?view=history`
+          )}
+        >
+          {view === "history" ? "Line Items" : "History"}
+        </Button>
         {canCancel  && <Button variant="secondary" onClick={() => setShowCancelModal(true)}>Cancel PO</Button>}
         {canEdit    && <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}/edit`)}>Edit</Button>}
         {canResend  && <Button variant="secondary" onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}

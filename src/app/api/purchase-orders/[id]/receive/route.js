@@ -44,12 +44,12 @@ export async function POST(request, { params }) {
       }
     }
 
-    await logPOActivity({ poId, tenantId, action: "edited" });
-
     const allFailed = results.every((r) => !r.success);
     if (allFailed) {
       return NextResponse.json({ success: false, results }, { status: 500 });
     }
+
+    await logPOActivity({ poId, tenantId, action: "received", request });
 
     return NextResponse.json({ success: true, results });
   } catch (err) {

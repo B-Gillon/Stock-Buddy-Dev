@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
 import { sendPOEmail } from '@/lib/sendPOEmail';
+import { logPOActivity } from '@/lib/logPOActivity';
 
 export async function POST(request, { params }) {
   const { id } = await params;
@@ -66,20 +67,18 @@ export async function POST(request, { params }) {
     // Non-fatal — PO is cancelled in DB, log and continue
   }
 
-  // ── Log to po_activity_log ─────────────────────────────────────────────────
-  await supabase.from('po_activity_log').insert({
-    tenant_id: tenantId,
-    po_id:     id,
-    action:    'cancelled',
-  });
-
   // ── Send cancellation email (non-blocking — don't fail the cancel if email fails) ──
   // Skip for drafts: the supplier never received the PO, so there is nothing to cancel.
+  let cancelNotes = 'Draft PO: supplier was not notified';
   try {
     if (po.status !== 'draft') {
-      await sendPOEmail(id, { isCancellation: true });
+      const emailResult = await sendPOEmail(id, { isCancellation: true });
+      cancelNotes = emailResult.success
+        ? (emailResult.notes ?? 'Supplier notified by email')
+        : `Supplier was not notified: ${emailResult.error}`;
     }
   } catch (emailErr) {
+    cancelNotes = `Supplier was not notified: ${emailErr.message}`;
     console.error('Cancellation email error (non-fatal):', emailErr.message);
     // Log to error_log but do not return an error to the client
     await supabase.from('error_log').insert({
@@ -89,6 +88,9 @@ export async function POST(request, { params }) {
       context:   { po_id: id, po_number: po.po_number },
     });
   }
+
+  // ── Log to po_activity_log ─────────────────────────────────────────────────
+  await logPOActivity({ poId: id, tenantId, action: 'cancelled', comments: cancelNotes, request });
 
   return NextResponse.json({ success: true });
 }

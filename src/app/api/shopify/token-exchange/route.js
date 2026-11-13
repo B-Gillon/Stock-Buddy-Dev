@@ -11,7 +11,8 @@
 
 import { NextResponse } from "next/server";
 import { getShopFromSessionToken } from "@/lib/shopify/sessionToken";
-import { exchangeTokenForAccess } from "@/lib/shopify/tokenExchange";
+import { exchangeTokenForAccess, exchangeTokenForOnlineUser } from "@/lib/shopify/tokenExchange";
+import { setUserCookie } from "@/lib/shopify/userCookie";
 import { supabase } from "@/lib/supabaseClient";
 
 export async function POST(request) {
@@ -57,7 +58,18 @@ export async function POST(request) {
     }
 
     console.log("[TokenExchange] Tenant upserted successfully for shop:", shop);
-    return NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true });
+
+    // 5. Record which staff user is using the app (for PO activity history).
+    //    Non-fatal: history falls back to "Unknown user" if this fails.
+    try {
+      const user = await exchangeTokenForOnlineUser(shop, sessionToken);
+      if (user) setUserCookie(response, user);
+    } catch (userErr) {
+      console.warn("[TokenExchange] Could not resolve user:", userErr.message);
+    }
+
+    return response;
 
   } catch (err) {
     console.error("[TokenExchange] Error:", err.message);

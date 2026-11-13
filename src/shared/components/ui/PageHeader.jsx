@@ -21,7 +21,7 @@ export default function PageHeader({ backHref, backLabel = "Back", title, badge,
         >
           ←
         </a>
-        <h1 className="text-lg font-semibold text-gray-900">{title}</h1>
+        {title && <h1 className="text-lg font-semibold text-gray-900">{title}</h1>}
         {badge && badge}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}

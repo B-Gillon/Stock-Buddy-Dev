@@ -5,6 +5,62 @@ import { getTenantId } from '@/lib/tenants';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { logError } from '@/lib/logError';
 
+const MAX_CHANGE_NOTES = 8;
+
+function fmtDay(v) {
+  if (!v) return '—';
+  const [y, m, d] = String(v).substring(0, 10).split('-');
+  return `${m}/${d}/${y}`;
+}
+
+const norm = (v) => (v == null ? '' : String(v).trim());
+const num  = (v) => (v == null || v === '' ? null : Number(v));
+
+/**
+ * Builds a short, readable list of what changed on a PO edit, for the History notes.
+ */
+function describeChanges({ beforeHeader, header, beforeLines, afterLines }) {
+  const changes = [];
+
+  if (norm(beforeHeader?.po_date).substring(0, 10) !== norm(header.po_date).substring(0, 10)) {
+    changes.push(`PO Date: ${fmtDay(beforeHeader?.po_date)} → ${fmtDay(header.po_date)}`);
+  }
+  if (norm(beforeHeader?.expected_date).substring(0, 10) !== norm(header.expected_date).substring(0, 10)) {
+    changes.push(`Expected Date: ${fmtDay(beforeHeader?.expected_date)} → ${fmtDay(header.expected_date)}`);
+  }
+  if (norm(beforeHeader?.notes_internal) !== norm(header.notes_internal)) changes.push('Internal notes updated');
+  if (norm(beforeHeader?.notes_supplier) !== norm(header.notes_supplier)) changes.push('Supplier notes updated');
+
+  if (afterLines) {
+    const before = new Map((beforeLines ?? []).map((l) => [l.variant_id, l]));
+    const after  = new Map(afterLines.map((l) => [l.variant_id, l]));
+    const label  = (l) => l.sku || l.title || 'line';
+
+    for (const [vid, l] of after) {
+      const old = before.get(vid);
+      if (!old) {
+        changes.push(`Added ${label(l)} (qty ${l.order_qty_units ?? 0})`);
+        continue;
+      }
+      if (num(old.order_qty_units) !== num(l.order_qty_units)) {
+        changes.push(`${label(l)}: qty ${old.order_qty_units ?? 0} → ${l.order_qty_units ?? 0}`);
+      }
+      if (num(old.unit_cost) !== num(l.unit_cost)) {
+        changes.push(`${label(l)}: unit cost ${old.unit_cost ?? '—'} → ${l.unit_cost ?? '—'}`);
+      }
+    }
+    for (const [vid, l] of before) {
+      if (!after.has(vid)) changes.push(`Removed ${label(l)}`);
+    }
+  }
+
+  if (changes.length === 0) return 'No changes detected';
+  if (changes.length > MAX_CHANGE_NOTES) {
+    return [...changes.slice(0, MAX_CHANGE_NOTES), `+${changes.length - MAX_CHANGE_NOTES} more changes`].join('; ');
+  }
+  return changes.join('; ');
+}
+
 export async function PATCH(request, { params }) {
   let tenantId = null;
   try {
@@ -13,6 +69,17 @@ export async function PATCH(request, { params }) {
     const { id } = await params;
     const body = await request.json();
     const { header, lines } = body;
+
+    // Snapshot the PO before editing so History can say what changed
+    const { data: beforeHeader } = await supabase
+      .from('purchase_orders')
+      .select('po_date, expected_date, notes_internal, notes_supplier')
+      .eq('id', id)
+      .single();
+    const { data: beforeLines } = await supabase
+      .from('purchase_order_lines')
+      .select('variant_id, sku, title, order_qty_units, unit_cost')
+      .eq('purchase_order_id', id);
 
     const headerUpdate = {
       po_date:        header.po_date,
@@ -64,7 +131,10 @@ export async function PATCH(request, { params }) {
       }
     }
 
-    await logPOActivity({ poId: id, tenantId, action: 'edited' });
+    await logPOActivity({
+      poId: id, tenantId, action: 'edited', request,
+      comments: describeChanges({ beforeHeader, header, beforeLines, afterLines: lines }),
+    });
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {
     await logError({ source: 'api/purchase-orders/[id]/PATCH', error: err, tenantId });

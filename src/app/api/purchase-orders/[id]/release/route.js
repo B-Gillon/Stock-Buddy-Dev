@@ -63,11 +63,17 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, error: "Shopify sync failed — PO rolled back to draft" }, { status: 500 });
     }
 
-    await logPOActivity({ poId, tenantId, action: "released" });
-
     // Send email — must be awaited before returning or Vercel will
     // terminate the function before the email is sent
     const emailResult = await sendPOEmail(poId, { isResend: false });
+
+    await logPOActivity({
+      poId, tenantId, action: "released", request,
+      comments: emailResult.success
+        ? emailResult.notes ?? null
+        : "PO email was not sent",
+    });
+
     if (!emailResult.success) {
       await logError({
         source: "releasePO/sendEmail",
@@ -76,7 +82,7 @@ export async function POST(request, { params }) {
         context: { poId },
       });
       await logPOActivity({
-        poId, tenantId, action: "error",
+        poId, tenantId, action: "error", request,
         comments: `Email send failed: ${emailResult.error}`,
       });
     }
