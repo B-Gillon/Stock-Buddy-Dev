@@ -1,0 +1,18 @@
+# Hourly check of the SFTP files delivered to suppliers (Stock Buddy Dev).
+# Needs two repository secrets: DEV_APP_URL (https://stock-buddy-dev.brandongillon.com) and CRON_SECRET.
+name: SFTP status check
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch: {}
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the status endpoint
+        env:
+          APP_URL: ${{ secrets.DEV_APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body -sS -X POST "$APP_URL/api/cron/sftp-status" \
+            -H "Authorization: Bearer $CRON_SECRET"

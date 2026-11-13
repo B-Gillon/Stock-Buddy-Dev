@@ -103,6 +103,19 @@ export async function testSftpConnection(settings) {
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 
+/** Picks a file name that is not already on the server: name.pdf, name_2.pdf, name_3.pdf ... */
+async function uniqueRemoteName(client, dir, name) {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  let candidate = name;
+  for (let n = 2; await client.exists(remotePath(dir, candidate)); n++) {
+    if (n > 999) throw new Error('Too many files with this name already exist on the SFTP site.');
+    candidate = `${stem}_${n}${ext}`;
+  }
+  return candidate;
+}
+
 /**
  * Uploads PO files. Each file is written under a temporary name and renamed, so the
  * supplier's system never picks up a half-written file, then the size is verified.
@@ -116,12 +129,6 @@ export async function uploadPOFiles(settings, files, { poId, tenantId, supplierI
   const now = () => new Date().toISOString();
 
   const record = async (r) => {
-    if (r.ok) {
-      // A resend replaces the remote file, so stop tracking the earlier copy of the same file
-      await supabase.from('po_sftp_transmissions').delete()
-        .eq('po_id', poId).eq('file_type', r.type).eq('file_name', r.name)
-        .in('status', ['uploaded', 'retrieved']);
-    }
     await supabase.from('po_sftp_transmissions').insert({
       tenant_id: tenantId, po_id: poId, supplier_id: supplierId,
       file_type: r.type, file_name: r.name, remote_dir: r.dir,
@@ -137,12 +144,16 @@ export async function uploadPOFiles(settings, files, { poId, tenantId, supplierI
     await withSftp(settings, async (client) => {
       for (const f of files) {
         const dir = cleanRemoteDir(f.type === 'pdf' ? settings.sftp_pdf_path : settings.sftp_csv_path);
-        const finalPath = remotePath(dir, f.name);
-        const tmpPath = `${finalPath}.tmp`;
         const r = { type: f.type, name: f.name, dir, size: f.buffer.length, ok: false };
+        let tmpPath = null;
         try {
+          // Never overwrite: if the name is taken, add _2, _3, ... before the extension.
+          // A name whose file the supplier already removed is free to use again.
+          const name = await uniqueRemoteName(client, dir, f.name);
+          r.name = name;
+          const finalPath = remotePath(dir, name);
+          tmpPath = `${finalPath}.tmp`;
           await client.put(f.buffer, tmpPath);
-          if (await client.exists(finalPath)) await client.delete(finalPath); // resend replaces the old copy
           await client.rename(tmpPath, finalPath);
           const st = await client.stat(finalPath);
           if (Number(st.size) !== f.buffer.length) {
@@ -151,7 +162,7 @@ export async function uploadPOFiles(settings, files, { poId, tenantId, supplierI
           r.ok = true;
         } catch (err) {
           r.error = String(err?.message ?? err);
-          await client.delete(tmpPath).catch(() => {});
+          if (tmpPath) await client.delete(tmpPath).catch(() => {});
         }
         results.push(r);
       }
@@ -247,4 +258,44 @@ export async function refreshSftpStatus({ poId, tenantId, settings }) {
   }
 
   return { checked: open.length, retrieved: retrieved.length, deleted: deleted.length };
+}
+
+
+/**
+ * Hourly sweep: looks at every file still being tracked, across all suppliers, and records
+ * the ones that are gone. Each supplier's SFTP site is opened once. Nothing is written to a
+ * PO's History unless something changed.
+ */
+export async function refreshAllSftpStatus() {
+  const { getTransmissionSettings } = await import('@/lib/transmissionSettings');
+  const { data: open } = await supabase
+    .from('po_sftp_transmissions')
+    .select('po_id, tenant_id, supplier_id')
+    .in('status', ['uploaded', 'retrieved']);
+
+  const groups = new Map();
+  for (const r of open ?? []) groups.set(`${r.supplier_id}|${r.po_id}`, r);
+
+  const bySupplier = new Map();
+  for (const g of groups.values()) {
+    if (!bySupplier.has(g.supplier_id)) bySupplier.set(g.supplier_id, []);
+    bySupplier.get(g.supplier_id).push(g);
+  }
+
+  const summary = { suppliers: bySupplier.size, pos: groups.size, retrieved: 0, deleted: 0, failed: 0 };
+  for (const [supplierId, pos] of bySupplier) {
+    try {
+      const settings = await getTransmissionSettings(supplierId, { withSecrets: true });
+      if (!settings.sftp_enabled) continue;
+      for (const g of pos) {
+        const res = await refreshSftpStatus({ poId: g.po_id, tenantId: g.tenant_id, settings });
+        summary.retrieved += res.retrieved;
+        summary.deleted += res.deleted;
+      }
+    } catch (err) {
+      summary.failed += 1;
+      console.error(`[sftp] sweep failed for supplier ${supplierId}:`, err.message);
+    }
+  }
+  return summary;
 }
