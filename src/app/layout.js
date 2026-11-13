@@ -23,6 +23,12 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        {/* Shopify App Bridge: must be a plain, synchronous script in <head>, with the
+            api-key meta tag. Provides window.shopify (session tokens, user identity). */}
+        <meta name="shopify-api-key" content={process.env.NEXT_PUBLIC_SHOPIFY_API_KEY} />
+        <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+      </head>
       <body className="bg-gray-100">
 
         {/* Google Analytics */}
