@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminActivityPage({ searchParams }) {
   const { key } = await searchParams;
-  if (key !== process.env.ADMIN_SECRET_KEY) redirect('/dashboard');
+  if (!process.env.ADMIN_SECRET_KEY || key !== process.env.ADMIN_SECRET_KEY) redirect('/dashboard');
 
   // ── Beta Testers ─────────────────────────────────────────────────────────
   const { data: betaTestersRaw } = await supabase
@@ -19,7 +19,7 @@ export default async function AdminActivityPage({ searchParams }) {
   // even if it wasn't explicitly written to beta_testers at install time.
   const { data: tenants } = await supabase
     .from('tenants')
-    .select('id, shop_domain, access_token');
+    .select('id, shop_domain');
 
   const tenantByDomain = {};
   for (const t of (tenants ?? [])) {

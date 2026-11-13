@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 export async function DELETE(request, { params }) {
   const { key } = Object.fromEntries(new URL(request.url).searchParams);
-  if (key !== process.env.ADMIN_SECRET_KEY) {
+  if (!process.env.ADMIN_SECRET_KEY || key !== process.env.ADMIN_SECRET_KEY) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
