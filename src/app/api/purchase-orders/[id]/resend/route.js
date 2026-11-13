@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { getTenantId } from '@/lib/tenants';
 import { sendPOEmail } from '@/lib/sendPOEmail';
 import { logPOActivity } from '@/lib/logPOActivity';
+import { logSftpUpload } from '@/lib/sftp';
 import { logError } from '@/lib/logError';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -37,6 +38,8 @@ export async function POST(request, { params }) {
     // terminate the function before the email is sent
     const result = await sendPOEmail(id, { isResend: true });
 
+    if (result.sftp) await logSftpUpload({ poId: id, tenantId, request, sftp: result.sftp });
+
     if (!result.success) {
       await logError({
         source: 'api/purchase-orders/[id]/resend/email',
@@ -44,10 +47,13 @@ export async function POST(request, { params }) {
         tenantId,
         context: { poId: id },
       });
-      await logPOActivity({
-        poId: id, tenantId, action: 'error', request,
-        comments: `Email send failed: ${result.error}`,
-      });
+      const sendError = result.emailError ?? (result.sftp ? null : result.error);
+      if (sendError) {
+        await logPOActivity({
+          poId: id, tenantId, action: 'error', request,
+          comments: `Send failed: ${sendError}`,
+        });
+      }
       return NextResponse.json({ success: false, error: result.error }, { status: 500 });
     }
 

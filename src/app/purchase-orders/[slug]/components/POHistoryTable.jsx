@@ -3,7 +3,14 @@
 // /src/app/purchase-orders/[slug]/components/POHistoryTable.jsx
 // Activity history for a single PO. Timestamps are shown in the viewer's local time zone.
 
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+
 const ACTION_LABELS = {
+  sftp_uploaded:  "SFTP Uploaded",
+  sftp_retrieved: "SFTP Retrieved",
+  sftp_deleted:   "SFTP Deleted",
+  sftp_failed:    "SFTP Failed",
   created:      "Created",
   edited:       "Edited",
   released:     "Released",
@@ -16,6 +23,10 @@ const ACTION_LABELS = {
 };
 
 const ACTION_STYLES = {
+  sftp_uploaded:  "bg-indigo-50 text-indigo-700",
+  sftp_retrieved: "bg-green-50 text-green-700",
+  sftp_deleted:   "bg-green-50 text-green-700",
+  sftp_failed:    "bg-red-50 text-red-700",
   created:      "bg-gray-100 text-gray-700",
   edited:       "bg-amber-50 text-amber-700",
   released:     "bg-blue-50 text-blue-700",
@@ -42,13 +53,61 @@ function fmtDateTime(iso) {
   return `${parts.month}/${parts.day}/${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod} ${parts.timeZoneName}`;
 }
 
-export default function POHistoryTable({ rows }) {
+export default function POHistoryTable({ rows, poId, openSftpCount = 0 }) {
+  const router = useRouter();
+  const [checking, setChecking] = useState(false);
+  const [checkMsg, setCheckMsg] = useState(null);
+  const autoChecked = useRef(false);
+
+  async function checkSftp() {
+    setChecking(true);
+    setCheckMsg(null);
+    try {
+      const res = await fetch(`/api/purchase-orders/${poId}/sftp-status`, { method: "POST" });
+      const json = await res.json();
+      if (!json.success) {
+        setCheckMsg(`Could not check the SFTP site: ${json.error ?? "unknown error"}`);
+      } else if (json.retrieved || json.deleted) {
+        setCheckMsg("SFTP status updated.");
+        router.refresh();
+      } else {
+        setCheckMsg("No change on the SFTP site yet.");
+      }
+    } catch (err) {
+      setCheckMsg(`Could not check the SFTP site: ${err.message}`);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  // Look at the SFTP site once when the History opens, if files we delivered are still being tracked
+  useEffect(() => {
+    if (openSftpCount > 0 && !autoChecked.current) {
+      autoChecked.current = true;
+      checkSftp();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSftpCount]);
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <h2 className="text-sm font-semibold text-gray-800">
           History<span className="ml-2 text-xs font-normal text-gray-400">({rows.length})</span>
         </h2>
+        {openSftpCount > 0 && (
+          <div className="flex items-center gap-3">
+            {checkMsg && <span className="text-xs text-gray-500">{checkMsg}</span>}
+            <button
+              type="button"
+              onClick={checkSftp}
+              disabled={checking}
+              className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition disabled:opacity-50"
+            >
+              {checking ? "Checking…" : "Check SFTP status"}
+            </button>
+          </div>
+        )}
       </div>
       <table className="w-full text-sm">
         <thead>

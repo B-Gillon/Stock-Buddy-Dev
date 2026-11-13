@@ -38,7 +38,15 @@ export async function POST(request, { params }) {
 
     const hasTo = recipients.some((r) => r.to_emails?.trim());
     if (!hasTo) {
-      return NextResponse.json({ error: "At least one record with a To email address is required." }, { status: 422 });
+      // Email can only be left empty when the supplier is set up to receive POs by SFTP
+      const { data: delivery } = await supabase
+        .from("supplier_transmission_settings")
+        .select("sftp_enabled")
+        .eq("supplier_id", supplierId)
+        .maybeSingle();
+      if (!delivery?.sftp_enabled) {
+        return NextResponse.json({ error: "At least one record with a To email address is required (or turn on SFTP delivery)." }, { status: 422 });
+      }
     }
 
     const { error: deleteError } = await supabase

@@ -4,6 +4,8 @@ import { getTenantId } from '@/lib/tenants';
 import { NextResponse } from 'next/server';
 import { generatePOPdf } from '@/lib/generatePO';
 import { logError } from '@/lib/logError';
+import { getTransmissionSettings } from '@/lib/transmissionSettings';
+import { buildPOFileBase } from '@/lib/poFileName';
 
 export async function GET(request, { params }) {
   let tenantId = null;
@@ -14,7 +16,7 @@ export async function GET(request, { params }) {
 
     const { data: po, error: poError } = await supabase
       .from('purchase_orders')
-      .select(`id, po_number, po_date, expected_date, status, notes_supplier, supplier:suppliers(supplier_name), location:locations(name, address1, address2, city, province, zip, country)`)
+      .select(`id, po_number, po_date, expected_date, status, notes_supplier, supplier:suppliers(id, supplier_name, supplier_number), location:locations(name, address1, address2, city, province, zip, country)`)
       .eq('id', id).single();
 
     if (poError || !po) return NextResponse.json({ error: 'PO not found' }, { status: 404 });
@@ -42,9 +44,14 @@ export async function GET(request, { params }) {
       contact_phone: settings['pdf.contact_phone'],
     }, lines, po.status !== 'released');
 
+    const naming = await getTransmissionSettings(po.supplier?.id);
+    const fileBase = buildPOFileBase(naming.file_name_pattern, {
+      poNumber: po.po_number, supplierNumber: po.supplier?.supplier_number, poDate: po.po_date,
+    });
+
     return new NextResponse(pdfBuffer, {
       status: 200,
-      headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="PO-${po.po_number}.pdf"` },
+      headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${fileBase}.pdf"` },
     });
   } catch (err) {
     await logError({ source: 'api/purchase-orders/[id]/export-pdf', error: err, tenantId });

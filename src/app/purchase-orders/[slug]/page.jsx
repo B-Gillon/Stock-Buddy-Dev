@@ -12,6 +12,7 @@ import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import PODetailActions from "./components/PODetailActions";
 import POHistoryTable from "./components/POHistoryTable";
+import CollapsibleCards from "./components/CollapsibleCards";
 
 function fmtDate(val) {
   if (!val) return "—";
@@ -110,7 +111,16 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
   };
 
   let history = [];
+  let openSftpCount = 0;
   if (view === "history") {
+    const { count } = await supabase
+      .from("po_sftp_transmissions")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("po_id", po.id)
+      .in("status", ["uploaded", "retrieved"]);
+    openSftpCount = count ?? 0;
+
     const { data: historyRows, error: historyError } = await supabase
       .from("po_activity_log")
       .select("id, action, comments, user_name, created_at")
@@ -134,6 +144,14 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
           actions={<PODetailActions po={flatPO} slug={slug} view={view} />}
         />
 
+        <CollapsibleCards
+          summary={[
+            flatPO.supplier_name,
+            flatPO.location_name && `Ship to ${flatPO.location_name}`,
+            `${flatLines.length} line${flatLines.length === 1 ? "" : "s"}`,
+            formatCurrency(totalCost, currencyCode),
+          ].filter(Boolean).join(" · ")}
+        >
         <div className="grid grid-cols-4 gap-4">
           <Card title="PO Info">
             <div className="space-y-1.5 text-sm">
@@ -166,6 +184,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
             </div>
           </Card>
         </div>
+        </CollapsibleCards>
 
         {(flatPO.notes_internal || flatPO.notes_supplier) && (
           <div className="grid grid-cols-2 gap-4">
@@ -175,7 +194,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
         )}
 
         {view === "history" ? (
-          <POHistoryTable rows={history} />
+          <POHistoryTable rows={history} poId={flatPO.id} openSftpCount={openSftpCount} />
         ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">

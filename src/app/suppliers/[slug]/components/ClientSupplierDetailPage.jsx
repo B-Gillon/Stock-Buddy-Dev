@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import Button from "@/shared/components/ui/Button";
 import { useToast } from "@/shared/components/ui/Toast";
+import SupplierDeliverySettings from "./SupplierDeliverySettings";
 
 // ─── Product column definitions ───────────────────────────────────────────────
 
@@ -711,7 +712,8 @@ function TransmissionTab({ supplierId }) {
 
   const handleSave = async () => {
     const hasPrimary = records.some((r) => r.to_emails.trim() !== "");
-    if (!hasPrimary) { showToast("At least one record must have a To email address.", "error"); return; }
+    // No records at all is allowed (the server checks the supplier has SFTP delivery instead)
+    if (records.length > 0 && !hasPrimary) { showToast("At least one record must have a To email address.", "error"); return; }
     setSaving(true);
     try {
       const payload = records.map((r) => ({
@@ -742,6 +744,8 @@ function TransmissionTab({ supplierId }) {
 
   return (
     <div className="space-y-4">
+      <SupplierDeliverySettings supplierId={supplierId} />
+
       <div className="flex items-start justify-between">
         <p className="text-sm text-gray-500 max-w-lg">
           Each record below represents one separate email send. Add multiple addresses per field using commas.

@@ -2,14 +2,20 @@
 import nodemailer from 'nodemailer';
 import { generatePOPdf, generatePOCsv } from '@/lib/generatePO';
 import { supabase } from '@/lib/supabaseClient';
+import { getTransmissionSettings, isSftpReady } from '@/lib/transmissionSettings';
+import { buildPOFileBase } from '@/lib/poFileName';
+import { uploadPOFiles } from '@/lib/sftp';
 
 /**
- * Sends one email per transmission recipient record for the given PO.
- * Falls back to supplier.po_email (with both attachments) if no records exist.
+ * Sends the PO to the supplier: one email per transmission recipient record (falling back to
+ * supplier.po_email with both attachments), and, when the supplier has SFTP set up, the files
+ * are also delivered to their SFTP site.
  *
  * @param {string} poId
  * @param {{ isResend?: boolean, isCancellation?: boolean }} options
- * @returns {{ success: boolean, error?: string, notes?: string }}  notes = who it was emailed to, and how
+ * @returns {{ success: boolean, error?: string, notes?: string, sftp?: object }}
+ *   success is true only if every channel that was attempted worked.
+ *   notes = who it was sent to, and how. sftp = per-file upload results (when SFTP was used).
  */
 export async function sendPOEmail(poId, { isResend = false, isCancellation = false } = {}) {
 
@@ -17,7 +23,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   const { data: po, error: poError } = await supabase
     .from('purchase_orders')
     .select(`
-      id, po_number, po_date, expected_date, status, notes_supplier, ship_to_location_id,
+      id, tenant_id, po_number, po_date, expected_date, status, notes_supplier, ship_to_location_id,
       supplier:suppliers ( id, supplier_name, supplier_number, po_email ),
       location:locations ( name, address1, address2, city, province, zip, country )
     `)
@@ -85,7 +91,12 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   const hasRecipients = recipients && recipients.length > 0;
   const fallbackEmail = po.supplier?.po_email;
 
-  if (!hasRecipients && !fallbackEmail) {
+  // ── Transmission settings (file naming + SFTP) ─────────────────────────────
+  const transmission = await getTransmissionSettings(po.supplier.id, { withSecrets: true });
+  const sftpReady = !isCancellation && isSftpReady(transmission);
+  const hasEmailTarget = hasRecipients || !!fallbackEmail;
+
+  if (!hasEmailTarget && !sftpReady) {
     return { success: false, error: 'No recipient email configured for this supplier' };
   }
 
@@ -260,7 +271,12 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   }
 
   // ── Email boilerplate ──────────────────────────────────────────────────────
-  const filename = `PO-${po.po_number}`;
+  // One naming convention per supplier, shared by the PDF and CSV (no extra "PO-" prefix).
+  const filename = buildPOFileBase(transmission.file_name_pattern, {
+    poNumber:       po.po_number,
+    supplierNumber: po.supplier.supplier_number,
+    poDate:         po.po_date,
+  });
   const subject  = isResend
     ? `Purchase Order ${po.po_number} (Resent)`
     : `Purchase Order ${po.po_number}`;
@@ -289,7 +305,8 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   });
 
   // ── Send emails ────────────────────────────────────────────────────────────
-  try {
+  let emailError = null;
+  if (hasEmailTarget) try {
     if (!hasRecipients) {
       await transporter.sendMail({
         from:        `"Stock Buddy" <${process.env.SMTP_USER}>`,
@@ -324,10 +341,38 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     }
   } catch (err) {
     console.error('Email send error:', err);
-    return { success: false, error: `Email failed: ${err.message}` };
+    emailError = `Email failed: ${err.message}`;
   }
 
-  return { success: true, notes: describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments: true }) };
+  // ── SFTP delivery (independent of email: one failing does not stop the other) ──
+  let sftp = null;
+  if (sftpReady) {
+    const files = [];
+    if (transmission.sftp_send_pdf) files.push({ type: 'pdf', name: `${filename}.pdf`, buffer: pdfBuffer });
+    if (transmission.sftp_send_csv) files.push({ type: 'csv', name: `${filename}.csv`, buffer: csvBuffer });
+    if (files.length > 0) {
+      sftp = await uploadPOFiles(transmission, files, {
+        poId: po.id, tenantId: po.tenant_id, supplierId: po.supplier.id,
+      });
+    }
+  }
+
+  const sftpError = sftp && !sftp.ok
+    ? `SFTP failed: ${sftp.files.filter((f) => !f.ok).map((f) => f.error).join('; ')}`
+    : null;
+
+  const notes = [
+    hasEmailTarget && !emailError
+      ? describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments: true })
+      : null,
+    emailError,
+    sftp ? `SFTP: ${sftp.notes}` : null,
+  ].filter(Boolean).join(' | ');
+
+  if (emailError || sftpError) {
+    return { success: false, error: [emailError, sftpError].filter(Boolean).join(' | '), emailError, notes, sftp };
+  }
+  return { success: true, notes, sftp };
 }
 
 /**

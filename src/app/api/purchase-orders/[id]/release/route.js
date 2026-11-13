@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { pushIncomingToShopify } from "@/lib/sync/po/pushIncoming";
 import { sendPOEmail } from "@/lib/sendPOEmail";
 import { logPOActivity } from "@/lib/logPOActivity";
+import { logSftpUpload } from "@/lib/sftp";
 import { logError } from "@/lib/logError";
 
 export async function POST(request, { params }) {
@@ -69,21 +70,23 @@ export async function POST(request, { params }) {
 
     await logPOActivity({
       poId, tenantId, action: "released", request,
-      comments: emailResult.success
-        ? emailResult.notes ?? null
-        : "PO email was not sent",
+      comments: emailResult.notes || (emailResult.success ? null : "PO was not sent to the supplier"),
     });
 
-    if (!emailResult.success) {
+    if (emailResult.sftp) await logSftpUpload({ poId, tenantId, request, sftp: emailResult.sftp });
+
+    // SFTP problems are already in History as "SFTP Failed"; log an error row only for email/other failures
+    const sendError = emailResult.success ? null : (emailResult.emailError ?? (emailResult.sftp ? null : emailResult.error));
+    if (sendError) {
       await logError({
         source: "releasePO/sendEmail",
-        error: new Error(emailResult.error),
+        error: new Error(sendError),
         tenantId,
         context: { poId },
       });
       await logPOActivity({
         poId, tenantId, action: "error", request,
-        comments: `Email send failed: ${emailResult.error}`,
+        comments: `Send failed: ${sendError}`,
       });
     }
 

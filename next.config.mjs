@@ -11,7 +11,8 @@ const nextConfig = {
     ],
   },
   // Prevent Next.js from bundling pdfkit — it must run as a native Node module
-  serverExternalPackages: ['pdfkit'],
+  // ssh2 (used by ssh2-sftp-client) has optional native bindings, so it is not bundled either
+  serverExternalPackages: ['pdfkit', 'ssh2-sftp-client', 'ssh2'],
 
   // Allow Shopify to embed this app in an iframe, AND allow the app to embed
   // its own routes (e.g. the PDF preview iframe in Settings) via 'self'.

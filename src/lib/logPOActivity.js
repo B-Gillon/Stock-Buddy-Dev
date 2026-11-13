@@ -9,13 +9,14 @@ import { readUserCookie } from '@/lib/shopify/userCookie';
  * @param {object} params
  * @param {string} params.poId
  * @param {string} params.tenantId
- * @param {'created'|'edited'|'released'|'resent'|'received'|'acknowledged'|'cancelled'|'closed'|'error'} params.action
+ * @param {'created'|'edited'|'released'|'resent'|'received'|'acknowledged'|'cancelled'|'closed'|'error'|'sftp_uploaded'|'sftp_retrieved'|'sftp_deleted'|'sftp_failed'} params.action
  * @param {string} [params.comments]   Notes shown in the History table
  * @param {Request} [params.request]   The incoming request; used to record which user acted
+ * @param {string} [params.userName]   Overrides the user (e.g. "System" for automatic checks)
  */
-export async function logPOActivity({ poId, tenantId, action, comments, request }) {
+export async function logPOActivity({ poId, tenantId, action, comments, request, userName }) {
   try {
-    const user = request ? readUserCookie(request) : null;
+    const user = userName ? { name: userName, id: null } : (request ? readUserCookie(request) : null);
     const { error } = await supabase
       .from('po_activity_log')
       .insert({
