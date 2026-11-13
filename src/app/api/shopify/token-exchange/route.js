@@ -64,7 +64,10 @@ export async function POST(request) {
     //    Non-fatal: history falls back to "Unknown user" if this fails.
     try {
       const user = await exchangeTokenForOnlineUser(shop, sessionToken);
-      if (user) setUserCookie(response, user);
+      if (user) {
+        setUserCookie(response, user);
+        console.log("[TokenExchange] User resolved; sb-user cookie set.");
+      }
     } catch (userErr) {
       console.warn("[TokenExchange] Could not resolve user:", userErr.message);
     }

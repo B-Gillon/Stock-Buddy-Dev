@@ -72,11 +72,18 @@ export async function exchangeTokenForOnlineUser(shop, sessionToken) {
     }),
   });
 
-  if (!response.ok) return null;
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    console.warn(`[TokenExchange] Online token exchange failed: ${response.status} ${text.slice(0, 200)}`);
+    return null;
+  }
 
   const data = await response.json();
   const u = data.associated_user;
-  if (!u) return null;
+  if (!u) {
+    console.warn("[TokenExchange] Online token exchange returned no associated_user.");
+    return null;
+  }
 
   const name = [u.first_name, u.last_name].filter(Boolean).join(" ").trim() || u.email || null;
   if (!name) return null;
