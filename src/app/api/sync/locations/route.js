@@ -50,7 +50,7 @@ export async function POST(request) {
   const last_synced_at = new Date().toISOString();
   await supabase.from("sync_status").upsert(
     { sync_type: "locations", last_synced_at, tenant_id: tenantId },
-    { onConflict: "sync_type" }
+    { onConflict: "sync_type,tenant_id" }
   );
 
   if (errors.length > 0) return NextResponse.json({ success: false, results, errors, last_synced_at }, { status: 207 });

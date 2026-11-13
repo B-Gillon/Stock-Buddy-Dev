@@ -34,25 +34,25 @@ export async function POST(request) {
     accessToken: tenant.access_token,
   };
 
-  try { await syncProducts(credentials);        results.products        = "ok"; }
+  try { await syncProducts(credentials, tenantId);        results.products        = "ok"; }
   catch (err) { console.error("syncProducts failed:", err);        errors.push(`products: ${err.message}`);        results.products        = "failed"; await logError({ source: "syncProducts",        error: err, tenantId }); }
 
-  try { await syncVendors(credentials);         results.vendors         = "ok"; }
+  try { await syncVendors(tenantId);            results.vendors         = "ok"; }
   catch (err) { console.error("syncVendors failed:", err);         errors.push(`vendors: ${err.message}`);         results.vendors         = "failed"; await logError({ source: "syncVendors",         error: err, tenantId }); }
 
   try { await syncLocations(tenantId, credentials);      results.locations       = "ok"; }
   catch (err) { console.error("syncLocations failed:", err);       errors.push(`locations: ${err.message}`);       results.locations       = "failed"; await logError({ source: "syncLocations",       error: err, tenantId }); }
 
-  try { await syncInventoryItems(credentials);  results.inventoryItems  = "ok"; }
+  try { await syncInventoryItems(credentials, tenantId);  results.inventoryItems  = "ok"; }
   catch (err) { console.error("syncInventoryItems failed:", err);  errors.push(`inventoryItems: ${err.message}`);  results.inventoryItems  = "failed"; await logError({ source: "syncInventoryItems",  error: err, tenantId }); }
 
-  try { await syncInventoryLevels(credentials); results.inventoryLevels = "ok"; }
+  try { await syncInventoryLevels(credentials, tenantId); results.inventoryLevels = "ok"; }
   catch (err) { console.error("syncInventoryLevels failed:", err); errors.push(`inventoryLevels: ${err.message}`); results.inventoryLevels = "failed"; await logError({ source: "syncInventoryLevels", error: err, tenantId }); }
 
   const last_synced_at = new Date().toISOString();
   await supabase.from("sync_status").upsert(
     { sync_type: "all", last_synced_at, tenant_id: tenantId },
-    { onConflict: "sync_type" }
+    { onConflict: "sync_type,tenant_id" }
   );
 
   if (errors.length > 0) return NextResponse.json({ success: false, results, errors, last_synced_at }, { status: 207 });

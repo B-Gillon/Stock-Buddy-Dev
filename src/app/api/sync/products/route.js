@@ -12,7 +12,7 @@ export async function POST(request) {
   const errors   = [];
 
   // Resolve tenant Shopify credentials
-  let credentials = {};
+  let credentials = null;
   try {
     const { data: tenant } = await supabase
       .from("tenants")
@@ -24,6 +24,14 @@ export async function POST(request) {
     }
   } catch (err) {
     await logError({ source: 'sync/products/tenantLookup', error: err, tenantId });
+  }
+
+  // Never fall back to env-level store credentials: require the tenant's own.
+  if (!credentials) {
+    return NextResponse.json(
+      { success: false, error: "Tenant credentials not found." },
+      { status: 401 }
+    );
   }
 
   try {
