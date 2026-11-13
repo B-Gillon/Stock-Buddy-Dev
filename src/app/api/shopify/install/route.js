@@ -74,7 +74,7 @@ export async function GET(request) {
         `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center;">
           <h2>Access Restricted</h2>
           <p>This app is currently in private beta. Your store has not been approved for access.</p>
-          <p>To request access, visit <a href="https://stock-buddy.brandongillon.com/request-access">stock-buddy.brandongillon.com/request-access</a>.</p>
+          <p>To request access, visit <a href="https://stock-buddy-dev.brandongillon.com/request-access">stock-buddy.brandongillon.com/request-access</a>.</p>
         </body></html>`,
         { status: 403, headers: { 'Content-Type': 'text/html' } }
       );

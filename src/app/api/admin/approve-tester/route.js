@@ -26,7 +26,7 @@ export async function POST(request) {
   if (!subject?.trim())    return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   if (!message?.trim())    return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
 
-  const installUrl = `https://stock-buddy.brandongillon.com/api/shopify/install?shop=${store_url}`;
+  const installUrl = `https://stock-buddy-dev.brandongillon.com/api/shopify/install?shop=${store_url}`;
 
   const bodyParagraphs = message
     .trim()

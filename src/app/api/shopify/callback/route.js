@@ -31,8 +31,8 @@ const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
 
 // The app handle as it appears in the Shopify Admin URL.
 // Found at: admin.shopify.com/store/{shop}/apps/{APP_HANDLE}
-// Update this if the handle changes in the Shopify Dev Dashboard.
-const APP_HANDLE = "stock-buddy-1";
+// Set SHOPIFY_APP_HANDLE to override (e.g. for a separate dev app); defaults to the existing app.
+const APP_HANDLE = process.env.SHOPIFY_APP_HANDLE || "stock-buddy-1";
 
 /**
  * Validate that the shop param looks like a legitimate Shopify domain.

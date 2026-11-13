@@ -149,7 +149,7 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
 // ── Approve Modal ─────────────────────────────────────────────────────────────
 
 function ApproveModal({ tester, accessRequest, adminKey, onClose, onApproved }) {
-  const installUrl = `https://stock-buddy.brandongillon.com/api/shopify/install?shop=${accessRequest?.store_url ?? ''}`;
+  const installUrl = `https://stock-buddy-dev.brandongillon.com/api/shopify/install?shop=${accessRequest?.store_url ?? ''}`;
   const firstName  = (accessRequest?.contact_name ?? tester.contact_name ?? '').split(' ')[0] || 'there';
 
   const approvalBody =

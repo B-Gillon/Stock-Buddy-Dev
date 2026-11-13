@@ -22,7 +22,6 @@ export async function POST(request) {
     tenantId,
     shop_domain: tenant?.shop_domain,
     has_token: !!tenant?.access_token,
-    token_prefix: tenant?.access_token?.slice(0, 10),
     tenantError: tenantError?.message,
   });
 
