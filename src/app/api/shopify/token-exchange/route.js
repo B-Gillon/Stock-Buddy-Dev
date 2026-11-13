@@ -34,7 +34,7 @@ export async function POST(request) {
     // 3. Exchange session token for offline access token
     console.log("[TokenExchange] Exchanging token for shop:", shop);
     const accessToken = await exchangeTokenForAccess(shop, sessionToken);
-    console.log("[TokenExchange] Token exchange successful, token prefix:", accessToken.slice(0, 10));
+    console.log("[TokenExchange] Token exchange successful.");
 
     // 4. Upsert tenant with fresh access token
     const now = new Date().toISOString();
