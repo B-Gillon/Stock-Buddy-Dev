@@ -74,12 +74,14 @@ export default async function AcknowledgePage({ params }) {
         <div className="rounded-lg border border-gray-200 bg-white p-5">
           {po.retailer && <p className="text-xs uppercase tracking-wide text-gray-500">{po.retailer}</p>}
           <h1 className="mt-1 text-xl font-semibold text-gray-900">Purchase Order {po.number}</h1>
-          <dl className="mt-4 space-y-3 text-sm">
-            <div><dt className="text-gray-500">Supplier</dt><dd className="text-gray-900">{po.supplierName}</dd></div>
-            <div><dt className="text-gray-500">PO create date</dt><dd className="text-gray-900">{day(po.date) || '—'}</dd></div>
+          <dl className="mt-4 grid grid-cols-2 gap-x-6 text-sm">
+            <div className="space-y-3">
+              <div><dt className="text-gray-500">Supplier</dt><dd className="text-gray-900">{po.supplierName}</dd></div>
+              <div><dt className="text-gray-500">PO Create Date</dt><dd className="text-gray-900">{day(po.date) || '—'}</dd></div>
+            </div>
             {po.shipTo && (
               <div>
-                <dt className="text-gray-500">Ship to</dt>
+                <dt className="text-gray-500">Ship To</dt>
                 <dd className="text-gray-900">{[po.shipTo.name, ...po.shipTo.lines].filter(Boolean).map((l, i) => <span key={i} className="block">{l}</span>)}</dd>
               </div>
             )}
@@ -94,8 +96,8 @@ export default async function AcknowledgePage({ params }) {
           <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm text-green-900">
             <p className="text-base font-semibold">This order has been acknowledged.</p>
             <p className="mt-2">By {data.acknowledgedBy}{data.acknowledgedAt ? ` on ${new Date(data.acknowledgedAt).toLocaleDateString('en-US')}` : ''}.</p>
-            <p className="mt-1">Required ship date: {day(po.requiredShipDate) || 'TBD'}</p>
-            <p>Expected ship date: {day(data.expectedShipDate) || 'Not provided'}</p>
+            <p className="mt-1">Required Ship Date: {day(po.requiredShipDate) || 'TBD'}</p>
+            <p>Expected Ship Date: {day(data.expectedShipDate) || 'Not provided'}</p>
           </div>
         ) : (
           <AcknowledgeForm token={token} stamp={signRenderStamp(data.ackId)} requiredShipDate={day(po.requiredShipDate)} />
