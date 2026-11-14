@@ -740,7 +740,7 @@ function TransmissionTab({ supplierId }) {
   if (loading) return <div className="py-12 text-center text-sm text-gray-400">Loading…</div>;
 
   const emailPanel = (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="flex items-start justify-between px-4 pt-3 pb-1">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">Email Addresses</h3>
@@ -751,7 +751,7 @@ function TransmissionTab({ supplierId }) {
         <div className="ml-4 shrink-0"><Button variant="secondary" size="sm" onClick={addRecord}>+ Add Recipient</Button></div>
       </div>
 
-      <div className="space-y-3 px-4 pb-3 pt-2">
+      <div className="flex-1 space-y-3 px-4 pb-3 pt-2">
         {records.length === 0 && (
           <div className="rounded border border-dashed border-gray-300 py-6 text-center text-sm text-gray-400">
             No recipients yet.{" "}

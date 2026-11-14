@@ -64,7 +64,14 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
 
   const effectiveCsvPath = sameFolder ? form.sftp_pdf_path : form.sftp_csv_path;
 
+  const pdfMissing = form.sftp_enabled && form.sftp_send_pdf && !String(form.sftp_pdf_path ?? "").trim();
+  const csvMissing = form.sftp_enabled && form.sftp_send_csv && !String(effectiveCsvPath ?? "").trim();
+
   async function save(extra = {}) {
+    if (form.sftp_enabled && (pdfMissing || csvMissing) && !extra.reset_host_key) {
+      showToast(`Enter the SFTP folder for ${pdfMissing ? "PDF" : "CSV"} files.`, "error");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch(`/api/suppliers/${supplierId}/transmission-settings`, {
@@ -155,12 +162,12 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   const nothingConfigured = emailLines.length === 0 && sftpLines.length === 0;
 
   const summaryCard = (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="px-4 pt-3 pb-1">
         <h3 className="text-sm font-semibold text-gray-800">Current Setup</h3>
         <p className="mt-0.5 text-xs text-gray-500">How POs are delivered to this supplier, based on what is saved.</p>
       </div>
-      <div className="space-y-3 px-4 pb-3 pt-2">
+      <div className="flex-1 space-y-3 px-4 pb-3 pt-2">
         {nothingConfigured ? (
           <p className="text-sm text-amber-700">
             Nothing is set up yet. POs can&apos;t be sent to this supplier until you add an email recipient or turn on SFTP.
@@ -186,14 +193,14 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   );
 
   const fileNamesCard = (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="px-4 pt-3 pb-1">
         <h3 className="text-sm font-semibold text-gray-800">File Names</h3>
         <p className="mt-0.5 text-xs text-gray-500">
           One naming rule for this supplier&apos;s PDF and CSV (emails, SFTP and Export). The extension is added automatically.
         </p>
       </div>
-      <div className="space-y-2 px-4 pb-3 pt-2">
+      <div className="flex-1 space-y-2 px-4 pb-3 pt-2">
         <input
           type="text"
           value={form.file_name_pattern}
@@ -228,13 +235,10 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   );
 
   const sftpCard = (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="flex items-start justify-between px-4 pt-3 pb-1">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">SFTP Delivery</h3>
-          <p className="mt-0.5 text-xs text-gray-500">
-            Also drop the PO files on the supplier&apos;s SFTP site when a PO is released or resent.
-          </p>
         </div>
         <label className="ml-4 flex shrink-0 items-center gap-2 text-xs font-medium text-gray-600">
           <input
@@ -248,10 +252,10 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
       </div>
 
       {form.sftp_enabled && (
-        <div className="space-y-3 px-4 pb-3 pt-2">
-          <div className="flex flex-wrap items-start gap-x-6 gap-y-4">
+        <div className="flex-1 space-y-3 px-4 pb-3 pt-2">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[14rem_minmax(0,1fr)]">
             {/* Connection fields (left) */}
-            <div className="w-56 max-w-full space-y-2.5">
+            <div className="space-y-2.5">
               <div className="flex gap-2">
                 <div className="min-w-0 flex-1">
                   <label className={labelCls}>Host</label>
@@ -277,20 +281,10 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={meta.has_password ? "leave blank to keep" : ""} />
               </div>
-              <div>
-                <label className={labelCls}>
-                  Private key <span className="font-normal text-gray-400">(optional)</span>{" "}
-                  {meta.has_private_key && <span className="font-normal text-green-600">(saved)</span>}
-                </label>
-                <textarea rows={2} className={`${inputCls} font-mono text-xs`} value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
-                  placeholder={meta.has_private_key ? "leave blank to keep" : "-----BEGIN OPENSSH PRIVATE KEY-----"} />
-              </div>
-              <p className="text-xs text-gray-400">Credentials are encrypted and never shown again.</p>
             </div>
 
             {/* Drop folders (right of the connection fields) */}
-            <div className="min-w-[15rem] flex-1 space-y-2.5 rounded border border-gray-100 bg-gray-50 p-3">
+            <div className="space-y-2.5 self-start rounded border border-gray-100 bg-gray-50 p-3">
               <p className="text-xs font-medium text-gray-600">Drop Folders</p>
 
               <div className="flex items-center gap-2">
@@ -300,8 +294,8 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
                     className="h-4 w-4 rounded border-gray-300 text-blue-600" />
                   PDF
                 </label>
-                <input type="text" className={inputCls} value={form.sftp_pdf_path}
-                  disabled={!form.sftp_send_pdf}
+                <input type="text" className={pdfMissing ? inputCls.replace("border-gray-200", "border-red-400") : inputCls} value={form.sftp_pdf_path}
+                  disabled={!(form.sftp_send_pdf || (sameFolder && form.sftp_send_csv))}
                   onChange={(e) => set("sftp_pdf_path", e.target.value)}
                   placeholder="/outbound/po" />
               </div>
@@ -313,7 +307,7 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
                     className="h-4 w-4 rounded border-gray-300 text-blue-600" />
                   CSV
                 </label>
-                <input type="text" className={inputCls}
+                <input type="text" className={csvMissing ? inputCls.replace("border-gray-200", "border-red-400") : inputCls}
                   value={sameFolder ? form.sftp_pdf_path : form.sftp_csv_path}
                   disabled={!form.sftp_send_csv || sameFolder}
                   onChange={(e) => set("sftp_csv_path", e.target.value)}
@@ -326,24 +320,19 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
                   className="h-4 w-4 rounded border-gray-300 text-blue-600" />
                 Put both files in the same folder
               </label>
-              <p className="text-xs text-gray-400">Leave a folder blank to use the login folder.</p>
             </div>
-          </div>
 
-          {/* Host key */}
-          <div className="flex items-center justify-between gap-3 text-xs text-gray-500">
-            <span>
-              Server identity:{" "}
-              {meta.host_fingerprint
-                ? <span className="font-mono text-gray-600" title={meta.host_fingerprint}>trusted ({meta.host_fingerprint.slice(0, 16)}…)</span>
-                : "will be trusted on the first successful connection"}
-            </span>
-            {meta.host_fingerprint && (
-              <button type="button" className="shrink-0 text-blue-600 hover:underline"
-                onClick={() => save({ reset_host_key: true })} disabled={saving}>
-                Reset host key
-              </button>
-            )}
+            {/* Private key (left) + note (right of it) */}
+            <div>
+              <label className={labelCls}>
+                Private key <span className="font-normal text-gray-400">(optional)</span>{" "}
+                {meta.has_private_key && <span className="font-normal text-green-600">(saved)</span>}
+              </label>
+              <textarea rows={2} className={`${inputCls} font-mono text-xs`} value={privateKey}
+                onChange={(e) => setPrivateKey(e.target.value)}
+                placeholder={meta.has_private_key ? "leave blank to keep" : "-----BEGIN OPENSSH PRIVATE KEY-----"} />
+            </div>
+            <p className="self-center text-xs text-gray-400">Credentials are encrypted and never shown again.</p>
           </div>
 
           {testResult && (
@@ -359,6 +348,13 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
       )}
 
       <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2.5">
+        {form.sftp_enabled && meta.host_fingerprint && (
+          <button type="button" className="mr-auto text-xs text-blue-600 hover:underline"
+            title="Only needed if the supplier changed their SFTP server or its security key"
+            onClick={() => save({ reset_host_key: true })} disabled={saving}>
+            Reset host key
+          </button>
+        )}
         {form.sftp_enabled && (
           <Button variant="secondary" size="sm" onClick={testConnection} disabled={testing || dirty}>
             {testing ? "Testing…" : dirty ? "Save to test" : "Test connection"}
@@ -372,12 +368,12 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   return (
     <div className="space-y-4">
       {/* Row 1: Current Setup (left) + Email Addresses (right) */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {summaryCard}
         {emailPanel}
       </div>
       {/* Row 2: File Names (left) + SFTP Delivery (right) */}
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {fileNamesCard}
         {sftpCard}
       </div>

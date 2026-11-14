@@ -116,6 +116,12 @@ export async function POST(request, { params }) {
       if (!row.sftp_send_pdf && !row.sftp_send_csv) {
         return NextResponse.json({ error: 'Choose at least one file type to send by SFTP.' }, { status: 422 });
       }
+      if (row.sftp_send_pdf && !row.sftp_pdf_path) {
+        return NextResponse.json({ error: 'Enter the SFTP folder for PDF files.' }, { status: 422 });
+      }
+      if (row.sftp_send_csv && !row.sftp_csv_path) {
+        return NextResponse.json({ error: 'Enter the SFTP folder for CSV files.' }, { status: 422 });
+      }
     }
 
     const { error } = await supabase

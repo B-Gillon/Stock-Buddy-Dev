@@ -18,14 +18,15 @@ export function validateSftpHost(host) {
   return null;
 }
 
-/** Cleans a remote directory path. Empty means the login directory. */
+/** Cleans a remote directory path. Empty means the login directory; "/" is the server root. */
 export function cleanRemoteDir(dir) {
-  const d = String(dir ?? '').trim().replace(/\\/g, '/').replace(/\/+$/, '');
+  const raw = String(dir ?? '').trim().replace(/\\/g, '/');
+  const d = /^\/+$/.test(raw) ? '/' : raw.replace(/\/+$/, '');
   if (d.includes('\0') || d.split('/').includes('..')) throw new Error('Paths cannot contain "..".');
   return d;
 }
 
-const remotePath = (dir, name) => (dir ? `${dir}/${name}` : name);
+const remotePath = (dir, name) => (dir === '/' ? `/${name}` : dir ? `${dir}/${name}` : name);
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
