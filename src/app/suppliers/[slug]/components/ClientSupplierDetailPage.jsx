@@ -673,6 +673,7 @@ function TransmissionTab({ supplierId }) {
   const [saved,   setSaved]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
+  const [editingSaved, setEditingSaved] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -729,6 +730,7 @@ function TransmissionTab({ supplierId }) {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Save failed");
       setSaved(records.map((r) => ({ ...r })));
+      setEditingSaved(false);
       showToast("Transmission recipients saved.", "success");
     } catch (err) {
       showToast(err.message, "error");
@@ -739,6 +741,11 @@ function TransmissionTab({ supplierId }) {
 
   if (loading) return <div className="py-12 text-center text-sm text-gray-400">Loading…</div>;
 
+  // Saved recipients stay tucked away until "Edit Recipients" is pressed; new (unsaved) ones always show.
+  const isSavedRecord = (r) => saved.some((s) => s._key === r._key);
+  const visibleRecords = editingSaved ? records : records.filter((r) => !isSavedRecord(r));
+  const savedCount = records.filter(isSavedRecord).length;
+
   const emailPanel = (
     <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="flex items-start justify-between px-4 pt-3 pb-1">
@@ -748,7 +755,14 @@ function TransmissionTab({ supplierId }) {
             Each record is one separate email send. Add several addresses per field with commas.
           </p>
         </div>
-        <div className="ml-4 shrink-0"><Button variant="secondary" size="sm" onClick={addRecord}>+ Add Recipient</Button></div>
+        <div className="ml-4 flex shrink-0 items-center gap-2">
+          {savedCount > 0 && (
+            <Button variant="secondary" size="sm" onClick={() => setEditingSaved((v) => !v)}>
+              {editingSaved ? "Hide Recipients" : "Edit Recipients"}
+            </Button>
+          )}
+          <Button variant="secondary" size="sm" onClick={addRecord}>+ Add Recipient</Button>
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 px-4 pb-3 pt-2">
@@ -758,7 +772,13 @@ function TransmissionTab({ supplierId }) {
             <button className="text-blue-600 underline hover:text-blue-700" onClick={addRecord}>Add one</button>.
           </div>
         )}
-        {records.map((r) => (
+        {records.length > 0 && visibleRecords.length === 0 && (
+          <p className="text-xs text-gray-400">
+            {savedCount === 1 ? "1 recipient is saved." : `${savedCount} recipients are saved.`}{" "}
+            Use Edit Recipients to change {savedCount === 1 ? "it" : "them"}, or Add Recipient to add another.
+          </p>
+        )}
+        {visibleRecords.map((r) => (
           <RecipientCard
             key={r._key}
             record={r}

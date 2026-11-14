@@ -9,7 +9,7 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { buildPOFileBase, FILE_NAME_TOKENS, DEFAULT_FILE_NAME_PATTERN } from "@/lib/poFileName";
 
 const inputCls =
-  "w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300";
+  "w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500";
 const labelCls = "block text-xs font-medium text-gray-500 mb-1";
 
 const EMPTY = {
@@ -36,6 +36,8 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [editFile, setEditFile] = useState(false);
+  const [editSftp, setEditSftp] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +91,8 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
       if (!res.ok) throw new Error(json.error ?? "Save failed");
       showToast("Delivery settings saved.", "success");
       setTestResult(null);
+      setEditFile(false);
+      setEditSftp(false);
       await load();
     } catch (err) {
       showToast(err.message, "error");
@@ -128,6 +132,19 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
     </Button>
   );
 
+  function cancelFile() {
+    setForm((f) => ({ ...f, file_name_pattern: saved.file_name_pattern }));
+    setEditFile(false);
+  }
+  function cancelSftp() {
+    setForm((f) => ({ ...saved, file_name_pattern: f.file_name_pattern }));
+    setPassword("");
+    setPrivateKey("");
+    setSameFolder((saved.sftp_pdf_path ?? "") === (saved.sftp_csv_path ?? ""));
+    setTestResult(null);
+    setEditSftp(false);
+  }
+
   // ── Current Setup: a plain-language recap of what is SAVED for this supplier ──────────
   const splitList = (v) => String(v ?? "").split(",").map((e) => e.trim()).filter(Boolean);
   const emailLines = [];
@@ -139,8 +156,9 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
       splitList(r.bcc_emails).length ? `bcc: ${splitList(r.bcc_emails).join(", ")}` : null,
     ].filter(Boolean);
     const suffix = extra.length ? ` (${extra.join("; ")})` : "";
-    if (r.send_pdf) emailLines.push(`PDF emailed to ${to.join(", ")}${suffix}`);
-    if (r.send_csv) emailLines.push(`CSV emailed to ${to.join(", ")}${suffix}`);
+    if (r.send_pdf && r.send_csv) emailLines.push(`PDF and CSV emailed to ${to.join(", ")}${suffix}`);
+    else if (r.send_pdf) emailLines.push(`PDF emailed to ${to.join(", ")}${suffix}`);
+    else if (r.send_csv) emailLines.push(`CSV emailed to ${to.join(", ")}${suffix}`);
     if (!r.send_pdf && !r.send_csv) emailLines.push(`Email with no attachments sent to ${to.join(", ")}${suffix}`);
   }
 
@@ -152,8 +170,12 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
     if (!sftpConfigured) {
       sftpWarning = "SFTP is turned on but not fully set up (host, username and a password or key are needed).";
     } else {
-      if (saved.sftp_send_pdf) sftpLines.push(`PDF sent to SFTP directory (${dirText(saved.sftp_pdf_path)}) on ${saved.sftp_host}`);
-      if (saved.sftp_send_csv) sftpLines.push(`CSV sent to SFTP directory (${dirText(saved.sftp_csv_path)}) on ${saved.sftp_host}`);
+      if (saved.sftp_send_pdf && saved.sftp_send_csv && dirText(saved.sftp_pdf_path) === dirText(saved.sftp_csv_path)) {
+        sftpLines.push(`PDF and CSV sent to SFTP directory (${dirText(saved.sftp_pdf_path)}) on ${saved.sftp_host}`);
+      } else {
+        if (saved.sftp_send_pdf) sftpLines.push(`PDF sent to SFTP directory (${dirText(saved.sftp_pdf_path)}) on ${saved.sftp_host}`);
+        if (saved.sftp_send_csv) sftpLines.push(`CSV sent to SFTP directory (${dirText(saved.sftp_csv_path)}) on ${saved.sftp_host}`);
+      }
       if (!saved.sftp_send_pdf && !saved.sftp_send_csv) sftpWarning = "SFTP is on, but neither PDF nor CSV is selected.";
     }
   }
@@ -194,13 +216,20 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
 
   const fileNamesCard = (
     <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="px-4 pt-3 pb-1">
-        <h3 className="text-sm font-semibold text-gray-800">File Names</h3>
-        <p className="mt-0.5 text-xs text-gray-500">
-          One naming rule for this supplier&apos;s PDF and CSV (emails, SFTP and Export). The extension is added automatically.
-        </p>
+      <div className="flex items-start justify-between px-4 pt-3 pb-1">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">File Names</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            One naming rule for this supplier&apos;s PDF and CSV (emails, SFTP and Export). The extension is added automatically.
+          </p>
+        </div>
+        <div className="ml-4 shrink-0">
+          <Button variant="secondary" size="sm" onClick={editFile ? cancelFile : () => setEditFile(true)}>
+            {editFile ? "Cancel" : "Edit"}
+          </Button>
+        </div>
       </div>
-      <div className="flex-1 space-y-2 px-4 pb-3 pt-2">
+      <fieldset disabled={!editFile} className={`flex-1 space-y-2 px-4 pb-3 pt-2 ${editFile ? "" : "opacity-60"}`}>
         <input
           type="text"
           value={form.file_name_pattern}
@@ -216,7 +245,7 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
               type="button"
               title={help}
               onClick={() => set("file_name_pattern", `${form.file_name_pattern}{${token}}`)}
-              className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
+              className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 enabled:hover:bg-gray-100 disabled:cursor-not-allowed"
             >
               {`{${token}}`}
             </button>
@@ -229,8 +258,10 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
         <p className="text-xs text-gray-400">
           Date and time placeholders use UTC, e.g. {`{po_number}_{datetime}`}.
         </p>
-      </div>
-      <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">{saveBtn}</div>
+      </fieldset>
+      {editFile && (
+        <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">{saveBtn}</div>
+      )}
     </div>
   );
 
@@ -240,19 +271,25 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
         <div>
           <h3 className="text-sm font-semibold text-gray-800">SFTP Delivery</h3>
         </div>
-        <label className="ml-4 flex shrink-0 items-center gap-2 text-xs font-medium text-gray-600">
-          <input
-            type="checkbox"
-            checked={form.sftp_enabled}
-            onChange={(e) => set("sftp_enabled", e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-blue-600"
-          />
-          Enabled
-        </label>
+        <div className="ml-4 flex shrink-0 items-center gap-3">
+          <label className={`flex items-center gap-2 text-xs font-medium text-gray-600 ${editSftp ? "" : "opacity-60"}`}>
+            <input
+              type="checkbox"
+              checked={form.sftp_enabled}
+              disabled={!editSftp}
+              onChange={(e) => set("sftp_enabled", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+            />
+            Enabled
+          </label>
+          <Button variant="secondary" size="sm" onClick={editSftp ? cancelSftp : () => setEditSftp(true)}>
+            {editSftp ? "Cancel" : "Edit"}
+          </Button>
+        </div>
       </div>
 
       {form.sftp_enabled && (
-        <div className="flex-1 space-y-3 px-4 pb-3 pt-2">
+        <fieldset disabled={!editSftp} className={`flex-1 space-y-3 px-4 pb-3 pt-2 ${editSftp ? "" : "opacity-60"}`}>
           <div className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-[14rem_minmax(0,1fr)]">
             {/* Connection fields (left) */}
             <div className="space-y-2.5">
@@ -334,19 +371,22 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
             </div>
             <p className="self-center text-xs text-gray-400">Credentials are encrypted and never shown again.</p>
           </div>
+        </fieldset>
+      )}
 
-          {testResult && (
-            <div className={`rounded border px-3 py-2 text-xs ${testResult.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}>
-              {testResult.error && <p>{testResult.error}</p>}
-              {(testResult.checks ?? []).map((c) => (
-                <p key={c.label}>{c.ok ? "✓" : "✗"} {c.label} ({c.path}): {c.message}</p>
-              ))}
-              {testResult.ok && !testResult.checks?.length && <p>✓ Connected.</p>}
-            </div>
-          )}
+      {form.sftp_enabled && testResult && (
+        <div className="px-4 pb-3">
+          <div className={`rounded border px-3 py-2 text-xs ${testResult.ok ? "border-green-200 bg-green-50 text-green-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+            {testResult.error && <p>{testResult.error}</p>}
+            {(testResult.checks ?? []).map((c) => (
+              <p key={c.label}>{c.ok ? "✓" : "✗"} {c.label} ({c.path}): {c.message}</p>
+            ))}
+            {testResult.ok && !testResult.checks?.length && <p>✓ Connected.</p>}
+          </div>
         </div>
       )}
 
+      {(form.sftp_enabled || editSftp) && (
       <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2.5">
         {form.sftp_enabled && meta.host_fingerprint && (
           <button type="button" className="mr-auto text-xs text-blue-600 hover:underline"
@@ -360,8 +400,9 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
             {testing ? "Testing…" : dirty ? "Save to test" : "Test connection"}
           </Button>
         )}
-        {saveBtn}
+        {editSftp && saveBtn}
       </div>
+      )}
     </div>
   );
 
