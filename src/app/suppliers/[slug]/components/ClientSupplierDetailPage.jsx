@@ -261,9 +261,6 @@ function GeneralInfoTab({ supplier, router, copyToClipboard }) {
           <Detail label="Contact Email" value={supplier.contact_email ? (
             <a href={`mailto:${supplier.contact_email}`} className="text-blue-600 hover:underline">{supplier.contact_email}</a>
           ) : null} />
-          <Detail label="PO Email" value={supplier.po_email ? (
-            <a href={`mailto:${supplier.po_email}`} className="text-blue-600 hover:underline">{supplier.po_email}</a>
-          ) : null} />
           <Detail label="Phone"      value={formatPhone(supplier.phone)} />
           <Detail label="Toll-Free"  value={formatPhone(supplier.phone_toll_free)} />
           <Detail label="Fax"        value={formatPhone(supplier.fax)} />
@@ -742,30 +739,25 @@ function TransmissionTab({ supplierId }) {
 
   if (loading) return <div className="py-12 text-center text-sm text-gray-400">Loading…</div>;
 
-  return (
-    <div className="space-y-4">
-      <SupplierDeliverySettings supplierId={supplierId} />
-
-      <div className="flex items-start justify-between">
-        <p className="text-sm text-gray-500 max-w-lg">
-          Each record below represents one separate email send. Add multiple addresses per field using commas.
-        </p>
-        <div className="flex items-center gap-2 ml-4 shrink-0">
-          <Button variant="secondary" size="sm" onClick={addRecord}>+ Add Recipient</Button>
-          <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
+  const emailPanel = (
+    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-start justify-between px-4 pt-3 pb-1">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Email Addresses</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Each record is one separate email send. Add several addresses per field with commas.
+          </p>
         </div>
+        <div className="ml-4 shrink-0"><Button variant="secondary" size="sm" onClick={addRecord}>+ Add Recipient</Button></div>
       </div>
 
-      {records.length === 0 && (
-        <div className="rounded-lg border border-dashed border-gray-300 py-12 text-center text-sm text-gray-400">
-          No recipients yet.{" "}
-          <button className="text-blue-600 underline hover:text-blue-700" onClick={addRecord}>Add one</button>.
-        </div>
-      )}
-
-      <div className="space-y-3">
+      <div className="space-y-3 px-4 pb-3 pt-2">
+        {records.length === 0 && (
+          <div className="rounded border border-dashed border-gray-300 py-6 text-center text-sm text-gray-400">
+            No recipients yet.{" "}
+            <button className="text-blue-600 underline hover:text-blue-700" onClick={addRecord}>Add one</button>.
+          </div>
+        )}
         {records.map((r) => (
           <RecipientCard
             key={r._key}
@@ -774,13 +766,20 @@ function TransmissionTab({ supplierId }) {
             onRemove={() => removeRecord(r._key)}
           />
         ))}
+        {records.length > 0 && !records.some((r) => r.to_emails.trim() !== "") && (
+          <p className="text-xs text-amber-600">⚠ At least one record needs a To email address before saving.</p>
+        )}
       </div>
 
-      {records.length > 0 && !records.some((r) => r.to_emails.trim() !== "") && (
-        <p className="text-xs text-amber-600">⚠ At least one record needs a To email address before saving.</p>
-      )}
+      <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">
+        <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </div>
     </div>
   );
+
+  return <SupplierDeliverySettings supplierId={supplierId} emailPanel={emailPanel} />;
 }
 
 function RecipientCard({ record, onUpdate, onRemove }) {

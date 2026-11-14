@@ -22,7 +22,7 @@ export async function POST(request) {
         website: form.website || null, ap_number: form.ap_number || null,
         payment_terms: form.payment_terms || null, payment_method: form.payment_method || null,
         currency: form.currency, lead_days: form.lead_days ? parseInt(form.lead_days, 10) : null,
-        po_email: form.po_email || null, online_order_form: form.online_order_form || null,
+        online_order_form: form.online_order_form || null,
         username: form.username || null, supplier_tax_type: form.supplier_tax_type || null,
         supplier_notes: form.supplier_notes || null, po_notes_template: form.po_notes_template || null,
       })

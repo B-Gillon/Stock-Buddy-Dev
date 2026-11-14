@@ -127,7 +127,6 @@ export default function AddSupplierForm() {
     shipping_method:            "",
     freight_scheduler:          "",
     shipping_notes:             "",
-    po_email:                   "",
     online_order_form:          "",
     username:                   "",
     supplier_tax_type:          "",
@@ -416,9 +415,6 @@ export default function AddSupplierForm() {
       {/* SECTION 5 — PO Transmission */}
       <SectionCard title="PO Transmission Info">
         <div className="grid grid-cols-4 gap-4">
-          <Field label="PO Email">
-            <Input type="email" value={form.po_email} onChange={set("po_email")} placeholder="orders@supplier.com" />
-          </Field>
           <Field label="Online Order Form / Portal">
             <Input type="url" value={form.online_order_form} onChange={set("online_order_form")} placeholder="https://portal.supplier.com" />
           </Field>

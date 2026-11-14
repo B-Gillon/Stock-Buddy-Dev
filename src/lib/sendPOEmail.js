@@ -7,9 +7,9 @@ import { buildPOFileBase } from '@/lib/poFileName';
 import { uploadPOFiles } from '@/lib/sftp';
 
 /**
- * Sends the PO to the supplier: one email per transmission recipient record (falling back to
- * supplier.po_email with both attachments), and, when the supplier has SFTP set up, the files
- * are also delivered to their SFTP site.
+ * Sends the PO to the supplier: one email per transmission recipient record and, when the
+ * supplier has SFTP set up, the files are also delivered to their SFTP site. All of this is
+ * configured on the supplier's Transmission tab.
  *
  * @param {string} poId
  * @param {{ isResend?: boolean, isCancellation?: boolean }} options
@@ -24,7 +24,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     .from('purchase_orders')
     .select(`
       id, tenant_id, po_number, po_date, expected_date, status, notes_supplier, ship_to_location_id,
-      supplier:suppliers ( id, supplier_name, supplier_number, po_email ),
+      supplier:suppliers ( id, supplier_name, supplier_number ),
       location:locations ( name, address1, address2, city, province, zip, country )
     `)
     .eq('id', poId)
@@ -89,15 +89,14 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     .order('sort_order', { ascending: true });
 
   const hasRecipients = recipients && recipients.length > 0;
-  const fallbackEmail = po.supplier?.po_email;
 
   // ── Transmission settings (file naming + SFTP) ─────────────────────────────
   const transmission = await getTransmissionSettings(po.supplier.id, { withSecrets: true });
   const sftpReady = !isCancellation && isSftpReady(transmission);
-  const hasEmailTarget = hasRecipients || !!fallbackEmail;
+  const hasEmailTarget = !!hasRecipients;
 
   if (!hasEmailTarget && !sftpReady) {
-    return { success: false, error: 'No recipient email configured for this supplier' };
+    return { success: false, error: 'No email recipients or SFTP delivery are set up for this supplier (Transmission tab)' };
   }
 
   // ── For cancellation emails, send a plain text notice (no attachments) ─────
@@ -124,35 +123,26 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     });
 
     try {
-      if (!hasRecipients) {
+      for (const r of recipients) {
+        const toList  = (r.to_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+        if (toList.length === 0) continue;
+        const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+        const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
         await transporter.sendMail({
           from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
-          to:      fallbackEmail,
+          to:      toList.join(', '),
+          cc:      ccList.length  > 0 ? ccList.join(', ')  : undefined,
+          bcc:     bccList.length > 0 ? bccList.join(', ') : undefined,
           subject,
           text:    bodyText,
         });
-      } else {
-        for (const r of recipients) {
-          const toList  = (r.to_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-          if (toList.length === 0) continue;
-          const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-          const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-          await transporter.sendMail({
-            from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
-            to:      toList.join(', '),
-            cc:      ccList.length  > 0 ? ccList.join(', ')  : undefined,
-            bcc:     bccList.length > 0 ? bccList.join(', ') : undefined,
-            subject,
-            text:    bodyText,
-          });
-        }
       }
     } catch (err) {
       console.error('Cancellation email send error:', err);
       return { success: false, error: `Email failed: ${err.message}` };
     }
 
-    return { success: true, notes: describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments: false }) };
+    return { success: true, notes: describeDelivery({ recipients, withAttachments: false }) };
   }
 
   // ── Fetch lines (for normal / resend emails) ───────────────────────────────
@@ -307,37 +297,24 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   // ── Send emails ────────────────────────────────────────────────────────────
   let emailError = null;
   if (hasEmailTarget) try {
-    if (!hasRecipients) {
+    for (const r of recipients) {
+      const toList  = (r.to_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+      if (toList.length === 0) continue;
+      const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+      const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
+      const attachments = [
+        ...(r.send_pdf ? [{ filename: `${filename}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }] : []),
+        ...(r.send_csv ? [{ filename: `${filename}.csv`, content: csvBuffer, contentType: 'text/csv'        }] : []),
+      ];
       await transporter.sendMail({
-        from:        `"Stock Buddy" <${process.env.SMTP_USER}>`,
-        to:          fallbackEmail,
+        from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
+        to:      toList.join(', '),
+        cc:      ccList.length  > 0 ? ccList.join(', ')  : undefined,
+        bcc:     bccList.length > 0 ? bccList.join(', ') : undefined,
         subject,
-        text:        bodyText,
-        attachments: [
-          { filename: `${filename}.pdf`, content: pdfBuffer, contentType: 'application/pdf' },
-          { filename: `${filename}.csv`, content: csvBuffer, contentType: 'text/csv' },
-        ],
+        text:    bodyText,
+        attachments,
       });
-    } else {
-      for (const r of recipients) {
-        const toList  = (r.to_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-        if (toList.length === 0) continue;
-        const ccList  = (r.cc_emails  ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-        const bccList = (r.bcc_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-        const attachments = [
-          ...(r.send_pdf ? [{ filename: `${filename}.pdf`, content: pdfBuffer, contentType: 'application/pdf' }] : []),
-          ...(r.send_csv ? [{ filename: `${filename}.csv`, content: csvBuffer, contentType: 'text/csv'        }] : []),
-        ];
-        await transporter.sendMail({
-          from:    `"Stock Buddy" <${process.env.SMTP_USER}>`,
-          to:      toList.join(', '),
-          cc:      ccList.length  > 0 ? ccList.join(', ')  : undefined,
-          bcc:     bccList.length > 0 ? bccList.join(', ') : undefined,
-          subject,
-          text:    bodyText,
-          attachments,
-        });
-      }
     }
   } catch (err) {
     console.error('Email send error:', err);
@@ -363,7 +340,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
 
   const notes = [
     hasEmailTarget && !emailError
-      ? describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments: true })
+      ? describeDelivery({ recipients, withAttachments: true })
       : null,
     emailError,
     sftp ? `SFTP: ${sftp.notes}` : null,
@@ -379,12 +356,8 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
  * Human-readable summary of who a PO email went to and how, for the PO History notes.
  * e.g. "Emailed to buyer@acme.com (PDF + CSV); cc: ops@acme.com"
  */
-function describeDelivery({ hasRecipients, recipients, fallbackEmail, withAttachments }) {
+function describeDelivery({ recipients, withAttachments }) {
   const split = (s) => (s ?? '').split(',').map((e) => e.trim()).filter(Boolean);
-
-  if (!hasRecipients) {
-    return `Emailed to ${fallbackEmail}${withAttachments ? ' (PDF + CSV)' : ''}`;
-  }
 
   const parts = [];
   for (const r of recipients) {

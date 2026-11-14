@@ -24,7 +24,6 @@ export default async function SupplierEditPage({ params }) {
       company_name,
       contact_name,
       contact_email,
-      po_email,
       lead_days,
       currency,
       supplier_tax_type,

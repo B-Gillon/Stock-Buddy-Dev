@@ -24,7 +24,7 @@ const EMPTY = {
   sftp_csv_path: "",
 };
 
-export default function SupplierDeliverySettings({ supplierId }) {
+export default function SupplierDeliverySettings({ supplierId, emailPanel = null }) {
   const { showToast } = useToast();
   const [form, setForm] = useState(EMPTY);
   const [saved, setSaved] = useState(EMPTY);
@@ -115,59 +115,69 @@ export default function SupplierDeliverySettings({ supplierId }) {
   };
   const preview = buildPOFileBase(form.file_name_pattern, sample);
 
+  const saveBtn = (
+    <Button size="sm" onClick={() => save()} disabled={!dirty || saving}>
+      {saving ? "Saving…" : "Save"}
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
-      {/* ── File naming ─────────────────────────────────────────────── */}
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-        <div className="px-4 pt-3 pb-1">
-          <h3 className="text-sm font-semibold text-gray-800">File names</h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            One naming rule for the PDF and CSV sent to this supplier (email attachments, SFTP files and the
-            Export buttons). The extension is added automatically.
-          </p>
-        </div>
-        <div className="px-4 pb-3 pt-2 space-y-2">
-          <label className={labelCls}>Pattern</label>
-          <input
-            type="text"
-            value={form.file_name_pattern}
-            onChange={(e) => set("file_name_pattern", e.target.value)}
-            className={inputCls}
-            placeholder="{po_number}"
-          />
-          <div className="flex flex-wrap gap-1.5">
-            {Object.entries(FILE_NAME_TOKENS).map(([token, help]) => (
-              <button
-                key={token}
-                type="button"
-                title={help}
-                onClick={() => set("file_name_pattern", `${form.file_name_pattern}{${token}}`)}
-                className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
-              >
-                {`{${token}}`}
-              </button>
-            ))}
+      {/* ── Top row: File Names (left half) + Email Addresses (right half) ── */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
+          <div className="px-4 pt-3 pb-1">
+            <h3 className="text-sm font-semibold text-gray-800">File Names</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              One naming rule for this supplier&apos;s PDF and CSV (emails, SFTP and Export). The extension is added automatically.
+            </p>
           </div>
-          <p className="text-xs text-gray-500">
-            Example: <span className="font-mono text-gray-700">{preview}.pdf</span>{" "}
-            and <span className="font-mono text-gray-700">{preview}.csv</span>
-          </p>
-          <p className="text-xs text-gray-400">
-            {`{po_number}`} is required. Date and time placeholders use UTC, e.g. {`{po_number}_{datetime}`}.
-          </p>
+          <div className="space-y-2 px-4 pb-3 pt-2">
+            <input
+              type="text"
+              value={form.file_name_pattern}
+              onChange={(e) => set("file_name_pattern", e.target.value)}
+              className={inputCls}
+              placeholder="{po_number}"
+              aria-label="File name pattern"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {Object.entries(FILE_NAME_TOKENS).map(([token, help]) => (
+                <button
+                  key={token}
+                  type="button"
+                  title={help}
+                  onClick={() => set("file_name_pattern", `${form.file_name_pattern}{${token}}`)}
+                  className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-100"
+                >
+                  {`{${token}}`}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500">
+              Example: <span className="font-mono text-gray-700">{preview}.pdf</span>{" "}
+              and <span className="font-mono text-gray-700">{preview}.csv</span>
+            </p>
+            <p className="text-xs text-gray-400">
+              Date and time placeholders use UTC, e.g. {`{po_number}_{datetime}`}.
+            </p>
+          </div>
+          <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">{saveBtn}</div>
         </div>
+
+        {emailPanel}
       </div>
 
       {/* ── SFTP ───────────────────────────────────────────────────── */}
       <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="flex items-start justify-between px-4 pt-3 pb-1">
           <div>
-            <h3 className="text-sm font-semibold text-gray-800">SFTP delivery</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <h3 className="text-sm font-semibold text-gray-800">SFTP Delivery</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
               Also drop the PO files on the supplier&apos;s SFTP site when a PO is released or resent.
             </p>
           </div>
-          <label className="flex items-center gap-2 text-xs font-medium text-gray-600 shrink-0 ml-4">
+          <label className="ml-4 flex shrink-0 items-center gap-2 text-xs font-medium text-gray-600">
             <input
               type="checkbox"
               checked={form.sftp_enabled}
@@ -179,82 +189,86 @@ export default function SupplierDeliverySettings({ supplierId }) {
         </div>
 
         {form.sftp_enabled && (
-          <div className="px-4 pb-3 pt-2 space-y-3">
-            <div className="grid grid-cols-6 gap-3">
-              <div className="col-span-4">
-                <label className={labelCls}>Host</label>
-                <input type="text" className={inputCls} value={form.sftp_host}
-                  onChange={(e) => set("sftp_host", e.target.value)} placeholder="sftp.supplier.com" />
+          <div className="space-y-3 px-4 pb-3 pt-2">
+            <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+              {/* Connection fields (left) */}
+              <div className="w-72 max-w-full space-y-2.5">
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label className={labelCls}>Host</label>
+                    <input type="text" className={inputCls} value={form.sftp_host}
+                      onChange={(e) => set("sftp_host", e.target.value)} placeholder="sftp.supplier.com" />
+                  </div>
+                  <div className="w-16 shrink-0">
+                    <label className={labelCls}>Port</label>
+                    <input type="number" className={inputCls} value={form.sftp_port}
+                      onChange={(e) => set("sftp_port", e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Username</label>
+                  <input type="text" className={inputCls} value={form.sftp_username} autoComplete="off"
+                    onChange={(e) => set("sftp_username", e.target.value)} />
+                </div>
+                <div>
+                  <label className={labelCls}>
+                    Password {meta.has_password && <span className="font-normal text-green-600">(saved)</span>}
+                  </label>
+                  <input type="password" className={inputCls} value={password} autoComplete="new-password"
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={meta.has_password ? "leave blank to keep" : ""} />
+                </div>
+                <div>
+                  <label className={labelCls}>
+                    Private key <span className="font-normal text-gray-400">(optional)</span>{" "}
+                    {meta.has_private_key && <span className="font-normal text-green-600">(saved)</span>}
+                  </label>
+                  <textarea rows={2} className={`${inputCls} font-mono text-xs`} value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    placeholder={meta.has_private_key ? "leave blank to keep" : "-----BEGIN OPENSSH PRIVATE KEY-----"} />
+                </div>
+                <p className="text-xs text-gray-400">Credentials are encrypted and never shown again.</p>
               </div>
-              <div className="col-span-2">
-                <label className={labelCls}>Port</label>
-                <input type="number" className={inputCls} value={form.sftp_port}
-                  onChange={(e) => set("sftp_port", e.target.value)} />
-              </div>
-              <div className="col-span-3">
-                <label className={labelCls}>Username</label>
-                <input type="text" className={inputCls} value={form.sftp_username} autoComplete="off"
-                  onChange={(e) => set("sftp_username", e.target.value)} />
-              </div>
-              <div className="col-span-3">
-                <label className={labelCls}>
-                  Password {meta.has_password && <span className="font-normal text-green-600">(saved, leave blank to keep)</span>}
-                </label>
-                <input type="password" className={inputCls} value={password} autoComplete="new-password"
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={meta.has_password ? "••••••••" : ""} />
-              </div>
-              <div className="col-span-6">
-                <label className={labelCls}>
-                  Private key <span className="font-normal text-gray-400">(optional, instead of or with a password)</span>{" "}
-                  {meta.has_private_key && <span className="font-normal text-green-600">(saved, leave blank to keep)</span>}
-                </label>
-                <textarea rows={3} className={`${inputCls} font-mono text-xs`} value={privateKey}
-                  onChange={(e) => setPrivateKey(e.target.value)}
-                  placeholder={meta.has_private_key ? "••••••••" : "-----BEGIN OPENSSH PRIVATE KEY-----"} />
-              </div>
-            </div>
-            <p className="text-xs text-gray-400">
-              Credentials are encrypted before they are stored and are never shown again.
-            </p>
 
-            {/* Drop folders */}
-            <div className="rounded border border-gray-100 bg-gray-50 p-3 space-y-3">
-              <p className="text-xs font-medium text-gray-600">Drop folders</p>
+              {/* Drop folders (right of the connection fields) */}
+              <div className="w-96 max-w-full space-y-2.5 rounded border border-gray-100 bg-gray-50 p-3">
+                <p className="text-xs font-medium text-gray-600">Drop Folders</p>
 
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 w-20 shrink-0 text-xs font-medium text-gray-600">
-                  <input type="checkbox" checked={form.sftp_send_pdf}
-                    onChange={(e) => set("sftp_send_pdf", e.target.checked)}
+                <div className="flex items-center gap-2">
+                  <label className="flex w-14 shrink-0 items-center gap-2 text-xs font-medium text-gray-600">
+                    <input type="checkbox" checked={form.sftp_send_pdf}
+                      onChange={(e) => set("sftp_send_pdf", e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                    PDF
+                  </label>
+                  <input type="text" className={inputCls} value={form.sftp_pdf_path}
+                    disabled={!form.sftp_send_pdf}
+                    onChange={(e) => set("sftp_pdf_path", e.target.value)}
+                    placeholder="/outbound/po" />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex w-14 shrink-0 items-center gap-2 text-xs font-medium text-gray-600">
+                    <input type="checkbox" checked={form.sftp_send_csv}
+                      onChange={(e) => set("sftp_send_csv", e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                    CSV
+                  </label>
+                  <input type="text" className={inputCls}
+                    value={sameFolder ? form.sftp_pdf_path : form.sftp_csv_path}
+                    disabled={!form.sftp_send_csv || sameFolder}
+                    onChange={(e) => set("sftp_csv_path", e.target.value)}
+                    placeholder="/outbound/po-csv" />
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  <input type="checkbox" checked={sameFolder}
+                    onChange={(e) => setSameFolder(e.target.checked)}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600" />
-                  PDF
+                  Put both files in the same folder
                 </label>
-                <input type="text" className={inputCls} value={form.sftp_pdf_path}
-                  disabled={!form.sftp_send_pdf}
-                  onChange={(e) => set("sftp_pdf_path", e.target.value)}
-                  placeholder="/outbound/po  (blank = login folder)" />
+                <p className="text-xs text-gray-400">Leave a folder blank to use the login folder.</p>
               </div>
-
-              <div className="flex items-center gap-3">
-                <label className="flex items-center gap-2 w-20 shrink-0 text-xs font-medium text-gray-600">
-                  <input type="checkbox" checked={form.sftp_send_csv}
-                    onChange={(e) => set("sftp_send_csv", e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600" />
-                  CSV
-                </label>
-                <input type="text" className={inputCls}
-                  value={sameFolder ? form.sftp_pdf_path : form.sftp_csv_path}
-                  disabled={!form.sftp_send_csv || sameFolder}
-                  onChange={(e) => set("sftp_csv_path", e.target.value)}
-                  placeholder="/outbound/po-csv  (blank = login folder)" />
-              </div>
-
-              <label className="flex items-center gap-2 text-xs text-gray-600">
-                <input type="checkbox" checked={sameFolder}
-                  onChange={(e) => setSameFolder(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600" />
-                Put both files in the same folder
-              </label>
             </div>
 
             {/* Host key */}
@@ -291,9 +305,7 @@ export default function SupplierDeliverySettings({ supplierId }) {
               {testing ? "Testing…" : dirty ? "Save to test" : "Test connection"}
             </Button>
           )}
-          <Button size="sm" onClick={() => save()} disabled={!dirty || saving}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
+          {saveBtn}
         </div>
       </div>
     </div>

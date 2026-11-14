@@ -27,9 +27,6 @@ export function validateFileNamePattern(pattern) {
   if (unknown.length > 0) {
     return { ok: false, error: `Unknown placeholder {${unknown[0]}}. Allowed: ${Object.keys(FILE_NAME_TOKENS).map((t) => `{${t}}`).join(', ')}.` };
   }
-  if (!tokens.includes('po_number')) {
-    return { ok: false, error: 'The pattern must include {po_number} so every file name is unique to its PO.' };
-  }
 
   const literals = p.replace(/\{[^}]*\}/g, '');
   if (/[\\/:*?"<>|\u0000-\u001f]/.test(literals) || /[{}]/.test(literals)) {

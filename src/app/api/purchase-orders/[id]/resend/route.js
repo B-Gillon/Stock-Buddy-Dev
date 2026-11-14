@@ -15,7 +15,7 @@ export async function POST(request, { params }) {
 
     const { data: po } = await supabase
       .from('purchase_orders')
-      .select('supplier_id, supplier:suppliers(id, po_email)')
+      .select('supplier_id, supplier:suppliers(id)')
       .eq('id', id)
       .single();
 
@@ -30,8 +30,6 @@ export async function POST(request, { params }) {
       toComment = recipients
         .flatMap((r) => (r.to_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean))
         .join(', ');
-    } else if (po?.supplier?.po_email) {
-      toComment = po.supplier.po_email;
     }
 
     // Send the email — must be awaited before returning or Vercel will
