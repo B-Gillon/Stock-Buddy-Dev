@@ -18,16 +18,27 @@ const day = (d) => {
   return `${m}/${dd}/${y}`;
 };
 
+const gradientStyle = {
+  background: 'linear-gradient(to right, #11E0FC, #0099FF)',
+  WebkitBackgroundClip: 'text',
+  WebkitTextFillColor: 'transparent',
+  backgroundClip: 'text',
+};
+
 function Shell({ children }) {
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="bg-gray-800">
-        <div className="mx-auto flex max-w-4xl items-center px-4 py-3">
+    <main className="min-h-screen bg-gray-50 px-4 py-6">
+      <div className="mx-auto w-full max-w-4xl space-y-4">
+        <header className="flex items-center gap-3 rounded-lg bg-gray-800 px-4 py-3 text-white shadow">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/STOCK_BUDDY_LOGO__1_.png" alt="Stock Buddy" className="h-14 w-auto" />
-        </div>
-      </header>
-      <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6">{children}</div>
+          <img src="/STOCK_BUDDY_LOGO__1_.png" alt="Stock Buddy logo" className="h-16 w-auto object-contain" />
+          <div>
+            <p className="text-2xl font-semibold" style={gradientStyle}>Stock Buddy</p>
+            <p className="mt-0.5 text-xs" style={gradientStyle}>Inventory Management for the Modern Age</p>
+          </div>
+        </header>
+        {children}
+      </div>
     </main>
   );
 }
@@ -94,25 +105,34 @@ export default async function AcknowledgePage({ params }) {
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
-              <tr><th className="px-3 py-2">#</th><th className="px-3 py-2">SKU</th><th className="px-3 py-2">Item</th><th className="px-3 py-2 text-right">Qty</th><th className="px-3 py-2 text-right">Unit</th><th className="px-3 py-2 text-right">Total</th></tr>
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
+                <th className="text-left px-3 py-2 font-medium">#</th>
+                <th className="text-left px-3 py-2 font-medium">SKU</th>
+                <th className="text-left px-3 py-2 font-medium">Description</th>
+                <th className="text-left px-3 py-2 font-medium">Qty</th>
+                <th className="text-left px-3 py-2 font-medium">Unit Cost</th>
+                <th className="text-left px-3 py-2 font-medium">Extended Cost</th>
+              </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {po.lines.map((l) => (
-                <tr key={l.lineNo}>
-                  <td className="px-3 py-2 text-gray-500">{l.lineNo}</td>
-                  <td className="px-3 py-2">{l.sku}</td>
-                  <td className="px-3 py-2">{l.title}</td>
-                  <td className="px-3 py-2 text-right">{l.qty}</td>
-                  <td className="px-3 py-2 text-right">{money(l.unitCost, po.currency)}</td>
-                  <td className="px-3 py-2 text-right">{money(l.extended, po.currency)}</td>
+                <tr key={l.lineNo} className="border-b border-gray-100">
+                  <td className="px-3 py-2 text-gray-400">{l.lineNo}</td>
+                  <td className="px-3 py-2 text-gray-600">{l.sku || '—'}</td>
+                  <td className="px-3 py-2 text-gray-800 font-medium">{l.title || '—'}</td>
+                  <td className="px-3 py-2 text-gray-800">{l.qty.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-gray-800">{money(l.unitCost, po.currency)}</td>
+                  <td className="px-3 py-2 text-gray-800">{money(l.extended, po.currency)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-gray-200 font-medium">
-                <td colSpan={5} className="px-3 py-2 text-right">Total</td>
-                <td className="px-3 py-2 text-right">{money(po.total, po.currency)}</td>
+              <tr className="border-t border-gray-200 bg-gray-50 text-sm text-gray-800">
+                <td className="px-3 py-2" colSpan={3}></td>
+                <td className="px-3 py-2 font-semibold">{po.lines.reduce((n, l) => n + l.qty, 0).toLocaleString()}</td>
+                <td className="px-3 py-2"></td>
+                <td className="px-3 py-2 font-semibold">{money(po.total, po.currency)}</td>
               </tr>
             </tfoot>
           </table>
