@@ -2,7 +2,7 @@
 // Supplier enters their name (and optionally an expected ship date) and clicks Acknowledge.
 import { useState } from 'react';
 
-export default function AcknowledgeForm({ token, stamp }) {
+export default function AcknowledgeForm({ token, stamp, requiredShipDate }) {
   const [name, setName] = useState('');
   const [shipDate, setShipDate] = useState('');
   const [website, setWebsite] = useState(''); // honeypot: hidden from people
@@ -41,17 +41,26 @@ export default function AcknowledgeForm({ token, stamp }) {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-6">
+    <form onSubmit={submit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-5">
       <h2 className="text-base font-semibold text-gray-900">Acknowledge this order</h2>
+      <p className="text-sm text-gray-600">
+        Acknowledge receipt and the required ship date, or provide a revised ship date and then acknowledge.
+      </p>
       <div>
         <label htmlFor="ack-name" className="block text-sm font-medium text-gray-700">Your name <span className="text-red-600">*</span></label>
         <input id="ack-name" type="text" value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoComplete="name"
           className="mt-1 w-full rounded border border-gray-300 px-3 py-2 text-sm" />
       </div>
-      <div>
-        <label htmlFor="ack-ship" className="block text-sm font-medium text-gray-700">Expected shipping date <span className="font-normal text-gray-500">(optional)</span></label>
-        <input id="ack-ship" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)}
-          className="mt-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Required Ship Date</label>
+          <div className="mt-1 rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800">{requiredShipDate || "TBD"}</div>
+        </div>
+        <div>
+          <label htmlFor="ack-ship" className="block text-sm font-medium text-gray-700">Expected Ship Date <span className="font-normal text-gray-500">(optional)</span></label>
+          <input id="ack-ship" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)}
+            className="mt-1 rounded border border-gray-300 px-3 py-2 text-sm" />
+        </div>
       </div>
       <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', height: 0, overflow: 'hidden' }}>
         <label>Website<input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} /></label>

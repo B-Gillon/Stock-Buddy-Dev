@@ -528,7 +528,7 @@ export default function PurchaseOrderCreatePage({
               {/* PO Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  PO Date <span className="text-red-500">*</span>
+                  PO Create Date <span className="text-red-500">*</span>
                 </label>
                 {header.status === 'released' ? (
                   <p className="text-sm text-gray-900 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{header.po_date || '—'}</p>
@@ -548,7 +548,7 @@ export default function PurchaseOrderCreatePage({
               {/* Expected Date — auto-populated from supplier lead days */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Expected Date
+                  Required Ship Date <span className="text-red-500">*</span>
                   {selectedSupplier?.lead_days && (
                     <span className="ml-1.5 text-xs text-gray-400 font-normal">
                       ({selectedSupplier.lead_days}-day lead)
@@ -559,8 +559,11 @@ export default function PurchaseOrderCreatePage({
                   type="date"
                   value={header.expected_date}
                   onChange={handleExpectedDateChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 ${
+                    headerErrors.expected_date ? "border-red-400 ring-1 ring-red-400" : "border-gray-300 hover:border-gray-400"
+                  }`}
                 />
+                {headerErrors.expected_date && <p className="mt-1 text-xs text-red-500">{headerErrors.expected_date}</p>}
               </div>
 
             </div>

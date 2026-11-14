@@ -15,7 +15,8 @@ export async function POST(request) {
     const { header, lines } = body;
 
     if (!header?.supplier_id) return NextResponse.json({ error: 'Supplier is required' }, { status: 400 });
-    if (!header?.po_date) return NextResponse.json({ error: 'PO Date is required' }, { status: 400 });
+    if (!header?.po_date) return NextResponse.json({ error: 'PO Create Date is required' }, { status: 400 });
+    if (!header?.expected_date) return NextResponse.json({ error: 'Required Ship Date is required' }, { status: 400 });
     if (!lines || lines.length === 0) return NextResponse.json({ error: 'At least one line item is required' }, { status: 400 });
 
     const { data: settingsRows } = await supabase.from('settings').select('key, value').in('key', ['po_next_number', 'po_format']);

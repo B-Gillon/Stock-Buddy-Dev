@@ -109,7 +109,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
       '',
       `Please be advised that Purchase Order ${po.po_number} has been cancelled.`,
       '',
-      `PO Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`,
+      `PO Create Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`,
       '',
       'If you have any questions, please contact us.',
       '',
@@ -290,7 +290,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     ? `Please find attached a resent copy of Purchase Order ${po.po_number}.`
     : `Please find attached Purchase Order ${po.po_number}.`;
   const poDateLine = `PO Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`;
-  const expectedLine = `Expected Date: ${po.expected_date ? new Date(po.expected_date).toLocaleDateString('en-US') : 'TBD'}`;
+  const expectedLine = `Required Ship Date: ${po.expected_date ? new Date(po.expected_date).toLocaleDateString('en-US') : 'TBD'}`;
 
   const bodyText = [
     `Dear ${po.supplier.supplier_name},`,

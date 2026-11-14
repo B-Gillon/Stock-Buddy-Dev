@@ -20,8 +20,14 @@ const day = (d) => {
 
 function Shell({ children }) {
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="mx-auto w-full max-w-2xl space-y-4">{children}</div>
+    <main className="min-h-screen bg-gray-50">
+      <header className="bg-gray-800">
+        <div className="mx-auto flex max-w-4xl items-center px-4 py-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/STOCK_BUDDY_LOGO__1_.png" alt="Stock Buddy" className="h-14 w-auto" />
+        </div>
+      </header>
+      <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-6">{children}</div>
     </main>
   );
 }
@@ -52,22 +58,36 @@ export default async function AcknowledgePage({ params }) {
 
   return (
     <Shell>
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <p className="text-xs uppercase tracking-wide text-gray-500">{po.retailer || 'Purchase order'}</p>
-        <h1 className="mt-1 text-xl font-semibold text-gray-900">Purchase Order {po.number}</h1>
-        <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <div><dt className="text-gray-500">Supplier</dt><dd className="text-gray-900">{po.supplierName}</dd></div>
-          <div><dt className="text-gray-500">PO date</dt><dd className="text-gray-900">{day(po.date) || '—'}</dd></div>
-          <div><dt className="text-gray-500">Requested date</dt><dd className="text-gray-900">{day(po.requestedDate) || 'TBD'}</dd></div>
-          {po.shipTo && (
-            <div>
-              <dt className="text-gray-500">Ship to</dt>
-              <dd className="text-gray-900">{[po.shipTo.name, ...po.shipTo.lines].filter(Boolean).map((l, i) => <span key={i} className="block">{l}</span>)}</dd>
-            </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Order details (left half) */}
+        <div className="rounded-lg border border-gray-200 bg-white p-5">
+          {po.retailer && <p className="text-xs uppercase tracking-wide text-gray-500">{po.retailer}</p>}
+          <h1 className="mt-1 text-xl font-semibold text-gray-900">Purchase Order {po.number}</h1>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div><dt className="text-gray-500">Supplier</dt><dd className="text-gray-900">{po.supplierName}</dd></div>
+            <div><dt className="text-gray-500">PO create date</dt><dd className="text-gray-900">{day(po.date) || '—'}</dd></div>
+            {po.shipTo && (
+              <div>
+                <dt className="text-gray-500">Ship to</dt>
+                <dd className="text-gray-900">{[po.shipTo.name, ...po.shipTo.lines].filter(Boolean).map((l, i) => <span key={i} className="block">{l}</span>)}</dd>
+              </div>
+            )}
+          </dl>
+          {po.notes && (
+            <div className="mt-4 rounded bg-gray-50 p-3 text-sm text-gray-700"><span className="font-medium">Notes: </span>{po.notes}</div>
           )}
-        </dl>
-        {po.notes && (
-          <div className="mt-4 rounded bg-gray-50 p-3 text-sm text-gray-700"><span className="font-medium">Notes: </span>{po.notes}</div>
+        </div>
+
+        {/* Acknowledgement (right half) */}
+        {data.state === 'acknowledged' ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm text-green-900">
+            <p className="text-base font-semibold">This order has been acknowledged.</p>
+            <p className="mt-2">By {data.acknowledgedBy}{data.acknowledgedAt ? ` on ${new Date(data.acknowledgedAt).toLocaleDateString('en-US')}` : ''}.</p>
+            <p className="mt-1">Required ship date: {day(po.requiredShipDate) || 'TBD'}</p>
+            <p>Expected ship date: {day(data.expectedShipDate) || 'Not provided'}</p>
+          </div>
+        ) : (
+          <AcknowledgeForm token={token} stamp={signRenderStamp(data.ackId)} requiredShipDate={day(po.requiredShipDate)} />
         )}
       </div>
 
@@ -98,15 +118,6 @@ export default async function AcknowledgePage({ params }) {
           </table>
         </div>
       </div>
-
-      {data.state === 'acknowledged' ? (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm text-green-900">
-          <p className="font-semibold">This order has been acknowledged.</p>
-          <p className="mt-1">By {data.acknowledgedBy}{data.acknowledgedAt ? ` on ${new Date(data.acknowledgedAt).toLocaleDateString('en-US')}` : ''}.{data.expectedShipDate ? ` Expected ship date: ${day(data.expectedShipDate)}.` : ''}</p>
-        </div>
-      ) : (
-        <AcknowledgeForm token={token} stamp={signRenderStamp(data.ackId)} />
-      )}
     </Shell>
   );
 }

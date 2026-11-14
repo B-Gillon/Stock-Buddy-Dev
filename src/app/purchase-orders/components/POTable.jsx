@@ -33,8 +33,8 @@ export default function POTable({ purchaseOrders }) {
           <th className={TH}>Supplier</th>
           <th className={TH}>Location</th>
           <th className={TH} style={{ width: '130px' }}>Status</th>
-          <th className={TH} style={{ width: '100px' }}>PO Date</th>
-          <th className={TH} style={{ width: '140px' }}>Expected Date</th>
+          <th className={TH} style={{ width: '130px' }}>PO Create Date</th>
+          <th className={TH} style={{ width: '150px' }}>Required Ship Date</th>
           <th className={TH} style={{ width: '110px' }}>Total Cost</th>
         </tr>
       </thead>

@@ -127,7 +127,7 @@ export async function loadAckForToken(token) {
     po: {
       number: po.po_number,
       date: po.po_date || null,
-      requestedDate: po.expected_date || null,
+      requiredShipDate: po.expected_date || null,
       currency: po.currency_code || 'USD',
       notes: po.notes_supplier || '',
       retailer: tenant?.shop_name || '',

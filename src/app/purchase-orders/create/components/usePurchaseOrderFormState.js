@@ -195,7 +195,8 @@ export function usePurchaseOrderFormState(initialHeader = null, initialRows = nu
     const errors = {};
     if (!header.supplier_id) errors.supplier_id = 'Supplier is required';
     if (!header.ship_to_location_id) errors.ship_to_location_id = 'Ship-To Location is required';
-    if (!header.po_date) errors.po_date = 'PO Date is required';
+    if (!header.po_date) errors.po_date = 'PO Create Date is required';
+    if (!header.expected_date) errors.expected_date = 'Required Ship Date is required';
     setHeaderErrors(errors);
 
     const rowsValid = activeRows.every((r) => !r.error);

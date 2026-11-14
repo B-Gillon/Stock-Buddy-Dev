@@ -23,10 +23,10 @@ function describeChanges({ beforeHeader, header, beforeLines, afterLines }) {
   const changes = [];
 
   if (norm(beforeHeader?.po_date).substring(0, 10) !== norm(header.po_date).substring(0, 10)) {
-    changes.push(`PO Date: ${fmtDay(beforeHeader?.po_date)} → ${fmtDay(header.po_date)}`);
+    changes.push(`PO Create Date: ${fmtDay(beforeHeader?.po_date)} → ${fmtDay(header.po_date)}`);
   }
   if (norm(beforeHeader?.expected_date).substring(0, 10) !== norm(header.expected_date).substring(0, 10)) {
-    changes.push(`Expected Date: ${fmtDay(beforeHeader?.expected_date)} → ${fmtDay(header.expected_date)}`);
+    changes.push(`Required Ship Date: ${fmtDay(beforeHeader?.expected_date)} → ${fmtDay(header.expected_date)}`);
   }
   if (norm(beforeHeader?.notes_internal) !== norm(header.notes_internal)) changes.push('Internal notes updated');
   if (norm(beforeHeader?.notes_supplier) !== norm(header.notes_supplier)) changes.push('Supplier notes updated');
@@ -69,6 +69,7 @@ export async function PATCH(request, { params }) {
     const { id } = await params;
     const body = await request.json();
     const { header, lines } = body;
+    if (!header?.expected_date) return NextResponse.json({ error: 'Required Ship Date is required' }, { status: 400 });
 
     // Snapshot the PO before editing so History can say what changed
     const { data: beforeHeader } = await supabase
