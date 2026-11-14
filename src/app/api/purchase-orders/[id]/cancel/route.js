@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
 import { sendPOEmail } from '@/lib/sendPOEmail';
 import { logPOActivity } from '@/lib/logPOActivity';
+import { cancelAckForPO } from '@/lib/acknowledgements';
 
 export async function POST(request, { params }) {
   const { id } = await params;
@@ -49,6 +50,9 @@ export async function POST(request, { params }) {
   if (updateError) {
     return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
   }
+
+  // An open acknowledgement request no longer applies (the link will show "cancelled")
+  await cancelAckForPO(id);
 
   // ── Zero out any remaining incoming qty in po_shopify_incoming ─────────────
   // Mark all un-reversed rows for this PO as reversed so downstream sync knows

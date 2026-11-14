@@ -78,6 +78,8 @@ export function proxy(request) {
     pathname.startsWith("/api/contact") ||
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/cron/") ||
+    pathname.startsWith("/acknowledge/") ||
+    pathname.startsWith("/api/acknowledge") ||
     pathname.startsWith("/api/shopify/set-shop-cookie") ||
     pathname.startsWith("/admin");
 

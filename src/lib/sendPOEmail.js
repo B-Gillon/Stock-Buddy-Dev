@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { getTransmissionSettings, isSftpReady } from '@/lib/transmissionSettings';
 import { buildPOFileBase } from '@/lib/poFileName';
 import { uploadPOFiles } from '@/lib/sftp';
+import { ensureAckRequest, cancelAckForPO, ackButtonHtml, escapeHtml } from '@/lib/acknowledgements';
+import { buildAckUrl } from '@/lib/ackLink';
 
 /**
  * Sends the PO to the supplier: one email per transmission recipient record and, when the
@@ -270,21 +272,51 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   const subject  = isResend
     ? `Purchase Order ${po.po_number} (Resent)`
     : `Purchase Order ${po.po_number}`;
+  // ── Acknowledgement (set per supplier on the Transmission tab) ─────────────
+  // Only applies to emailed POs; SFTP-only suppliers have no one to send a link to.
+  let ack = null;
+  if (transmission.ack_required && hasRecipients) {
+    const allTo = recipients.flatMap((r) => (r.to_emails ?? '').split(',').map((e) => e.trim()).filter(Boolean));
+    if (allTo.length > 0) {
+      ack = await ensureAckRequest({
+        poId: po.id, tenantId: po.tenant_id, supplierId: po.supplier.id,
+        recipientEmails: allTo, settings: transmission,
+      });
+    }
+  }
+  const ackUrl = ack ? buildAckUrl(ack.id) : null;
+
+  const introLine = isResend
+    ? `Please find attached a resent copy of Purchase Order ${po.po_number}.`
+    : `Please find attached Purchase Order ${po.po_number}.`;
+  const poDateLine = `PO Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`;
+  const expectedLine = `Expected Date: ${po.expected_date ? new Date(po.expected_date).toLocaleDateString('en-US') : 'TBD'}`;
+
   const bodyText = [
     `Dear ${po.supplier.supplier_name},`,
     '',
-    isResend
-      ? `Please find attached a resent copy of Purchase Order ${po.po_number}.`
-      : `Please find attached Purchase Order ${po.po_number}.`,
+    introLine,
     '',
-    `PO Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`,
-    `Expected Date: ${po.expected_date ? new Date(po.expected_date).toLocaleDateString('en-US') : 'TBD'}`,
+    poDateLine,
+    expectedLine,
     '',
-    'Please confirm receipt of this order.',
+    ...(ackUrl
+      ? ['Please acknowledge this order, and let us know your expected ship date, using this link:', ackUrl]
+      : ['Please confirm receipt of this order.']),
     '',
     'Thank you,',
     'Stock Buddy',
   ].join('\n');
+
+  const bodyHtml = ackUrl
+    ? `<div style="font-family:Arial,sans-serif;font-size:14px;color:#222">`
+      + `<p>Dear ${escapeHtml(po.supplier.supplier_name)},</p>`
+      + `<p>${escapeHtml(introLine)}</p>`
+      + `<p>${escapeHtml(poDateLine)}<br>${escapeHtml(expectedLine)}</p>`
+      + `<p>Please acknowledge this order, and let us know your expected ship date:</p>`
+      + ackButtonHtml(ackUrl)
+      + `<p>Thank you,<br>Stock Buddy</p></div>`
+    : undefined;
 
   // ── Create transporter ─────────────────────────────────────────────────────
   const transporter = nodemailer.createTransport({
@@ -313,6 +345,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
         bcc:     bccList.length > 0 ? bccList.join(', ') : undefined,
         subject,
         text:    bodyText,
+        html:    bodyHtml,
         attachments,
       });
     }
@@ -320,6 +353,9 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     console.error('Email send error:', err);
     emailError = `Email failed: ${err.message}`;
   }
+
+  // If the email never went out, don't leave a fresh request behind that would trigger a reminder.
+  if (emailError && ack?.created) await cancelAckForPO(po.id);
 
   // ── SFTP delivery (independent of email: one failing does not stop the other) ──
   let sftp = null;
@@ -343,6 +379,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
       ? describeDelivery({ recipients, withAttachments: true })
       : null,
     emailError,
+    ack && !emailError ? 'Acknowledgement requested' : null,
     sftp ? `SFTP: ${sftp.notes}` : null,
   ].filter(Boolean).join(' | ');
 

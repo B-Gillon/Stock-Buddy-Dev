@@ -8,6 +8,7 @@ import AppLayout from "@/shared/components/layout/AppLayout";
 import Button from "@/shared/components/ui/Button";
 import { useToast } from "@/shared/components/ui/Toast";
 import SupplierDeliverySettings from "./SupplierDeliverySettings";
+import AcknowledgementSettings from "./AcknowledgementSettings";
 
 // ─── Product column definitions ───────────────────────────────────────────────
 
@@ -674,10 +675,15 @@ function TransmissionTab({ supplierId }) {
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [editingSaved, setEditingSaved] = useState(false);
+  const [ack, setAck] = useState({ ack_required: false, ack_reminder_days: null, ack_reminder_cc: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      fetch(`/api/suppliers/${supplierId}/acknowledgement-settings`)
+        .then((r) => r.json())
+        .then((j) => { if (j.settings) setAck(j.settings); })
+        .catch(() => {});
       const res  = await fetch(`/api/suppliers/${supplierId}/transmission`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to load");
@@ -791,6 +797,8 @@ function TransmissionTab({ supplierId }) {
         )}
       </div>
 
+      <AcknowledgementSettings supplierId={supplierId} saved={ack} onSaved={setAck} />
+
       <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">
         <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>
           {saving ? "Saving…" : "Save"}
@@ -799,7 +807,7 @@ function TransmissionTab({ supplierId }) {
     </div>
   );
 
-  return <SupplierDeliverySettings supplierId={supplierId} emailPanel={emailPanel} savedRecipients={saved} />;
+  return <SupplierDeliverySettings supplierId={supplierId} emailPanel={emailPanel} savedRecipients={saved} ackSettings={ack} />;
 }
 
 function RecipientCard({ record, onUpdate, onRemove }) {

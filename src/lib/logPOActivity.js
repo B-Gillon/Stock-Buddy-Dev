@@ -9,7 +9,7 @@ import { readUserCookie } from '@/lib/shopify/userCookie';
  * @param {object} params
  * @param {string} params.poId
  * @param {string} params.tenantId
- * @param {'created'|'edited'|'released'|'resent'|'received'|'acknowledged'|'cancelled'|'closed'|'error'|'sftp_uploaded'|'sftp_retrieved'|'sftp_deleted'|'sftp_failed'} params.action
+ * @param {'created'|'edited'|'released'|'resent'|'received'|'acknowledged'|'cancelled'|'closed'|'error'|'sftp_uploaded'|'sftp_retrieved'|'sftp_deleted'|'sftp_failed'|'reminder_sent'} params.action
  * @param {string} [params.comments]   Notes shown in the History table
  * @param {Request} [params.request]   The incoming request; used to record which user acted
  * @param {string} [params.userName]   Overrides the user (e.g. "System" for automatic checks)

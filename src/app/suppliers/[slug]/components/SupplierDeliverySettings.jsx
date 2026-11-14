@@ -24,7 +24,7 @@ const EMPTY = {
   sftp_csv_path: "",
 };
 
-export default function SupplierDeliverySettings({ supplierId, emailPanel = null, savedRecipients = [] }) {
+export default function SupplierDeliverySettings({ supplierId, emailPanel = null, savedRecipients = [], ackSettings = null }) {
   const { showToast } = useToast();
   const [form, setForm] = useState(EMPTY);
   const [saved, setSaved] = useState(EMPTY);
@@ -204,6 +204,28 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
     }
   }
 
+  // Acknowledgement only applies to emailed POs.
+  const hasEmailRecipients = emailLines.length > 0;
+  const ackLines = [];
+  let ackWarning = null;
+  if (ackSettings?.ack_required) {
+    if (!hasEmailRecipients) {
+      ackWarning = "Acknowledgement is required, but there are no email recipients, so no link will be sent.";
+    } else {
+      ackLines.push("Supplier must acknowledge each PO using a link in the email");
+      if (ackSettings.ack_reminder_days) {
+        const n = ackSettings.ack_reminder_days;
+        const copy = splitList(ackSettings.ack_reminder_cc);
+        ackLines.push(
+          `Reminder emailed if not acknowledged within ${n} business day${n === 1 ? "" : "s"}` +
+          (copy.length ? ` (copy to ${copy.join(", ")})` : " (no copy to you)")
+        );
+      } else {
+        ackLines.push("No reminder is sent");
+      }
+    }
+  }
+
   const savedPreview = buildPOFileBase(saved.file_name_pattern, sample);
   const nothingConfigured = emailLines.length === 0 && sftpLines.length === 0;
 
@@ -226,8 +248,12 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
             {sftpLines.map((line, i) => (
               <li key={`s${i}`} className="flex gap-2"><span aria-hidden className="text-gray-400">•</span><span>{line}</span></li>
             ))}
+            {ackLines.map((line, i) => (
+              <li key={`a${i}`} className="flex gap-2"><span aria-hidden className="text-gray-400">•</span><span>{line}</span></li>
+            ))}
           </ul>
         )}
+        {ackWarning && <p className="text-xs text-amber-700">⚠ {ackWarning}</p>}
         {sftpWarning && <p className="text-xs text-amber-700">⚠ {sftpWarning}</p>}
         <p className="border-t border-gray-100 pt-2 text-xs text-gray-500">
           Files are named like{" "}
