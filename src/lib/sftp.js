@@ -29,12 +29,18 @@ const remotePath = (dir, name) => (dir ? `${dir}/${name}` : name);
 
 // ── Connection ────────────────────────────────────────────────────────────────
 
-function friendlyError(err, pinned) {
+function friendlyError(err, pinned, detail = {}) {
   const msg = String(err?.message ?? err);
   if (pinned && /host denied|verification failed|handshake failed/i.test(msg)) {
     return "The SFTP server's host key has changed since it was first trusted. If that is expected, use 'Reset host key' in the supplier's Transmission settings.";
   }
-  if (/authentication|all configured authentication methods failed/i.test(msg)) return 'SFTP login failed: check the username and password or key.';
+  if (/authentication|all configured authentication methods failed/i.test(msg)) {
+    const extra = [];
+    if (detail.username) extra.push(`tried user "${detail.username}"`);
+    extra.push(detail.usedPassword ? 'with a saved password' : 'no password saved');
+    if (detail.offered) extra.push(`server accepts: ${detail.offered}`);
+    return `SFTP login failed: check the username and password or key. (${extra.join('; ')})`;
+  }
   if (/ENOTFOUND|getaddrinfo/i.test(msg)) return 'SFTP host name could not be found.';
   if (/ETIMEDOUT|timed out|timeout/i.test(msg)) return 'Timed out connecting to the SFTP server.';
   if (/ECONNREFUSED/i.test(msg)) return 'The SFTP server refused the connection (check the host and port).';
@@ -49,6 +55,7 @@ async function withSftp(settings, fn) {
   const client = new SftpClient();
   const pinned = settings.sftp_host_fingerprint || null;
   let seen = null;
+  let offered = null;
 
   // Some servers only accept the password through a "keyboard-interactive" prompt
   // (FileZilla handles this automatically), so answer that prompt with the same password.
@@ -66,12 +73,19 @@ async function withSftp(settings, fn) {
       password: settings.sftp_password || undefined,
       privateKey: settings.sftp_private_key || undefined,
       tryKeyboard: !!settings.sftp_password,
+      // Remember which login methods the server says it accepts (helps diagnose failed logins)
+      debug: (m) => {
+        const hit = /USERAUTH_FAILURE \(([^)]*)\)/.exec(m);
+        if (hit) offered = hit[1] || null;
+      },
       readyTimeout: 15000,
       hostHash: 'sha256',
       hostVerifier: (hash) => { seen = hash; return pinned ? hash === pinned : true; },
     });
   } catch (err) {
-    throw new Error(friendlyError(err, !!pinned));
+    throw new Error(friendlyError(err, !!pinned, {
+      username: settings.sftp_username, usedPassword: !!settings.sftp_password, offered,
+    }));
   }
 
   try {
