@@ -96,7 +96,8 @@ export async function POST(request, { params }) {
     row.sftp_username = username || null;
 
     // Secrets: blank = keep what is stored. Only a typed value replaces it.
-    const newPassword = typeof b.sftp_password === 'string' && b.sftp_password !== '' ? b.sftp_password : null;
+    const trimmedPassword = typeof b.sftp_password === 'string' ? b.sftp_password.trim() : '';
+    const newPassword = trimmedPassword !== '' ? trimmedPassword : null;
     const newKey = typeof b.sftp_private_key === 'string' && b.sftp_private_key.trim() !== '' ? b.sftp_private_key : null;
     row.sftp_password_enc    = newPassword ? encryptSecret(newPassword) : existing?.sftp_password_enc ?? null;
     row.sftp_private_key_enc = newKey ? encryptSecret(newKey) : existing?.sftp_private_key_enc ?? null;

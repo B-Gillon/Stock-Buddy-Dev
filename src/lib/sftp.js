@@ -50,6 +50,14 @@ async function withSftp(settings, fn) {
   const pinned = settings.sftp_host_fingerprint || null;
   let seen = null;
 
+  // Some servers only accept the password through a "keyboard-interactive" prompt
+  // (FileZilla handles this automatically), so answer that prompt with the same password.
+  if (settings.sftp_password) {
+    client.on('keyboard-interactive', (_name, _instructions, _lang, prompts, finish) => {
+      finish(prompts.map(() => settings.sftp_password));
+    });
+  }
+
   try {
     await client.connect({
       host: settings.sftp_host,
@@ -57,6 +65,7 @@ async function withSftp(settings, fn) {
       username: settings.sftp_username,
       password: settings.sftp_password || undefined,
       privateKey: settings.sftp_private_key || undefined,
+      tryKeyboard: !!settings.sftp_password,
       readyTimeout: 15000,
       hostHash: 'sha256',
       hostVerifier: (hash) => { seen = hash; return pinned ? hash === pinned : true; },
