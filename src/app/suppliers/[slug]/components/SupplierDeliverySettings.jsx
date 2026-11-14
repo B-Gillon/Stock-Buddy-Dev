@@ -62,38 +62,57 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   useEffect(() => { load(); }, [load]);
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
-  const dirty = JSON.stringify(form) !== JSON.stringify(saved) || password !== "" || privateKey !== "";
-
   const effectiveCsvPath = sameFolder ? form.sftp_pdf_path : form.sftp_csv_path;
+
+  // Each card tracks and saves only its own fields.
+  const SFTP_FIELDS = ["sftp_enabled", "sftp_host", "sftp_port", "sftp_username", "sftp_send_pdf", "sftp_send_csv", "sftp_pdf_path"];
+  const dirtyFile = form.file_name_pattern !== saved.file_name_pattern;
+  const dirtySftp =
+    SFTP_FIELDS.some((k) => String(form[k] ?? "") !== String(saved[k] ?? "")) ||
+    String(effectiveCsvPath ?? "") !== String(saved.sftp_csv_path ?? "") ||
+    password !== "" || privateKey !== "";
 
   const pdfMissing = form.sftp_enabled && form.sftp_send_pdf && !String(form.sftp_pdf_path ?? "").trim();
   const csvMissing = form.sftp_enabled && form.sftp_send_csv && !String(effectiveCsvPath ?? "").trim();
 
-  async function save(extra = {}) {
-    if (form.sftp_enabled && (pdfMissing || csvMissing) && !extra.reset_host_key) {
+  /**
+   * scope "file"  : saves only the file name pattern (everything else is sent as already saved)
+   * scope "sftp"  : saves only the SFTP settings (the file name pattern is sent as already saved)
+   * scope "reset" : clears the pinned server key, changing nothing else
+   */
+  async function save(scope, extra = {}) {
+    if (scope === "sftp" && form.sftp_enabled && (pdfMissing || csvMissing)) {
       showToast(`Enter the SFTP folder for ${pdfMissing ? "PDF" : "CSV"} files.`, "error");
       return;
     }
+    const pendingPattern = form.file_name_pattern;
+    const body = scope === "sftp"
+      ? { ...form, file_name_pattern: saved.file_name_pattern, sftp_csv_path: effectiveCsvPath,
+          sftp_password: password, sftp_private_key: privateKey }
+      : { ...saved, ...(scope === "file" ? { file_name_pattern: form.file_name_pattern } : {}),
+          sftp_password: "", sftp_private_key: "", ...extra };
+
     setSaving(true);
     try {
       const res = await fetch(`/api/suppliers/${supplierId}/transmission-settings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          sftp_csv_path: effectiveCsvPath,
-          sftp_password: password,
-          sftp_private_key: privateKey,
-          ...extra,
-        }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Save failed");
-      showToast("Delivery settings saved.", "success");
-      setTestResult(null);
-      setEditFile(false);
-      setEditSftp(false);
-      await load();
+      showToast(scope === "file" ? "File name saved." : scope === "sftp" ? "SFTP settings saved." : "Host key reset.", "success");
+
+      if (scope === "file") {
+        setSaved((sv) => ({ ...sv, file_name_pattern: pendingPattern }));
+        setEditFile(false);
+      } else {
+        setTestResult(null);
+        if (scope === "sftp") setEditSftp(false);
+        await load();
+        // load() refreshes everything from the server; keep any file-name edit still in progress
+        if (editFile) setForm((f) => ({ ...f, file_name_pattern: pendingPattern }));
+      }
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -126,8 +145,13 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
   };
   const preview = buildPOFileBase(form.file_name_pattern, sample);
 
-  const saveBtn = (
-    <Button size="sm" onClick={() => save()} disabled={!dirty || saving}>
+  const saveFileBtn = (
+    <Button size="sm" onClick={() => save("file")} disabled={!dirtyFile || saving}>
+      {saving ? "Saving…" : "Save"}
+    </Button>
+  );
+  const saveSftpBtn = (
+    <Button size="sm" onClick={() => save("sftp")} disabled={!dirtySftp || saving}>
       {saving ? "Saving…" : "Save"}
     </Button>
   );
@@ -260,7 +284,7 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
         </p>
       </fieldset>
       {editFile && (
-        <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">{saveBtn}</div>
+        <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">{saveFileBtn}</div>
       )}
     </div>
   );
@@ -391,16 +415,16 @@ export default function SupplierDeliverySettings({ supplierId, emailPanel = null
         {form.sftp_enabled && meta.host_fingerprint && (
           <button type="button" className="mr-auto text-xs text-blue-600 hover:underline"
             title="Only needed if the supplier changed their SFTP server or its security key"
-            onClick={() => save({ reset_host_key: true })} disabled={saving}>
+            onClick={() => save("reset", { reset_host_key: true })} disabled={saving}>
             Reset host key
           </button>
         )}
         {form.sftp_enabled && (
-          <Button variant="secondary" size="sm" onClick={testConnection} disabled={testing || dirty}>
-            {testing ? "Testing…" : dirty ? "Save to test" : "Test connection"}
+          <Button variant="secondary" size="sm" onClick={testConnection} disabled={testing || dirtySftp}>
+            {testing ? "Testing…" : dirtySftp ? "Save to test" : "Test connection"}
           </Button>
         )}
-        {editSftp && saveBtn}
+        {editSftp && saveSftpBtn}
       </div>
       )}
     </div>
