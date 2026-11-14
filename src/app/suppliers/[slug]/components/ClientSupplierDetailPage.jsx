@@ -779,7 +779,7 @@ function TransmissionTab({ supplierId }) {
     </div>
   );
 
-  return <SupplierDeliverySettings supplierId={supplierId} emailPanel={emailPanel} />;
+  return <SupplierDeliverySettings supplierId={supplierId} emailPanel={emailPanel} savedRecipients={saved} />;
 }
 
 function RecipientCard({ record, onUpdate, onRemove }) {
