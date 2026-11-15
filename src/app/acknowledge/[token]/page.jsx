@@ -113,8 +113,8 @@ export default async function AcknowledgePage({ params }) {
                 <th className="text-left px-3 py-2 font-medium">SKU</th>
                 <th className="text-left px-3 py-2 font-medium">Description</th>
                 <th className="text-left px-3 py-2 font-medium">Qty</th>
-                <th className="text-left px-3 py-2 font-medium">Unit Cost</th>
-                <th className="text-left px-3 py-2 font-medium">Extended Cost</th>
+                <th className="text-left pl-10 pr-3 py-2 font-medium">Unit Cost</th>
+                <th className="text-left pl-8 pr-3 py-2 font-medium">Extended Cost</th>
               </tr>
             </thead>
             <tbody>
@@ -124,8 +124,8 @@ export default async function AcknowledgePage({ params }) {
                   <td className="px-3 py-2 text-gray-600">{l.sku || '—'}</td>
                   <td className="px-3 py-2 text-gray-800 font-medium">{l.title || '—'}</td>
                   <td className="px-3 py-2 text-gray-800">{l.qty.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-gray-800">{money(l.unitCost, po.currency)}</td>
-                  <td className="px-3 py-2 text-gray-800">{money(l.extended, po.currency)}</td>
+                  <td className="pl-10 pr-3 py-2 text-gray-800">{money(l.unitCost, po.currency)}</td>
+                  <td className="pl-8 pr-3 py-2 text-gray-800">{money(l.extended, po.currency)}</td>
                 </tr>
               ))}
             </tbody>
@@ -133,8 +133,8 @@ export default async function AcknowledgePage({ params }) {
               <tr className="border-t border-gray-200 bg-gray-50 text-sm text-gray-800">
                 <td className="px-3 py-2" colSpan={3}></td>
                 <td className="px-3 py-2 font-semibold">{po.lines.reduce((n, l) => n + l.qty, 0).toLocaleString()}</td>
-                <td className="px-3 py-2"></td>
-                <td className="px-3 py-2 font-semibold">{money(po.total, po.currency)}</td>
+                <td className="pl-10 pr-3 py-2"></td>
+                <td className="pl-8 pr-3 py-2 font-semibold">{money(po.total, po.currency)}</td>
               </tr>
             </tfoot>
           </table>

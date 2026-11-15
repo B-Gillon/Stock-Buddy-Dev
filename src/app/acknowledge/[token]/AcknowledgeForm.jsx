@@ -43,18 +43,15 @@ export default function AcknowledgeForm({ token, stamp, requiredShipDate }) {
   return (
     <form onSubmit={submit} className="space-y-4 rounded-lg border border-gray-200 bg-white p-5">
       <h2 className="text-base font-semibold text-gray-900">Acknowledgement Required</h2>
-      <p className="text-sm text-gray-600">
-        Acknowledge receipt and the required ship date, or provide a revised ship date and then acknowledge.
-      </p>
-      <div className="flex flex-wrap items-end gap-4">
+      <div className="flex flex-wrap items-start gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Required Ship Date</label>
-          <div className="mt-1 flex h-10 items-center rounded border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800">{requiredShipDate || "TBD"}</div>
+          <div style={{ height: 40, boxSizing: "border-box" }} className="mt-1 flex items-center rounded border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800">{requiredShipDate || "TBD"}</div>
         </div>
         <div>
           <label htmlFor="ack-ship" className="block text-sm font-medium text-gray-700">Expected Ship Date <span className="font-normal text-gray-500">(optional)</span></label>
           <input id="ack-ship" type="date" value={shipDate} onChange={(e) => setShipDate(e.target.value)}
-            className="mt-1 h-10 rounded border border-gray-300 px-3 text-sm" />
+            style={{ height: 40, boxSizing: "border-box", display: "block" }} className="mt-1 rounded border border-gray-300 px-3 text-sm" />
         </div>
       </div>
 
