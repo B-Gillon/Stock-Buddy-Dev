@@ -111,9 +111,9 @@ export default async function AcknowledgePage({ params }) {
               <col style={{ width: 48 }} />
               <col style={{ width: 150 }} />
               <col />
-              <col style={{ width: 110 }} />
-              <col style={{ width: 150 }} />
-              <col style={{ width: 170 }} />
+              <col style={{ width: 77 }} />
+              <col style={{ width: 105 }} />
+              <col style={{ width: 122 }} />
             </colgroup>
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
