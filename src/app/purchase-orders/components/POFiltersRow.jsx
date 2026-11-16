@@ -3,11 +3,25 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 
+const STATUS_OPTIONS = [
+  { value: '',                        label: 'All Open' },
+  { value: 'draft',                   label: 'Draft' },
+  { value: 'pending_acknowledgement', label: 'Pending Acknowledgement' },
+  { value: 'waiting_to_ship',         label: 'Waiting to Ship' },
+  { value: 'partially_shipped',       label: 'Partially Shipped' },
+  { value: 'shipped',                 label: 'Shipped' },
+  { value: 'partially_received',      label: 'Partially Received' },
+  { value: 'received',                label: 'Received' },
+  { value: 'overdue',                 label: 'Overdue' },
+  { value: 'cancelled',               label: 'Cancelled' },
+];
+
 export default function POFiltersRow({ suppliers, locations, currentFilters }) {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
   const [search,     setSearch]     = useState(currentFilters.search      ?? '');
+  const [status,     setStatus]     = useState(currentFilters.status      ?? '');
   const [supplierId, setSupplierId] = useState(currentFilters.supplier_id ?? '');
   const [locationId, setLocationId] = useState(currentFilters.location_id ?? '');
   const [dateFrom,   setDateFrom]   = useState(currentFilters.date_from   ?? '');
@@ -17,6 +31,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
     const params = new URLSearchParams(searchParams.toString());
     const values = {
       search,
+      status,
       supplier_id: supplierId,
       location_id: locationId,
       date_from:   dateFrom,
@@ -32,16 +47,17 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
 
   function clearFilters() {
     setSearch('');
+    setStatus('');
     setSupplierId('');
     setLocationId('');
     setDateFrom('');
     setDateTo('');
     const params = new URLSearchParams(searchParams.toString());
-    ['search', 'supplier_id', 'location_id', 'date_from', 'date_to', 'page'].forEach((k) => params.delete(k));
+    ['search', 'status', 'supplier_id', 'location_id', 'date_from', 'date_to', 'page'].forEach((k) => params.delete(k));
     router.push(`/purchase-orders?${params.toString()}`);
   }
 
-  const hasFilters = search || supplierId || locationId || dateFrom || dateTo;
+  const hasFilters = search || status || supplierId || locationId || dateFrom || dateTo;
 
   return (
     <div className="flex items-center gap-2">
@@ -60,6 +76,15 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
           className="pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 w-32"
         />
       </div>
+
+      {/* Status */}
+      <select
+        value={status}
+        onChange={(e) => { setStatus(e.target.value); applyFilters({ status: e.target.value }); }}
+        className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      >
+        {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
 
       {/* Supplier */}
       <select

@@ -169,16 +169,15 @@ export default function PODetailActions({ po, slug, view = "details" }) {
         isCancelling={isCancelling}
       />
       <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          onClick={() => router.push(
-            view === "history"
-              ? `/purchase-orders/${slug}`
-              : `/purchase-orders/${slug}?view=history`
-          )}
-        >
-          {view === "history" ? "Line Items" : "History"}
-        </Button>
+        {view !== "details" && (
+          <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}`)}>Line Items</Button>
+        )}
+        {view !== "shipments" && (
+          <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}?view=shipments`)}>Shipments</Button>
+        )}
+        {view !== "history" && (
+          <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}?view=history`)}>History</Button>
+        )}
         {canCancel  && <Button variant="secondary" onClick={() => setShowCancelModal(true)}>Cancel PO</Button>}
         {canEdit    && <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}/edit`)}>Edit</Button>}
         {canResend  && <Button variant="secondary" onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}

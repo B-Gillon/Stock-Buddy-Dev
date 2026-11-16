@@ -248,7 +248,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
-            {creating ? `Create Shipment · Carton ${curNo}` : 'Line Items'}<span className="ml-2 text-xs font-normal text-gray-400">({lines.length})</span>
+            {creating ? `Create Shipment · Carton ${curNo}` : (<>Line Items<span className="ml-2 text-xs font-normal text-gray-400">({lines.length})</span></>)}
           </h2>
           {creating ? buttons : exportLinks}
         </div>
@@ -263,7 +263,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
               <th className={th}>#</th><th className={th}></th><th className={th}>SKU</th><th className={th}>Description</th>
               <th className={th}>Ordered</th><th className={th}>Shipped</th>
-              <th className={th}>Received</th><th className={th}>Open</th>
+              <th className={th}>Received</th>
               {creating && <th className={th}>Shipment Qty</th>}
               {creating && (
                 <th className={th}>
@@ -276,9 +276,8 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
           </thead>
           <tbody>
             {lines.length === 0 ? (
-              <tr><td colSpan={creating ? 12 : 10} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
+              <tr><td colSpan={creating ? 11 : 9} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
             ) : lines.map((l) => {
-              const open = (l.ordered ?? 0) - (l.received ?? 0);
               const left = leftFor(l, cur);
               return (
                 <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -294,7 +293,6 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
                   <td className="px-3 py-2 text-gray-800">{l.ordered?.toLocaleString() ?? '—'}</td>
                   <td className="px-3 py-2 text-gray-800">{(l.shipped ?? 0).toLocaleString()}</td>
                   <td className="px-3 py-2 text-gray-800">{(l.received ?? 0).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-gray-800">{open > 0 ? open.toLocaleString() : '—'}</td>
                   {creating && (
                     <td className={`px-3 py-2 font-medium ${(thisShipment[l.id] ?? 0) > remainingBase(l) ? 'text-red-600' : 'text-gray-900'}`}>
                       {(thisShipment[l.id] ?? 0).toLocaleString()}
@@ -319,7 +317,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
                 <td className="px-3 py-2" colSpan={3}></td>
                 <td className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
                 <td className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>
-                <td className="px-3 py-2" colSpan={creating ? 6 : 4}></td>
+                <td className="px-3 py-2" colSpan={creating ? 5 : 3}></td>
                 <td className="px-3 py-2 font-semibold">{formatCurrency(totalCost, currency)}</td>
               </tr>
             </tfoot>

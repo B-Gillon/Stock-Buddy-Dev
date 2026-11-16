@@ -13,6 +13,7 @@ import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import PODetailActions from "./components/PODetailActions";
 import POHistoryTable from "./components/POHistoryTable";
+import ShipmentsView from "./components/ShipmentsView";
 import CollapsibleCards from "./components/CollapsibleCards";
 
 function fmtDate(val) {
@@ -28,7 +29,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
   const { slug } = await params;
   const poNumber = decodeURIComponent(slug);
   const { view: viewParam } = (await searchParams) ?? {};
-  const view = viewParam === "history" ? "history" : "details";
+  const view = viewParam === "history" ? "history" : viewParam === "shipments" ? "shipments" : "details";
 
   const headersList = await headers();
   const tenantId    = await getTenantIdFromHeaders(headersList);
@@ -200,6 +201,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
 
         {view === "history" ? (
           <POHistoryTable rows={history} poId={flatPO.id} openSftpCount={openSftpCount} />
+        ) : view === "shipments" ? (
+          <ShipmentsView poId={flatPO.id} lines={flatLines} />
         ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
