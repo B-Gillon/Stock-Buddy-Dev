@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, readSessionValue } from "@/lib/auth/session";
+import { verifySessionToken } from "@/lib/shopify/sessionToken";
+import {
+  SHOP_COOKIE,
+  createShopCookieValue,
+  readShopCookieValue,
+  shopCookieOptions,
+  verifyShopifyLoadUrl,
+} from "@/lib/shopify/shopSession";
 
 /**
  * src/proxy.js
@@ -14,21 +22,12 @@ import { SESSION_COOKIE, readSessionValue } from "@/lib/auth/session";
  *    to the x-shop-domain header so API routes and server components
  *    can call getTenantId(request) without re-parsing the session.
  *
- * Shop domain resolution order:
- *   1. x-shop-domain header (set by upstream or prior middleware)
- *   2. ?shop query param (present on initial Shopify embed load)
- *   3. ?shop extracted from Referer header (RSC and client nav requests)
- *   4. sb-shop cookie (persisted from a prior resolution this session)
- *   5. NEXT_PUBLIC_DEV_SHOP_DOMAIN env var (local dev fallback — remove before production)
- *
- * When the shop is resolved from ?shop or the header, it is written
- * into the sb-shop cookie so subsequent navigations (which don't carry
- * ?shop) still resolve the correct tenant.
- *
- * BEFORE GOING TO PRODUCTION:
- * - Remove the NEXT_PUBLIC_DEV_SHOP_DOMAIN fallback
- * - Enforce rejection of requests with no shop domain
- * - Replace cookie-based resolution with full session token verification (TECH_DEBT #6)
+ * Shop domain resolution (verified sources only, in order):
+ *   1. Shopify session token (Authorization: Bearer, or ?id_token=)
+ *   2. Shopify-signed app-load URL (?hmac=)
+ *   3. Our signed sb-shop-v2 cookie, issued after 1 or 2
+ *   4. NEXT_PUBLIC_DEV_SHOP_DOMAIN (non-production only)
+ * ?shop, Referer, x-shop-domain and the old plain sb-shop cookie are ignored.
  */
 
 /**
@@ -60,7 +59,7 @@ const DESKTOP_ROUTE_PREFIXES = [
   "/settings",
 ];
 
-export function proxy(request) {
+export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
   // Pass through static files and Next.js internals
@@ -165,79 +164,63 @@ export function proxy(request) {
     return NextResponse.redirect(mobileUrl);
   }
 
-  // ── Resolve shop domain ────────────────────────────────────────────────────
+  // ── Resolve shop domain (verified sources only) ───────────────────────────
+  // The store is NEVER taken from ?shop, Referer, a client-sent x-shop-domain header, or a plain
+  // cookie: anyone can forge those. It must come from something Shopify signed, or from our own
+  // signed cookie that we only issue after such a check.
+  let shopDomain = null;
+  let via = null;
 
-  // 1. Explicit header (set by App Bridge or prior pass)
-  const headerShop = request.headers.get("x-shop-domain");
+  const bearer = request.headers.get("authorization");
+  const jwt =
+    bearer && /^Bearer\s+/i.test(bearer)
+      ? bearer.replace(/^Bearer\s+/i, "").trim()
+      : request.nextUrl.searchParams.get("id_token");
 
-  // 2. ?shop query param (Shopify sets this on initial iframe load)
-  const queryShop = request.nextUrl.searchParams.get("shop");
-
-  // 3. Extract ?shop from Referer header (present on RSC and client nav requests)
-  let refererShop = null;
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      const refererUrl = new URL(referer);
-      const shopParam = refererUrl.searchParams.get("shop");
-      if (
-        shopParam &&
-        /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shopParam)
-      ) {
-        refererShop = shopParam;
-      }
-    } catch {
-      /* ignore malformed referer */
-    }
+  if (jwt) {
+    shopDomain = await verifySessionToken(jwt);
+    if (shopDomain) via = "session-token";
   }
-
-  // 4. Cookie (persisted from a prior resolution)
-  const cookieShop = request.cookies.get("sb-shop")?.value;
-
-  // 5. Dev fallback
-  const devShop = process.env.NEXT_PUBLIC_DEV_SHOP_DOMAIN;
-
-  const shopDomain =
-    headerShop || queryShop || refererShop || cookieShop || devShop;
+  if (!shopDomain) {
+    shopDomain = verifyShopifyLoadUrl(request.nextUrl.searchParams);
+    if (shopDomain) via = "signed-url";
+  }
+  if (!shopDomain) {
+    shopDomain = readShopCookieValue(request.cookies.get(SHOP_COOKIE)?.value);
+    if (shopDomain) via = "signed-cookie";
+  }
+  // Local development only
+  if (!shopDomain && process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_DEV_SHOP_DOMAIN) {
+    shopDomain = process.env.NEXT_PUBLIC_DEV_SHOP_DOMAIN;
+    via = "dev";
+  }
 
   // Read host param — App Bridge needs this to initialize in the iframe
   const host =
     request.headers.get("x-shopify-host") ||
     request.nextUrl.searchParams.get("host");
 
-  if (!shopDomain) {
-    // Not inside Shopify and not signed in: send page visits to the website login
-    if (!isApi) return NextResponse.redirect(new URL("/login", request.url));
-    return NextResponse.next();
-  }
-
-  // Forward shop domain and host as clean headers for downstream use
+  // Never let a visitor supply identity headers
   const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete("x-shop-domain");
   requestHeaders.delete("x-auth-user");
   requestHeaders.delete("x-auth-role");
   requestHeaders.delete("x-auth-supplier");
-  requestHeaders.set("x-shop-domain", shopDomain);
 
-  if (host) {
-    requestHeaders.set("x-shopify-host", host);
+  if (!shopDomain) {
+    // Not inside Shopify and not signed in: send page visits to the website login
+    if (!isApi) return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.next({ request: { headers: requestHeaders } });
   }
 
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  });
+  requestHeaders.set("x-shop-domain", shopDomain);
+  if (host) requestHeaders.set("x-shopify-host", host);
 
-  // Persist the shop domain in a cookie whenever we have a fresh source
-  // (header or query param), so subsequent navigations resolve correctly.
-  // Cookie-based resolution alone is not secure — replace with session
-  // token verification before public launch (TECH_DEBT #6).
-  if (headerShop || queryShop || refererShop) {
-    response.cookies.set("sb-shop", shopDomain, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "none", // required for Shopify iframe context
-      path: "/",
-      maxAge: 60 * 60 * 8, // 8 hours — matches a typical work session
-    });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+
+  // After a Shopify-verified request, remember it with our own signed cookie
+  if (via === "session-token" || via === "signed-url") {
+    response.cookies.set(SHOP_COOKIE, createShopCookieValue(shopDomain), shopCookieOptions);
   }
 
   return response;

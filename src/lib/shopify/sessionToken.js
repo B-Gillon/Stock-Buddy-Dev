@@ -32,7 +32,8 @@
 
 const SHOPIFY_API_KEY = process.env.SHOPIFY_API_KEY;
 const SHOPIFY_API_SECRET = process.env.SHOPIFY_API_SECRET;
-const DEV_SHOP_DOMAIN = process.env.DEV_SHOP_DOMAIN;
+// Local development only: never honoured in production
+const DEV_SHOP_DOMAIN = process.env.NODE_ENV === "production" ? undefined : process.env.DEV_SHOP_DOMAIN;
 
 /**
  * Decode a base64url-encoded string to a UTF-8 string.
@@ -73,7 +74,7 @@ function parseJwt(token) {
  * @param {string} token — the raw JWT string
  * @returns {Promise<string|null>} — the shop domain, or null if invalid
  */
-async function verifySessionToken(token) {
+export async function verifySessionToken(token) {
   let parsed;
 
   try {

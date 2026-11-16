@@ -1,37 +1,17 @@
 // src/app/api/shopify/set-shop-cookie/route.js
-// Called by AppBridgeProvider on mount to set the sb-shop cookie
-// server-side from the verified shop domain extracted from App Bridge.
-// This ensures the correct tenant is resolved on all subsequent requests.
-
+// Called by AppBridgeProvider on mount. Requires a valid Shopify session token; the store is
+// taken from the token, never from the request body. Sets our signed shop cookie.
 import { NextResponse } from 'next/server';
-
-function isValidShopDomain(shop) {
-  return /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.myshopify\.com$/.test(shop);
-}
+import { verifySessionToken } from '@/lib/shopify/sessionToken';
+import { SHOP_COOKIE, createShopCookieValue, shopCookieOptions } from '@/lib/shopify/shopSession';
 
 export async function POST(request) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
-  }
-
-  const { shop } = body;
-
-  if (!shop || !isValidShopDomain(shop)) {
-    return NextResponse.json({ error: 'Invalid shop domain' }, { status: 400 });
-  }
+  const auth = request.headers.get('authorization') || '';
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  const shop = token ? await verifySessionToken(token) : null;
+  if (!shop) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const response = NextResponse.json({ success: true });
-
-  response.cookies.set('sb-shop', shop, {
-    httpOnly: true,
-    secure:   true,
-    sameSite: 'none', // required for Shopify iframe context
-    path:     '/',
-    maxAge:   60 * 60 * 8, // 8 hours
-  });
-
+  response.cookies.set(SHOP_COOKIE, createShopCookieValue(shop), shopCookieOptions);
   return response;
 }
