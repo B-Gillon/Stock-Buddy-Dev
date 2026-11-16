@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier } from '@/lib/supplierPortal';
 import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
+import { normalizeLineColumns } from '@/lib/supplierColumns';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import Badge from '@/shared/components/ui/Badge';
 import Card from '@/shared/components/ui/Card';
@@ -37,14 +38,23 @@ export default async function OrderPage({ params, searchParams }) {
 
   const { data: rows } = await supabase
     .from('purchase_order_lines')
-    .select('id, line_no, sku, title, order_qty_units, received_qty_units, unit_cost, extended_cost, variant:variants!variant_id ( display_title, image_src )')
+    .select('id, line_no, sku, title, order_qty_units, received_qty_units, unit_cost, extended_cost, supplier_variant_id, variant:variants!variant_id ( display_title, image_src, barcode )')
     .eq('purchase_order_id', po.id).order('line_no', { ascending: true });
   const shipConfig = await loadShipmentConfig(s.tenantId);
   const shipped = await shippedByLine((rows ?? []).map((r) => r.id));
+  const svIds = [...new Set((rows ?? []).map((r) => r.supplier_variant_id).filter(Boolean))];
+  const { data: svs } = svIds.length
+    ? await supabase.from('supplier_variants').select('id, supplier_sku, supplier_barcode').in('id', svIds)
+    : { data: [] };
+  const svById = new Map((svs ?? []).map((v) => [v.id, v]));
+  const { data: me } = await supabase.from('app_users').select('ui_prefs').eq('id', s.userId).maybeSingle();
+  const lineColumns = normalizeLineColumns(me?.ui_prefs?.lineColumns);
   const lines = (rows ?? []).map((l) => {
+    const sv = svById.get(l.supplier_variant_id);
     const v = Array.isArray(l.variant) ? l.variant[0] : l.variant;
     return {
-      id: l.id, lineNo: l.line_no, sku: l.sku, title: v?.display_title || l.title, image: v?.image_src ?? null,
+      id: l.id, lineNo: l.line_no, sku: l.sku, supplierSku: sv?.supplier_sku ?? null,
+      barcode: v?.barcode || sv?.supplier_barcode || null, title: v?.display_title || l.title, image: v?.image_src ?? null,
       ordered: l.order_qty_units ?? 0, shipped: shipped[l.id] ?? 0, received: l.received_qty_units ?? 0,
       unitCost: l.unit_cost, extended: l.extended_cost,
     };
@@ -123,6 +133,7 @@ export default async function OrderPage({ params, searchParams }) {
             lines={lines}
             currency={cur}
             config={shipConfig}
+            lineColumns={lineColumns}
             exportLinks={
               <div className="flex items-center gap-2">
                 <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className={btn}>Export CSV</a>

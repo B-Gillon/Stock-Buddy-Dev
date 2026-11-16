@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation';
 import Button from '@/shared/components/ui/Button';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import { validateShipment, WEIGHT_UNITS, DIM_UNITS } from '@/lib/shipmentFields';
+import { LINE_COLUMN_DEFS } from '@/lib/supplierColumns';
+
+const idValue = (l, id) => (id === 'sku' ? l.sku : id === 'supplier_sku' ? l.supplierSku : l.barcode) || '—';
 
 const Ctx = createContext(null);
 
@@ -112,12 +115,12 @@ function ShipmentDetails({ cfg, s, set }) {
 
 const th = 'text-left px-3 py-2 font-medium';
 
-function ItemQtyTable({ lines, carton, leftFor, onQty }) {
+function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
-          <th className="py-1 pr-3 font-medium">SKU</th><th className="py-1 pr-3 font-medium">Description</th>
+          {idCols.map((c) => <th key={c.id} className="py-1 pr-3 font-medium">{c.label}</th>)}<th className="py-1 pr-3 font-medium">Description</th>
           <th className="py-1 pr-3 font-medium">Left to Ship</th><th className="py-1 font-medium">Carton Qty</th>
         </tr>
       </thead>
@@ -127,7 +130,7 @@ function ItemQtyTable({ lines, carton, leftFor, onQty }) {
           const left = leftFor(l);
           return (
             <tr key={l.id} className="border-b border-gray-50 last:border-0">
-              <td className="py-1.5 pr-3 text-gray-600">{l.sku || '—'}</td>
+              {idCols.map((c) => <td key={c.id} className="py-1.5 pr-3 text-gray-600">{idValue(l, c.id)}</td>)}
               <td className="py-1.5 pr-3 text-gray-800">{l.title}</td>
               <td className="py-1.5 pr-3 text-gray-800">{Math.max(0, left - mine)}</td>
               <td className="py-1">
@@ -143,7 +146,7 @@ function ItemQtyTable({ lines, carton, leftFor, onQty }) {
   );
 }
 
-export function LinesTable({ poId, lines, currency, exportLinks, config }) {
+export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns }) {
   const router = useRouter();
   const { creating, setCreating } = useContext(Ctx);
   const [saved, setSaved] = useState([]);          // cartons already saved, in order
@@ -152,6 +155,18 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
   const [ship, setShip] = useState({ ship_date: today(), weight_unit: 'lb' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [cols, setCols] = useState(lineColumns);
+  const [colsOpen, setColsOpen] = useState(false);
+  const idCols = LINE_COLUMN_DEFS.filter((c) => cols[c.id]);
+
+  async function toggleCol(id) {
+    const next = { ...cols, [id]: !cols[id] };
+    if (!next.sku && !next.supplier_sku && !next.barcode) return; // keep at least one
+    setCols(next);
+    try {
+      await fetch('/api/supplier-portal/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lineColumns: next }) });
+    } catch { /* the choice still applies on this screen */ }
+  }
 
   const qtyIn = (c, id) => Number(c.q[id] || 0) || 0;
   const hasQty = (c) => lines.some((l) => qtyIn(c, l.id) > 0);
@@ -250,7 +265,23 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
           <h2 className="text-sm font-semibold text-gray-800">
             {creating ? `Create Shipment · Carton ${curNo}` : (<>Line Items<span className="ml-2 text-xs font-normal text-gray-400">({lines.length})</span></>)}
           </h2>
-          {creating ? buttons : exportLinks}
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button type="button" onClick={() => setColsOpen((o) => !o)}
+                className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">Columns</button>
+              {colsOpen && (
+                <div className="absolute right-0 z-10 mt-1 w-48 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">Show item columns</p>
+                  {LINE_COLUMN_DEFS.map((c) => (
+                    <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-gray-700 hover:bg-gray-50">
+                      <input type="checkbox" checked={!!cols[c.id]} onChange={() => toggleCol(c.id)} />{c.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {creating ? buttons : exportLinks}
+          </div>
         </div>
         {error ? <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p> : null}
         {creating && (
@@ -261,7 +292,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
-              <th className={th}>#</th><th className={th}></th><th className={th}>SKU</th><th className={th}>Description</th>
+              <th className={th}>#</th><th className={th}></th>{idCols.map((c) => <th key={c.id} className={th}>{c.label}</th>)}<th className={th}>Description</th>
               <th className={th}>Ordered</th><th className={th}>Shipped</th>
               <th className={th}>Received</th>
               {creating && <th className={th}>Shipment Qty</th>}
@@ -276,7 +307,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
           </thead>
           <tbody>
             {lines.length === 0 ? (
-              <tr><td colSpan={creating ? 11 : 9} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
+              <tr><td colSpan={(creating ? 10 : 8) + idCols.length} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
             ) : lines.map((l) => {
               const left = leftFor(l, cur);
               return (
@@ -288,7 +319,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
                       {l.image ? <img src={l.image} alt={l.title} className="object-cover w-full h-full" /> : null}
                     </div>
                   </td>
-                  <td className="px-3 py-2 text-gray-600">{l.sku || '—'}</td>
+                  {idCols.map((c) => <td key={c.id} className="px-3 py-2 text-gray-600">{idValue(l, c.id)}</td>)}
                   <td className="px-3 py-2 text-gray-800 font-medium">{l.title || '—'}</td>
                   <td className="px-3 py-2 text-gray-800">{l.ordered?.toLocaleString() ?? '—'}</td>
                   <td className="px-3 py-2 text-gray-800">{(l.shipped ?? 0).toLocaleString()}</td>
@@ -314,7 +345,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
           {lines.length > 0 && (
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 text-sm text-gray-800">
-                <td className="px-3 py-2" colSpan={3}></td>
+                <td className="px-3 py-2" colSpan={2 + idCols.length}></td>
                 <td className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
                 <td className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>
                 <td className="px-3 py-2" colSpan={creating ? 5 : 3}></td>
@@ -347,7 +378,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
               {editing ? (
                 <div className="space-y-4">
                   <CartonFields cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
-                  <ItemQtyTable lines={lines} carton={c} leftFor={(l) => leftFor(l, c)}
+                  <ItemQtyTable lines={lines} carton={c} idCols={idCols} leftFor={(l) => leftFor(l, c)}
                     onQty={(lineId, v) => patchSaved(i, { q: { ...c.q, [lineId]: v } })} />
                 </div>
               ) : (

@@ -170,7 +170,7 @@ export default function PODetailActions({ po, slug, view = "details" }) {
       />
       <div className="flex items-center gap-2">
         {view !== "details" && (
-          <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}`)}>Line Items</Button>
+          <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}`)}>Details</Button>
         )}
         {view !== "shipments" && (
           <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}?view=shipments`)}>Shipments</Button>

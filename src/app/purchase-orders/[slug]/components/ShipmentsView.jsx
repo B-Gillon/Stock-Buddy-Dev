@@ -87,8 +87,8 @@ export default async function ShipmentsView({ poId, lines }) {
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs text-gray-600">
                       <th className="px-3 py-2 font-medium">Carton</th>
                       {cols.map((c) => <th key={c.key} className="px-3 py-2 font-medium">{c.head}</th>)}
-                      <th className="px-3 py-2 font-medium">Items Packed</th>
-                      <th className="px-3 py-2 font-medium">Units</th>
+                      <th className="px-3 py-2 font-medium">SKU</th>
+                      <th className="px-3 py-2 font-medium">Quantity</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -99,9 +99,11 @@ export default async function ShipmentsView({ poId, lines }) {
                           <td className="px-3 py-2 font-medium text-gray-800">Carton {c.carton_no}</td>
                           {cols.map((col) => <td key={col.key} className="px-3 py-2 text-gray-700">{dash(col.get(c))}</td>)}
                           <td className="px-3 py-2 text-gray-700">
-                            {ci.map((i) => <div key={i.po_line_id}>{label(i.po_line_id)} × {i.shipped_qty}</div>)}
+                            {ci.map((i) => <div key={i.po_line_id}>{label(i.po_line_id)}</div>)}
                           </td>
-                          <td className="px-3 py-2 text-gray-800">{ci.reduce((t, i) => t + (i.shipped_qty ?? 0), 0)}</td>
+                          <td className="px-3 py-2 text-gray-800">
+                            {ci.map((i) => <div key={i.po_line_id}>{i.shipped_qty}</div>)}
+                          </td>
                         </tr>
                       );
                     })}

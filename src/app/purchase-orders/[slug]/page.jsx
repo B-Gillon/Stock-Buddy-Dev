@@ -14,7 +14,6 @@ import PageHeader from "@/shared/components/ui/PageHeader";
 import PODetailActions from "./components/PODetailActions";
 import POHistoryTable from "./components/POHistoryTable";
 import ShipmentsView from "./components/ShipmentsView";
-import CollapsibleCards from "./components/CollapsibleCards";
 
 function fmtDate(val) {
   if (!val) return "—";
@@ -149,14 +148,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
           actions={<PODetailActions po={flatPO} slug={slug} view={view} />}
         />
 
-        <CollapsibleCards
-          summary={[
-            flatPO.supplier_name,
-            flatPO.location_name && `Ship to ${flatPO.location_name}`,
-            `${flatLines.length} line${flatLines.length === 1 ? "" : "s"}`,
-            formatCurrency(totalCost, currencyCode),
-          ].filter(Boolean).join(" · ")}
-        >
+        {view === "details" && (<>
         <div className="grid grid-cols-4 gap-4">
           <Card title="PO Info">
             <div className="space-y-1.5 text-sm">
@@ -190,7 +182,6 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
             </div>
           </Card>
         </div>
-        </CollapsibleCards>
 
         {(flatPO.notes_internal || flatPO.notes_supplier) && (
           <div className="grid grid-cols-2 gap-4">
@@ -198,6 +189,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
             {flatPO.notes_supplier && <Card title="Supplier Notes"><p className="text-sm text-gray-700 whitespace-pre-wrap">{flatPO.notes_supplier}</p></Card>}
           </div>
         )}
+        </>)}
 
         {view === "history" ? (
           <POHistoryTable rows={history} poId={flatPO.id} openSftpCount={openSftpCount} />
