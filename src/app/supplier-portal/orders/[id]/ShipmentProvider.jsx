@@ -41,13 +41,13 @@ function Field({ label, required, children, wide }) {
   );
 }
 
-function CartonFields({ cfg, f, set }) {
+function CartonFields({ cfg, f, set, autoSscc }) {
   const v = (id) => cfg[id].visible; const r = (id) => cfg[id].required;
   const text = (key) => <input className={input} value={f[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {v('supplier_carton_id') && <Field label="Supplier Carton ID" required={r('supplier_carton_id')}>{text('supplier_carton_id')}</Field>}
-      {v('sscc') && <Field label="SSCC" required={r('sscc')}><input className={input} inputMode="numeric" placeholder="18 digits" value={f.sscc ?? ''} onChange={(e) => set({ sscc: e.target.value })} /></Field>}
+      {v('sscc') && <Field label="SSCC" required={r('sscc')}><input className={input} inputMode="numeric" placeholder={autoSscc ? 'Assigned when saved' : '18 digits'} disabled={!!autoSscc} value={f.sscc ?? ''} onChange={(e) => set({ sscc: e.target.value })} /></Field>}
       {v('carton_tracking') && <Field label="Carton Tracking Number" required={r('carton_tracking')}>{text('tracking_number')}</Field>}
       {v('weight') && (
         <Field label="Weight" required={r('weight')}>
@@ -146,7 +146,10 @@ function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
   );
 }
 
-export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns }) {
+const labelUrl = (sscc) => `/supplier-portal/labels?sscc=${sscc}`;
+const SSCC_PLACEHOLDER = '000000000000000000';
+
+export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels }) {
   const router = useRouter();
   const { creating, setCreating } = useContext(Ctx);
   const [saved, setSaved] = useState([]);          // cartons already saved, in order
@@ -189,8 +192,15 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   const cartonCount = saved.length + (hasQty(cur) ? 1 : 0);
 
   const cartonPayload = (c) => ({ ...c.f, lines: lines.map((l) => ({ lineId: l.id, qty: qtyIn(c, l.id) })).filter((x) => x.qty) });
+  const withPh = (c) => (labels?.enabled && !c.f.sscc ? { ...c, f: { ...c.f, sscc: SSCC_PLACEHOLDER } } : c);
+  async function reserve(cartonNo) {
+    const res = await fetch('/api/supplier-portal/sscc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ poId, cartonNo }) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || !d.ok) throw new Error(d.error || 'Could not assign an SSCC.');
+    return d.sscc;
+  }
   function cartonErrors(c, n) {
-    return validateShipment(config, { ship_date: '2000-01-01' }, [cartonPayload(c)])
+    return validateShipment(config, { ship_date: '2000-01-01' }, [cartonPayload(withPh(c))])
       .filter((e) => e.startsWith('Carton 1'))
       .map((e) => e.replace('Carton 1', `Carton ${n}`));
   }
@@ -201,11 +211,22 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     setCur((c) => ({ ...c, q }));
   }
 
-  function saveAndAddAnother() {
+  async function saveAndAddAnother() {
     const errs = cartonErrors(cur, curNo);
     if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
     setError('');
-    setSaved((cs) => [...cs, cur]);
+    let carton = cur;
+    if (labels?.enabled) {
+      const w = labels.printMode === 'each_carton' ? window.open('', '_blank') : null; // opened now so the browser allows it
+      setBusy(true);
+      try {
+        const sscc = await reserve(curNo);
+        carton = { ...cur, f: { ...cur.f, sscc } };
+        if (w) w.location.href = labelUrl(sscc);
+      } catch (e) { w?.close(); setError(e.message); setBusy(false); return; }
+      setBusy(false);
+    }
+    setSaved((cs) => [...cs, carton]);
     setCur(blankCarton());
   }
   const patchSaved = (i, patch) => setSaved((cs) => cs.map((c, k) => (k === i ? { ...c, ...patch } : c)));
@@ -228,20 +249,31 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     setError('');
     const all = hasQty(cur) ? [...saved, cur] : saved;
     const { ...shipment } = ship;
-    const body = { poId, shipment, cartons: all.map(cartonPayload) };
-    const errs = validateShipment(config, body.shipment, body.cartons);
+    const errs = validateShipment(config, shipment, all.map((c) => cartonPayload(withPh(c))));
     if (!hasQty(cur) && Object.values(cur.f).some((v) => v && !['lb', 'in'].includes(v))) {
       errs.push(`Carton ${curNo}: enter a quantity for at least one item, or clear its fields.`);
     }
     for (const l of lines) if ((thisShipment[l.id] ?? 0) > remainingBase(l)) errs.push(`${l.sku || `Line ${l.lineNo}`}: more than the ${remainingBase(l)} remaining unshipped.`);
     if (errs.length) { setError(errs.slice(0, 4).join(' ') + (errs.length > 4 ? ` (and ${errs.length - 4} more)` : '')); return; }
     setBusy(true);
+    const wantWin = labels?.enabled && (labels.printMode === 'end' || (labels.printMode === 'each_carton' && hasQty(cur)));
+    const w = wantWin ? window.open('', '_blank') : null;
     try {
+      let cartons = all;
+      if (labels?.enabled) {
+        cartons = [];
+        for (let i = 0; i < all.length; i++) {
+          const c = all[i];
+          cartons.push(c.f.sscc ? c : { ...c, f: { ...c.f, sscc: await reserve(i + 1) } });
+        }
+      }
+      const body = { poId, shipment, cartons: cartons.map(cartonPayload) };
       const res = await fetch('/api/supplier-portal/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) { setError(data.error || 'Something went wrong.'); setBusy(false); return; }
+      if (!res.ok || !data.ok) { w?.close(); setError(data.error || 'Something went wrong.'); setBusy(false); return; }
+      if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc);
       cancel(); setBusy(false); router.refresh();
-    } catch { setError('Something went wrong.'); setBusy(false); }
+    } catch (e) { w?.close(); setError(e?.message || 'Something went wrong.'); setBusy(false); }
   }
 
   const buttons = (
@@ -289,7 +321,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
         {error ? <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p> : null}
         {creating && (
           <div className="border-b border-gray-200 p-4">
-            <CartonFields cfg={config.carton} f={cur.f} set={(patch) => setCur((c) => ({ ...c, f: { ...c.f, ...patch } }))} />
+            <CartonFields autoSscc={labels?.enabled} cfg={config.carton} f={cur.f} set={(patch) => setCur((c) => ({ ...c, f: { ...c.f, ...patch } }))} />
           </div>
         )}
         <table className="w-full text-sm">
@@ -384,13 +416,14 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
                 {editing
                   ? <button type="button" className="text-blue-700 hover:underline" onClick={() => doneEditing(i)}>Done</button>
                   : <button type="button" className="text-blue-700 hover:underline" onClick={() => { setEditIdx(i); setError(''); }}>Edit</button>}
+                {c.f.sscc && <a className="text-blue-700 hover:underline" href={labelUrl(c.f.sscc)} target="_blank" rel="noopener noreferrer">Print label</a>}
                 <button type="button" className="text-red-600 hover:underline" onClick={() => removeSaved(i)}>Remove</button>
               </div>
             </div>
             <div className="border-t border-gray-100 px-4 py-3">
               {editing ? (
                 <div className="space-y-4">
-                  <CartonFields cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
+                  <CartonFields autoSscc={labels?.enabled} cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
                   <ItemQtyTable lines={lines} carton={c} idCols={idCols} leftFor={(l) => leftFor(l, c)}
                     onQty={(lineId, v) => patchSaved(i, { q: { ...c.q, [lineId]: v } })} />
                 </div>

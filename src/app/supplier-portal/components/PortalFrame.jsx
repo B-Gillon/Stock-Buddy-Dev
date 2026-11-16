@@ -14,6 +14,7 @@ const TABS = [
   { key: 'shipping', href: '/supplier-portal/shipping', label: 'Shipping' },
   { key: 'invoicing', href: '/supplier-portal/invoicing', label: 'Invoicing' },
   { key: 'inventory', href: '/supplier-portal/inventory', label: 'Inventory' },
+  { key: 'settings', href: '/supplier-portal/settings', label: 'Settings' },
 ];
 
 export default function PortalFrame({ supplierName, email, active: activeKey, children }) {

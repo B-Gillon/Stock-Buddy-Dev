@@ -7,6 +7,7 @@ import { shippedByLine } from '@/lib/shipments';
 import { markRetrieved } from '@/lib/supplierPortal';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { validateShipment } from '@/lib/shipmentFields';
+import { loadLabelSettings, validSscc } from '@/lib/sscc';
 
 const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
 const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -41,6 +42,18 @@ export async function POST(request) {
   const cartonsIn = Array.isArray(body.cartons) ? body.cartons : [];
   const errors = validateShipment(config, sh, cartonsIn);
   if (errors.length) return bad(errors[0] + (errors.length > 1 ? ` (and ${errors.length - 1} more)` : ''));
+
+  // Generated SSCCs must be ones this supplier reserved for this PO and hasn't used yet
+  const labels = await loadLabelSettings(tenantId, supplierId);
+  const generated = labels.enabled ? cartonsIn.map((c) => String(c.sscc ?? '').replace(/\s+/g, '')).filter(Boolean) : [];
+  if (generated.length) {
+    if (new Set(generated).size !== generated.length) return bad('Two cartons have the same SSCC.');
+    if (generated.some((x) => !validSscc(x))) return bad('A carton has an invalid SSCC.');
+    const { data: held } = await supabase.from('supplier_ssccs').select('sscc, shipment_id')
+      .eq('tenant_id', tenantId).eq('supplier_id', supplierId).eq('po_id', po.id).in('sscc', generated);
+    const ok = new Set((held ?? []).filter((r) => !r.shipment_id).map((r) => r.sscc));
+    if (generated.some((x) => !ok.has(x))) return bad('A carton SSCC is not valid for this shipment. Remove the carton and add it again.');
+  }
 
   // Quantities against what is left to ship
   const { data: lines } = await supabase.from('purchase_order_lines').select('id, order_qty_units').eq('purchase_order_id', po.id);
@@ -93,7 +106,7 @@ export async function POST(request) {
     return {
       tenant_id: tenantId, shipment_id: created.id, carton_no: i + 1,
       supplier_carton_id: vc.supplier_carton_id.visible ? clean(c.supplier_carton_id) : null,
-      sscc: vc.sscc.visible && clean(c.sscc) ? String(c.sscc).replace(/\s+/g, '') : null,
+      sscc: (vc.sscc.visible || labels.enabled) && clean(c.sscc) ? String(c.sscc).replace(/\s+/g, '') : null,
       tracking_number: vc.carton_tracking.visible ? clean(c.tracking_number) : null,
       weight: hasW ? numOrNull(c.weight) : null, weight_unit: hasW ? c.weight_unit : null,
       length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,
@@ -104,6 +117,7 @@ export async function POST(request) {
   const { data: cartonIds, error: cErr } = await supabase.from('shipment_cartons').insert(cartonRows).select('id, carton_no');
   if (cErr) { console.error('[shipments] cartons failed:', cErr); await rollback(); return bad('Could not create the shipment. Please try again.', 500); }
   const idByNo = new Map(cartonIds.map((r) => [r.carton_no, r.id]));
+  if (generated.length) await supabase.from('supplier_ssccs').update({ shipment_id: created.id }).eq('tenant_id', tenantId).in('sscc', generated);
 
   const lineRows = [];
   cartonsIn.forEach((c, i) => {
@@ -127,5 +141,5 @@ export async function POST(request) {
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
   await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: user.email,
     comments: `Shipment ${number}` });
-  return NextResponse.json({ ok: true, shipmentNumber: number });
+  return NextResponse.json({ ok: true, shipmentNumber: number, shipmentId: created.id });
 }

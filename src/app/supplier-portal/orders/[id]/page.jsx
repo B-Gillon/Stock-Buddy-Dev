@@ -5,6 +5,7 @@ import { requireSupplier } from '@/lib/supplierPortal';
 import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { normalizeLineColumns } from '@/lib/supplierColumns';
+import { loadLabelSettings } from '@/lib/sscc';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import Badge from '@/shared/components/ui/Badge';
 import Card from '@/shared/components/ui/Card';
@@ -41,6 +42,10 @@ export default async function OrderPage({ params, searchParams }) {
     .select('id, line_no, sku, title, order_qty_units, received_qty_units, unit_cost, extended_cost, supplier_variant_id, variant:variants!variant_id ( display_title, image_src, barcode )')
     .eq('purchase_order_id', po.id).order('line_no', { ascending: true });
   const shipConfig = await loadShipmentConfig(s.tenantId);
+  const labelSettings = await loadLabelSettings(s.tenantId, s.supplierId);
+  const { data: shipRows } = await supabase.from('shipments')
+    .select('id, shipment_number, ship_date, total_cartons, shipment_cartons ( sscc )')
+    .eq('po_id', po.id).eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).order('created_at', { ascending: true });
   const shipped = await shippedByLine((rows ?? []).map((r) => r.id));
   const svIds = [...new Set((rows ?? []).map((r) => r.supplier_variant_id).filter(Boolean))];
   const { data: svs } = svIds.length
@@ -134,6 +139,7 @@ export default async function OrderPage({ params, searchParams }) {
             currency={cur}
             config={shipConfig}
             lineColumns={lineColumns}
+            labels={{ enabled: labelSettings.enabled, printMode: labelSettings.printMode }}
             exportLinks={
               <div className="flex items-center gap-2">
                 <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className={btn}>Export CSV</a>
@@ -141,6 +147,34 @@ export default async function OrderPage({ params, searchParams }) {
               </div>
             }
           />
+
+          <HideWhileCreating>
+            {(shipRows ?? []).length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">Shipments</h2>
+                <table className="w-full text-sm">
+                  <thead><tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
+                    <th className="text-left px-3 py-2 font-medium">Shipment</th><th className="text-left px-3 py-2 font-medium">Ship Date</th>
+                    <th className="text-left px-3 py-2 font-medium">Cartons</th><th className="px-3 py-2"></th>
+                  </tr></thead>
+                  <tbody>
+                    {shipRows.map((sh) => (
+                      <tr key={sh.id} className="border-b border-gray-100">
+                        <td className="px-3 py-2 font-medium text-gray-800">{sh.shipment_number}</td>
+                        <td className="px-3 py-2 text-gray-700">{fmtDate(sh.ship_date)}</td>
+                        <td className="px-3 py-2 text-gray-700">{sh.total_cartons ?? '—'}</td>
+                        <td className="px-3 py-2 text-right">
+                          {(sh.shipment_cartons ?? []).some((c) => c.sscc) && (
+                            <a className={btn} href={`/supplier-portal/labels?shipment=${sh.id}`} target="_blank" rel="noopener noreferrer">Print labels</a>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </HideWhileCreating>
         </div>
       </ShipmentProvider>
     </PortalFrame>
