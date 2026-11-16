@@ -31,7 +31,7 @@ export default async function OrderPage({ params }) {
   const total = (lines ?? []).reduce((t, l) => t + Number(l.extended_cost ?? (l.unit_cost ?? 0) * (l.order_qty_units ?? 0)), 0);
 
   return (
-    <PortalFrame active="orders" supplierName={s.supplierName} email={s.email}>
+    <PortalFrame supplierName={s.supplierName} email={s.email}>
       <Link href="/supplier-portal/orders" className="text-sm text-blue-700 hover:underline">← Back to purchase orders</Link>
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">

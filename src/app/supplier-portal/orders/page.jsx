@@ -44,7 +44,7 @@ export default async function OrdersPage() {
   );
 
   return (
-    <PortalFrame active="orders" supplierName={s.supplierName} email={s.email}>
+    <PortalFrame supplierName={s.supplierName} email={s.email}>
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Needs acknowledgement ({needs.length})</h2>
         {needs.length === 0 ? <p className="text-sm text-gray-400">Nothing waiting for you.</p> : <Table items={needs} />}
