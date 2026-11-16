@@ -101,3 +101,23 @@ export function addBusinessDays(start, n, timeZone = BUSINESS_TIME_ZONE) {
     timeZone,
   );
 }
+
+/**
+ * Hours elapsed between two instants, not counting weekends or holidays (Eastern Time days).
+ * Used for "over 24 business hours" checks.
+ */
+export function businessHoursBetween(start, end, timeZone = BUSINESS_TIME_ZONE) {
+  const a = new Date(start).getTime();
+  const b = new Date(end).getTime();
+  if (!(b > a)) return 0;
+  const s = localParts(new Date(a), timeZone);
+  let dayStart = zonedToInstant({ year: s.year, month: s.month, day: s.day, hour: 0, minute: 0, second: 0 }, timeZone).getTime();
+  let ms = 0;
+  for (let guard = 0; dayStart < b && guard < 400; guard += 1) {
+    const lp = localParts(new Date(dayStart + 12 * 3600e3), timeZone);
+    const nextMid = zonedToInstant({ year: lp.year, month: lp.month, day: lp.day + 1, hour: 0, minute: 0, second: 0 }, timeZone).getTime();
+    if (isBusinessDay(lp.year, lp.month, lp.day)) ms += Math.max(0, Math.min(b, nextMid) - Math.max(a, dayStart));
+    dayStart = nextMid;
+  }
+  return ms / 3600e3;
+}

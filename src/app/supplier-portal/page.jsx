@@ -2,19 +2,63 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier, fmtDate } from '@/lib/supplierPortal';
+import { businessHoursBetween } from '@/lib/businessDays';
 import PortalFrame from './components/PortalFrame';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Supplier – Stock Buddy', robots: { index: false, follow: false } };
 
-function Card({ title, value, href }) {
+function Card({ title, value, href, red }) {
   const body = (
     <div className="flex h-full flex-col items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-4 text-center shadow-sm hover:border-gray-300">
       <p className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-gray-500">{title}</p>
-      <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
+      <p className={`mt-2 text-3xl font-semibold ${red ? 'text-red-600' : 'text-gray-900'}`}>{value}</p>
     </div>
   );
-  return href ? <Link href={href}>{body}</Link> : body;
+  return href ? <Link href={href} className="block">{body}</Link> : body;
+}
+
+const DONUT_COLORS = { ready: '#2563eb', week: '#f59e0b', overdue: '#dc2626' };
+
+function Donut({ ready, week, overdue }) {
+  const total = ready + week + overdue;
+  const R = 70, C = 2 * Math.PI * R;
+  const parts = [
+    { key: 'ready', label: 'Ready to Ship', n: ready },
+    { key: 'week', label: 'Ship this Week', n: week },
+    { key: 'overdue', label: 'Overdue Shipments', n: overdue },
+  ];
+  let offset = 0;
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
+      <svg viewBox="0 0 200 200" className="h-44 w-44 shrink-0" role="img"
+        aria-label={`Shipping status: ${parts.map((p) => `${p.n} ${p.label}`).join(', ')}`}>
+        <g transform="rotate(-90 100 100)">
+          <circle cx="100" cy="100" r={R} fill="none" stroke="#e5e7eb" strokeWidth="28" />
+          {total > 0 && parts.filter((p) => p.n > 0).map((p) => {
+            const len = (p.n / total) * C;
+            const el = (
+              <circle key={p.key} cx="100" cy="100" r={R} fill="none" stroke={DONUT_COLORS[p.key]} strokeWidth="28"
+                strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} />
+            );
+            offset += len;
+            return el;
+          })}
+        </g>
+        <text x="100" y="98" textAnchor="middle" className="fill-gray-900" style={{ fontSize: 30, fontWeight: 600 }}>{total}</text>
+        <text x="100" y="120" textAnchor="middle" className="fill-gray-500" style={{ fontSize: 12 }}>open orders</text>
+      </svg>
+      <ul className="space-y-2 text-sm">
+        {parts.map((p) => (
+          <li key={p.key} className="flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: DONUT_COLORS[p.key] }} />
+            <span className="text-gray-700">{p.label}</span>
+            <span className="ml-auto pl-4 font-semibold text-gray-900">{p.n}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export default async function SupplierDashboard() {
@@ -23,7 +67,7 @@ export default async function SupplierDashboard() {
 
   const { data: pos } = await supabase
     .from('purchase_orders')
-    .select('id, po_number, status, po_date, supplier_retrieved_at, expected_date, expected_ship_date, location:locations ( name )')
+    .select('id, po_number, status, po_date, released_at, supplier_retrieved_at, expected_date, expected_ship_date, location:locations ( name )')
     .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId)
     .in('status', ['pending_acknowledgement', 'waiting_to_ship', 'partially_received'])
     .order('po_date', { ascending: false }).limit(500);
@@ -36,23 +80,44 @@ export default async function SupplierDashboard() {
   const weekStart = monday.toISOString().slice(0, 10);
   const weekEnd = new Date(monday.getTime() + 6 * 864e5).toISOString().slice(0, 10);
 
-  // New POs = not yet retrieved (downloaded, or picked up by the supplier's system), same as the New POs tab
-  const newPOs = list.filter((p) => p.status !== 'partially_received' && !p.supplier_retrieved_at).length;
-  const notAck = list.filter((p) => p.status === 'pending_acknowledgement').length;
-  const notShipped = list.length;
+  const nowMs = Date.now();
+  const OVER = 24; // business hours (weekends and major holidays excluded)
+
+  // Not Printed = not yet retrieved (downloaded, emailed, or picked up by the supplier's system), same as the New POs tab
+  const unretrieved = list.filter((p) => p.status !== 'partially_received' && !p.supplier_retrieved_at);
+  const notPrinted = unretrieved.length;
+  const notPrintedRed = unretrieved.some((p) => businessHoursBetween(p.released_at || p.po_date, nowMs) > OVER);
+
+  const pendingIds = list.filter((p) => p.status === 'pending_acknowledgement').map((p) => p.id);
+  const { data: acks } = pendingIds.length
+    ? await supabase.from('po_acknowledgements').select('po_id, requested_at').in('po_id', pendingIds).eq('status', 'pending')
+    : { data: [] };
+  const askedAt = new Map((acks ?? []).map((a) => [a.po_id, a.requested_at]));
+  const notAck = pendingIds.length;
+  const notAckRed = list.some((p) => p.status === 'pending_acknowledgement'
+    && businessHoursBetween(askedAt.get(p.id) || p.released_at || p.po_date, nowMs) > OVER);
+
+  const waitingToShip = list.length; // shipping isn't tracked yet, so open means not shipped
   const thisWeek = list.filter((p) => shipDate(p) && shipDate(p) >= today && shipDate(p) >= weekStart && shipDate(p) <= weekEnd).length;
   const overdue = list.filter((p) => shipDate(p) && shipDate(p) < today).length;
+  const ready = waitingToShip - thisWeek - overdue; // open orders shipping later or with no date
   const notInvoiced = 0; // invoicing not built yet
 
   return (
     <PortalFrame supplierName={s.supplierName} email={s.email}>
-      <div className="grid grid-cols-6 gap-3">
-        <Card title="New POs" value={newPOs} href="/supplier-portal/orders" />
-        <Card title="Not Acknowledged" value={notAck} href="/supplier-portal/orders" />
-        <Card title="Not Shipped" value={notShipped} href="/supplier-portal/shipping" />
-        <Card title="Ship this Week" value={thisWeek} />
-        <Card title="Overdue" value={overdue} />
-        <Card title="Not Invoiced" value={notInvoiced} href="/supplier-portal/invoicing" />
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid grid-cols-3 gap-3">
+          <Card title="Not Printed" value={notPrinted} href="/supplier-portal/orders" red={notPrintedRed} />
+          <Card title="Not Acknowledged" value={notAck} href="/supplier-portal/orders" red={notAckRed} />
+          <Card title="Waiting to Ship" value={waitingToShip} href="/supplier-portal/shipping" red={overdue > 0} />
+          <Card title="Ship this Week" value={thisWeek} />
+          <Card title="Overdue" value={overdue} />
+          <Card title="Not Invoiced" value={notInvoiced} href="/supplier-portal/invoicing" />
+        </div>
+        <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Shipping Status</h2>
+          <Donut ready={ready} week={thisWeek} overdue={overdue} />
+        </div>
       </div>
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Open purchase orders</h2>

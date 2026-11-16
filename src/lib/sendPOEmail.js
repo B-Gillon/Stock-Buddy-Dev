@@ -357,6 +357,13 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   // If the email never went out, don't leave a fresh request behind that would trigger a reminder.
   if (emailError && ack?.created) await cancelAckForPO(po.id);
 
+  // An emailed PO counts as retrieved by the supplier (it no longer shows as "Not Printed" in their portal)
+  if (hasEmailTarget && !emailError) {
+    await supabase.from('purchase_orders')
+      .update({ supplier_retrieved_at: new Date().toISOString(), supplier_retrieved_by: 'Email' })
+      .eq('id', po.id).is('supplier_retrieved_at', null);
+  }
+
   // ── SFTP delivery (independent of email: one failing does not stop the other) ──
   let sftp = null;
   if (sftpReady) {
