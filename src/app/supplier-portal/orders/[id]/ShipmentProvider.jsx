@@ -75,13 +75,13 @@ export function LinesTable({ poId, lines, currency, exportLinks }) {
           <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
             <th className={th}>#</th><th className={th}></th><th className={th}>SKU</th><th className={th}>Description</th>
             <th className={th}>Ordered</th><th className={th}>Shipped</th>
+            <th className={th}>Received</th><th className={th}>Open</th>
             {creating && (
               <th className={th}>
                 <button type="button" onClick={fillAll} title="Fill every line with its remaining unshipped quantity"
-                  className="font-medium text-blue-700 underline decoration-dotted hover:text-blue-900">Shipped Qty</button>
+                  className="cursor-pointer font-medium text-gray-600 hover:text-gray-900">Shipped Qty</button>
               </th>
-            )}
-            <th className={th}>Received</th><th className={th}>Open</th><th className={th}>Unit Cost</th><th className={th}>Extended Cost</th>
+            )}<th className={th}>Unit Cost</th><th className={th}>Extended Cost</th>
           </tr>
         </thead>
         <tbody>
@@ -103,6 +103,8 @@ export function LinesTable({ poId, lines, currency, exportLinks }) {
                 <td className="px-3 py-2 text-gray-800 font-medium">{l.title || '—'}</td>
                 <td className="px-3 py-2 text-gray-800">{l.ordered?.toLocaleString() ?? '—'}</td>
                 <td className="px-3 py-2 text-gray-800">{(l.shipped ?? 0).toLocaleString()}</td>
+                <td className="px-3 py-2 text-gray-800">{(l.received ?? 0).toLocaleString()}</td>
+                <td className="px-3 py-2 text-gray-800">{open > 0 ? open.toLocaleString() : '—'}</td>
                 {creating && (
                   <td className="px-3 py-1.5">
                     <input type="number" min="0" max={rem} step="1" inputMode="numeric" disabled={rem === 0}
@@ -111,8 +113,6 @@ export function LinesTable({ poId, lines, currency, exportLinks }) {
                       className="h-8 w-24 rounded border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
                   </td>
                 )}
-                <td className="px-3 py-2 text-gray-800">{(l.received ?? 0).toLocaleString()}</td>
-                <td className="px-3 py-2 text-gray-800">{open > 0 ? open.toLocaleString() : '—'}</td>
                 <td className="px-3 py-2 text-gray-800">{formatCurrency(l.unitCost, currency)}</td>
                 <td className="px-3 py-2 text-gray-800">{formatCurrency(l.extended, currency)}</td>
               </tr>
