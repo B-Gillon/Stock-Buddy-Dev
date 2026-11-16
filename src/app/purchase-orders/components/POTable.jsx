@@ -29,13 +29,13 @@ export default function POTable({ purchaseOrders }) {
     <table className="w-full border-collapse" style={{ margin: '0 16px', width: 'calc(100% - 32px)' }}>
       <thead>
         <tr className="border-b border-gray-200 bg-gray-50">
-          <th className={`${TH} whitespace-nowrap`} style={{ width: '14%' }}>PO Number</th>
-          <th className={TH} style={{ width: '14%' }}>Supplier</th>
-          <th className={TH} style={{ width: '14%' }}>Location</th>
-          <th className={`${TH} whitespace-nowrap`} style={{ width: '14%' }}>Status</th>
-          <th className={`${TH} whitespace-nowrap`} style={{ width: '14%' }}>Create Date</th>
-          <th className={`${TH} whitespace-nowrap`} style={{ width: '14%' }}>Req Ship Date</th>
-          <th className={`${TH} whitespace-nowrap`} style={{ width: '14%' }}>Exp Ship Date</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '11%' }}>PO Number</th>
+          <th className={TH}>Supplier</th>
+          <th className={TH}>Location</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '11%' }}>Status</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '11%' }}>Create Date</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '11%' }}>Req Ship Date</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '11%' }}>Exp Ship Date</th>
         </tr>
       </thead>
       <tbody>
