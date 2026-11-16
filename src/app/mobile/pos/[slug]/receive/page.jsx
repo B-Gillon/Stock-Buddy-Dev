@@ -1,3 +1,4 @@
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 // src/app/mobile/pos/[slug]/receive/page.jsx
 // Server component — fetches PO and line items for the receive screen.
 // Validates PO is in a receivable state before rendering.
@@ -39,7 +40,7 @@ export default async function MobileReceivePage({ params }) {
   if (poError || !po) return notFound();
 
   // Only released or partially_received POs can be received
-  if (!["released", "partially_received"].includes(po.status)) {
+  if (!RECEIVABLE_STATUSES.includes(po.status)) {
     redirect(`/mobile/pos/${encodeURIComponent(poNumber)}`);
   }
 

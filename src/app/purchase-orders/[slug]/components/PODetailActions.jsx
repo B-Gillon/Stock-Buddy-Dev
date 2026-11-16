@@ -1,4 +1,5 @@
 "use client";
+import { RECEIVABLE_STATUSES, RESENDABLE_STATUSES, OPEN_STATUSES } from '@/lib/poStatus';
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -145,10 +146,10 @@ export default function PODetailActions({ po, slug, view = "details" }) {
   };
 
   const canRelease = po.status === "draft";
-  const canReceive = ["released", "partially_received"].includes(po.status);
-  const canResend  = ["released", "partially_received", "received"].includes(po.status);
+  const canReceive = RECEIVABLE_STATUSES.includes(po.status);
+  const canResend  = RESENDABLE_STATUSES.includes(po.status);
   const canEdit    = po.status !== "cancelled";
-  const canCancel  = ["draft", "released", "partially_received"].includes(po.status);
+  const canCancel  = OPEN_STATUSES.includes(po.status);
 
   return (
     <>

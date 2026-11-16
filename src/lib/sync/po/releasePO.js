@@ -63,7 +63,7 @@ export async function releasePO({ supabase, poId, tenantId }) {
   const releasedAt = new Date().toISOString();
   const { error: updateError } = await supabase
     .from("purchase_orders")
-    .update({ status: "released", released_at: releasedAt, updated_at: releasedAt })
+    .update({ status: "waiting_to_ship", released_at: releasedAt, updated_at: releasedAt })
     .eq("id", poId)
     .eq("tenant_id", tenantId);
 

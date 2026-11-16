@@ -384,9 +384,9 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   ].filter(Boolean).join(' | ');
 
   if (emailError || sftpError) {
-    return { success: false, error: [emailError, sftpError].filter(Boolean).join(' | '), emailError, notes, sftp };
+    return { success: false, error: [emailError, sftpError].filter(Boolean).join(' | '), emailError, notes, sftp, ackRequested: !!ack && !emailError };
   }
-  return { success: true, notes, sftp };
+  return { success: true, notes, sftp, ackRequested: !!ack };
 }
 
 /**

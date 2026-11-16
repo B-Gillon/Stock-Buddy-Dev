@@ -1,3 +1,4 @@
+import { RESENDABLE_STATUSES } from '@/lib/poStatus';
 // src/app/mobile/pos/[slug]/finalize/page.jsx
 // Server component — fetches PO and lines for the finalization screen.
 // Redirects back to detail if PO is not ready to finalize.
@@ -39,7 +40,7 @@ export default async function MobileFinalizePage({ params }) {
   if (poError || !po) return notFound();
 
   // Only receivable or already-received POs reach this screen
-  const validStatuses = ["released", "partially_received", "received"];
+  const validStatuses = RESENDABLE_STATUSES;
   if (!validStatuses.includes(po.status)) {
     redirect(`/mobile/pos/${encodeURIComponent(poNumber)}`);
   }

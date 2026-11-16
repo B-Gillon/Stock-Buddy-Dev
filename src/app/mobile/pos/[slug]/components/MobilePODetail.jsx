@@ -1,4 +1,5 @@
 "use client";
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 
 // src/app/mobile/pos/[slug]/components/MobilePODetail.jsx
 // PO summary screen shown before entering the receive flow.
@@ -61,7 +62,8 @@ function ProgressRing({ received, total }) {
 
 function StatusBadge({ status }) {
   const map = {
-    released: { label: "Released", classes: "bg-blue-100 text-blue-700" },
+    pending_acknowledgement: { label: "Pending Ack", classes: "bg-purple-100 text-purple-700" },
+    waiting_to_ship: { label: "Waiting to Ship", classes: "bg-blue-100 text-blue-700" },
     partially_received: { label: "In Progress", classes: "bg-amber-100 text-amber-700" },
     received: { label: "Received", classes: "bg-green-100 text-green-700" },
   };
@@ -86,7 +88,7 @@ function MetaRow({ label, value }) {
 export default function MobilePODetail({ po, lines }) {
   const router = useRouter();
 
-  const isReceivable = ["released", "partially_received"].includes(po.status);
+  const isReceivable = RECEIVABLE_STATUSES.includes(po.status);
   const isFullyReceived = po.receivedUnits >= po.totalUnits && po.totalUnits > 0;
 
   const fullyReceivedLines = lines.filter(

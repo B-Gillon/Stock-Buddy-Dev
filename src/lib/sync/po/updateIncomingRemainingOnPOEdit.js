@@ -1,3 +1,4 @@
+import { OPEN_STATUSES } from '@/lib/poStatus';
 /**
  * updateIncomingRemainingOnPOEdit.js
  *
@@ -41,7 +42,7 @@ export async function updateIncomingRemainingOnPOEdit(poId, tenantId) {
       return { success: true, linesUpdated: 0, skipped: true };
     }
 
-    if (!["draft", "released", "partially_received"].includes(po.status)) {
+    if (!OPEN_STATUSES.includes(po.status)) {
       return { success: true, linesUpdated: 0, skipped: true };
     }
 

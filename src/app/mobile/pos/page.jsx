@@ -1,3 +1,4 @@
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 // src/app/mobile/pos/page.jsx
 // Server component — fetches released/partially_received POs for the tenant.
 // Flattens supplier name and line totals before passing to client.
@@ -28,7 +29,7 @@ export default async function MobilePOListPage() {
       purchase_order_lines ( order_qty_units, received_qty_units )
     `)
     .eq("tenant_id", tenantId)
-    .in("status", ["released", "partially_received"])
+    .in("status", RECEIVABLE_STATUSES)
     .order("expected_date", { ascending: true });
 
   if (error) {

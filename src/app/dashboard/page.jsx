@@ -1,3 +1,4 @@
+import { OPEN_STATUSES } from '@/lib/poStatus';
 // /src/app/dashboard/page.jsx
 
 import { headers } from "next/headers";
@@ -98,7 +99,7 @@ export default async function DashboardPage() {
       )
     `)
     .eq("tenant_id", tenantId)
-    .in("purchase_orders.status", ["draft", "released", "partially_received"]);
+    .in("purchase_orders.status", OPEN_STATUSES);
 
   const incomingByVariant = {};
   let totalIncoming = 0;

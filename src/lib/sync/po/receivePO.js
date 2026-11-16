@@ -1,3 +1,4 @@
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 /**
  * receivePO.js
  *
@@ -40,7 +41,7 @@ export async function receiveInStockBuddy({ poId, lineId, qtyToReceive, tenantId
     const { po, lines } = await fetchPOWithLines(poId, tenantId);
 
     // Guard: must be in a receivable status
-    if (!["released", "partially_received"].includes(po.status)) {
+    if (!RECEIVABLE_STATUSES.includes(po.status)) {
       return {
         success: false,
         error: `PO status '${po.status}' is not receivable`,

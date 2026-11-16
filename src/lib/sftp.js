@@ -281,6 +281,13 @@ export async function refreshSftpStatus({ poId, tenantId, settings }) {
       comments: `${names(deleted)} no longer on the SFTP site (removed by the supplier's system)` });
   }
 
+  // The supplier's system has picked the file up: a PO waiting on acknowledgement moves on to Waiting to Ship.
+  if (retrieved.length || deleted.length) {
+    await supabase.from('purchase_orders')
+      .update({ status: 'waiting_to_ship' })
+      .eq('id', poId).eq('tenant_id', tenantId).eq('status', 'pending_acknowledgement');
+  }
+
   return { checked: open.length, retrieved: retrieved.length, deleted: deleted.length };
 }
 

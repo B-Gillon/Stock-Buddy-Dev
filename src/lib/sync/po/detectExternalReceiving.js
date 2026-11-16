@@ -1,3 +1,4 @@
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 /**
  * detectExternalReceiving.js
  *
@@ -67,7 +68,7 @@ export async function detectExternalReceiving(tenantId = null) {
   let poQuery = supabase
     .from("purchase_orders")
     .select("id, tenant_id, ship_to_location_id, receiving_source")
-    .in("status", ["released", "partially_received"])
+    .in("status", RECEIVABLE_STATUSES)
     .eq("receiving_source", "stock_buddy");
 
   if (tenantId) poQuery = poQuery.eq("tenant_id", tenantId);

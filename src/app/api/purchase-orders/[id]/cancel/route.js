@@ -1,3 +1,4 @@
+import { OPEN_STATUSES } from '@/lib/poStatus';
 // /src/app/api/purchase-orders/[id]/cancel/route.js
 
 import { NextResponse } from 'next/server';
@@ -29,7 +30,7 @@ export async function POST(request, { params }) {
     return NextResponse.json({ success: false, error: 'PO not found' }, { status: 404 });
   }
 
-  if (!['draft', 'released', 'partially_received'].includes(po.status)) {
+  if (!OPEN_STATUSES.includes(po.status)) {
     return NextResponse.json(
       { success: false, error: `Cannot cancel a PO with status "${po.status}"` },
       { status: 400 }

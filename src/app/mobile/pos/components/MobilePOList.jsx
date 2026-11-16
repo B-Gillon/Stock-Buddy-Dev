@@ -46,7 +46,8 @@ function ProgressBar({ received, total }) {
 
 function StatusBadge({ status }) {
   const map = {
-    released: { label: "Released", classes: "bg-blue-100 text-blue-700" },
+    pending_acknowledgement: { label: "Pending Ack", classes: "bg-purple-100 text-purple-700" },
+    waiting_to_ship: { label: "Waiting to Ship", classes: "bg-blue-100 text-blue-700" },
     partially_received: { label: "In Progress", classes: "bg-amber-100 text-amber-700" },
   };
   const { label, classes } = map[status] ?? { label: status, classes: "bg-gray-100 text-gray-600" };

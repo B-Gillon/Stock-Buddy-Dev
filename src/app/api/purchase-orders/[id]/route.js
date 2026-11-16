@@ -1,3 +1,4 @@
+import { SENT_STATUSES } from '@/lib/poStatus';
 // /src/app/api/purchase-orders/[id]/route.js
 import { NextResponse } from 'next/server';
 import { supabase, setTenantContext } from '@/lib/supabaseClient';
@@ -89,7 +90,7 @@ export async function PATCH(request, { params }) {
       notes_supplier: header.notes_supplier || null,
       updated_at:     new Date().toISOString(),
     };
-    if (header.status === 'released' && header.released_at) headerUpdate.released_at = header.released_at;
+    if (SENT_STATUSES.includes(header.status) && header.released_at) headerUpdate.released_at = header.released_at;
     if (header.status === 'cancelled' && header.cancelled_at) headerUpdate.cancelled_at = header.cancelled_at;
 
     const { error: poError } = await supabase.from('purchase_orders').update(headerUpdate).eq('id', id);

@@ -3,7 +3,8 @@
  *
  * Releases a draft PO:
  *   1. Validates status === 'draft'
- *   2. Updates status → 'released', sets released_at
+ *   2. Updates status → 'waiting_to_ship' (or 'pending_acknowledgement' once the email asks for
+ *      an acknowledgement), sets released_at
  *   3. Pushes incoming quantities via pushIncomingToShopify
  *   4. Rolls back DB status if push fails
  *   5. Sends PO email to supplier
@@ -44,7 +45,7 @@ export async function POST(request, { params }) {
 
     const { error: updateError } = await supabase
       .from("purchase_orders")
-      .update({ status: "released", released_at: new Date().toISOString() })
+      .update({ status: "waiting_to_ship", released_at: new Date().toISOString() })
       .eq("id", poId);
 
     if (updateError) {
@@ -67,6 +68,11 @@ export async function POST(request, { params }) {
     // Send email — must be awaited before returning or Vercel will
     // terminate the function before the email is sent
     const emailResult = await sendPOEmail(poId, { isResend: false });
+
+    // Supplier must acknowledge → hold in Pending Acknowledgement until they do
+    if (emailResult.ackRequested) {
+      await supabase.from("purchase_orders").update({ status: "pending_acknowledgement" }).eq("id", poId);
+    }
 
     await logPOActivity({
       poId, tenantId, action: "released", request,

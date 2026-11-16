@@ -200,6 +200,11 @@ export async function submitAck({ token, name, shipDate, stamp, website, ip, use
   }
   if (!updated) return { ok: false, code: 'already', error: 'This order has already been acknowledged.' };
 
+  // Acknowledged → the PO is now waiting for the supplier to ship
+  await supabase.from('purchase_orders')
+    .update({ status: 'waiting_to_ship' })
+    .eq('id', ack.po_id).eq('status', 'pending_acknowledgement');
+
   await logPOActivity({
     poId: ack.po_id,
     tenantId: ack.tenant_id,
@@ -258,9 +263,15 @@ export async function sendDueReminders() {
         .select('po_number, status, supplier:suppliers ( supplier_name )')
         .eq('id', ack.po_id).single();
 
-      if (!po || po.status === 'cancelled' || po.status === 'received' || po.status === 'closed') {
+      if (!po || po.status === 'cancelled' || po.status === 'received') {
         await supabase.from('po_acknowledgements')
           .update({ status: 'cancelled', reminder_due_at: null }).eq('id', id);
+        result.skipped += 1;
+        continue;
+      }
+      // Already moved on (e.g. the supplier's system picked up the SFTP file): no reminder needed.
+      if (po.status !== 'pending_acknowledgement') {
+        await supabase.from('po_acknowledgements').update({ reminder_due_at: null }).eq('id', id);
         result.skipped += 1;
         continue;
       }

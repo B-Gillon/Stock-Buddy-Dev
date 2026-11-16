@@ -1,3 +1,4 @@
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -33,7 +34,7 @@ export default async function ReceivePOPage({ params }) {
   if (poError || !po) notFound();
 
   // Only released or partially_received POs can be received
-  if (!["released", "partially_received"].includes(po.status)) {
+  if (!RECEIVABLE_STATUSES.includes(po.status)) {
     redirect(`/purchase-orders/${slug}`);
   }
 

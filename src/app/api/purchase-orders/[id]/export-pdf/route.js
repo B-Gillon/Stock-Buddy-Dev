@@ -42,7 +42,7 @@ export async function GET(request, { params }) {
       contact_name:  settings['pdf.contact_name'],
       contact_email: settings['pdf.contact_email'],
       contact_phone: settings['pdf.contact_phone'],
-    }, lines, po.status !== 'released');
+    }, lines, po.status === 'draft');
 
     const naming = await getTransmissionSettings(po.supplier?.id);
     const fileBase = buildPOFileBase(naming.file_name_pattern, {

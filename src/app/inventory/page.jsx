@@ -1,3 +1,4 @@
+import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
 // /src/app/inventory/page.jsx
 // SERVER COMPONENT — no "use client"
 
@@ -111,7 +112,7 @@ export default async function InventoryPage({ searchParams }) {
       `)
       .eq("tenant_id", tenantId)
       .in("variant_id", variantIds)
-      .in("purchase_orders.status", ["released", "partially_received"])
+      .in("purchase_orders.status", RECEIVABLE_STATUSES)
       .gt("incoming_remaining", 0);
 
     // Build a map of variant_id + location_id → total incoming_remaining

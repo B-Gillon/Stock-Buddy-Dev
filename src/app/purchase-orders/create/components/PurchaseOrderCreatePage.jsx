@@ -1,4 +1,5 @@
 "use client";
+import { SENT_STATUSES } from '@/lib/poStatus';
 
 // /src/app/purchase-orders/create/components/PurchaseOrderCreatePage.jsx
 
@@ -376,7 +377,7 @@ export default function PurchaseOrderCreatePage({
         slug = data.slug;
       }
 
-      if (editMode && existingPO && header.status === 'released') {
+      if (editMode && existingPO && SENT_STATUSES.includes(header.status)) {
         try {
           await fetch(`/api/purchase-orders/${existingPO.id}/resend`, { method: 'POST' });
         } catch {
@@ -386,7 +387,7 @@ export default function PurchaseOrderCreatePage({
 
       isDirtyRef.current = false;
       setIsDirty(false);
-      showToast(editMode && header.status === 'released' ? 'Changes saved and PO resent to supplier.' : 'Saved successfully.');
+      showToast(editMode && SENT_STATUSES.includes(header.status) ? 'Changes saved and PO resent to supplier.' : 'Saved successfully.');
       setTimeout(() => router.push(`/purchase-orders/${encodeURIComponent(slug)}`), 100);
     } catch (err) {
       showToast(err.message || 'Failed to save.', 'error');
@@ -530,7 +531,7 @@ export default function PurchaseOrderCreatePage({
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   PO Create Date <span className="text-red-500">*</span>
                 </label>
-                {header.status === 'released' ? (
+                {SENT_STATUSES.includes(header.status) ? (
                   <p className="text-sm text-gray-900 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md">{header.po_date || '—'}</p>
                 ) : (
                   <input
