@@ -11,7 +11,11 @@ export default async function SettingsPage() {
   const settings = await loadLabelSettings(s.tenantId, s.supplierId);
   return (
     <PortalFrame active="settings" supplierName={s.supplierName} email={s.email}>
-      <LabelSettingsForm initial={settings} />
+      {settings.allowed ? <LabelSettingsForm initial={{ ...settings, enabled: settings.wantsEnabled }} /> : (
+        <div className="max-w-2xl rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-600 shadow-sm">
+          Carton labels (SSCC) aren’t turned on for your account. Ask your customer to enable them.
+        </div>
+      )}
     </PortalFrame>
   );
 }

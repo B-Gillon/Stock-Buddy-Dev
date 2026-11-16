@@ -20,6 +20,8 @@ export async function POST(request) {
   const w = await who(request);
   if (!w) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   let b; try { b = await request.json(); } catch { b = {}; }
+  const current = await loadLabelSettings(w.tenantId, w.supplierId);
+  if (!current.allowed) return NextResponse.json({ ok: false, error: 'Carton labels are not turned on for your account. Ask your customer to enable them.' }, { status: 403 });
   const enabled = !!b.enabled;
   const prefix = String(b.companyPrefix ?? '').replace(/\s+/g, '');
   const ext = Number(b.extensionDigit);

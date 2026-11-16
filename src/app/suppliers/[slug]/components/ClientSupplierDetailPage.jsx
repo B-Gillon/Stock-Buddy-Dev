@@ -9,6 +9,7 @@ import Button from "@/shared/components/ui/Button";
 import { useToast } from "@/shared/components/ui/Toast";
 import SupplierDeliverySettings from "./SupplierDeliverySettings";
 import AcknowledgementSettings from "./AcknowledgementSettings";
+import CartonLabelSettings from "./CartonLabelSettings";
 
 // ─── Product column definitions ───────────────────────────────────────────────
 
@@ -798,6 +799,7 @@ function TransmissionTab({ supplierId }) {
       </div>
 
       <AcknowledgementSettings supplierId={supplierId} saved={ack} onSaved={setAck} />
+      <CartonLabelSettings supplierId={supplierId} />
 
       <div className="flex items-center justify-end border-t border-gray-100 px-4 py-2">
         <Button size="sm" onClick={handleSave} disabled={!dirty || saving}>

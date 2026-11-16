@@ -22,14 +22,18 @@ export function buildSscc(extension, prefix, serial) {
 export const validSscc = (v) => /^\d{18}$/.test(v) && checkDigit(v.slice(0, 17)) === Number(v[17]);
 
 export async function loadLabelSettings(tenantId, supplierId) {
+  const { data: sup } = await supabase.from('suppliers').select('allow_carton_labels').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle();
+  const allowed = !!sup?.allow_carton_labels;
   const { data } = await supabase.from('supplier_label_settings')
     .select('enabled, company_prefix, extension_digit, print_mode, next_serial')
     .eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
   return {
-    enabled: !!data?.enabled && validPrefix(data?.company_prefix),
+    allowed,
+    enabled: allowed && !!data?.enabled && validPrefix(data?.company_prefix),
     companyPrefix: data?.company_prefix ?? '',
     extensionDigit: data?.extension_digit ?? 0,
     printMode: data?.print_mode ?? 'each_carton',
+    wantsEnabled: !!data?.enabled,
     nextSerial: Number(data?.next_serial ?? 0),
   };
 }
