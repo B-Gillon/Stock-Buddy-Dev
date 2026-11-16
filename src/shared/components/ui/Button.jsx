@@ -32,6 +32,7 @@ export default function Button({
   disabled = false,
   children,
   type = "button",
+  title,
 }) {
   const cls = [
     "inline-flex items-center justify-center rounded-lg font-medium transition",
@@ -46,7 +47,7 @@ export default function Button({
     : onClick;
 
   return (
-    <button type={type} className={cls} onClick={handleClick} disabled={disabled}>
+    <button type={type} className={cls} onClick={handleClick} disabled={disabled} title={title}>
       {children}
     </button>
   );

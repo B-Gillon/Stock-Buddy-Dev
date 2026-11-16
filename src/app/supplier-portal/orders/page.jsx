@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier, fmtDate } from '@/lib/supplierPortal';
+import ClickRow from '@/app/supplier-portal/components/ClickRow';
 import PortalFrame from '../components/PortalFrame';
 
 export const dynamic = 'force-dynamic';
@@ -30,14 +31,14 @@ export default async function OrdersPage() {
       </tr></thead>
       <tbody>
         {items.map((p) => (
-          <tr key={p.id} className="border-b border-gray-50 last:border-0">
+          <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}`} className="border-b border-gray-50 last:border-0">
             <td className="py-1.5"><Link className="text-blue-700 hover:underline" href={`/supplier-portal/orders/${p.id}`}>{p.po_number}</Link></td>
             <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
             <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>
             <td className="py-1.5 text-gray-700">{fmtDate(p.expected_date)}</td>
             <td className="py-1.5 text-gray-700">{fmtDate(p.expected_ship_date)}</td>
             <td className="py-1.5 text-gray-700">{LABEL[p.status] ?? p.status}</td>
-          </tr>
+          </ClickRow>
         ))}
       </tbody>
     </table>

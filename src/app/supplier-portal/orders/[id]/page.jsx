@@ -1,75 +1,128 @@
-// One purchase order, as the supplier sees it
-import Link from 'next/link';
+// One purchase order, as the supplier sees it: same layout as the retailer's PO screen
 import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { requireSupplier, fmtDate, money } from '@/lib/supplierPortal';
+import { requireSupplier } from '@/lib/supplierPortal';
+import { shippedByLine } from '@/lib/shipments';
+import { formatCurrency } from '@/shared/utils/formatCurrency';
+import Badge from '@/shared/components/ui/Badge';
+import Card from '@/shared/components/ui/Card';
+import PageHeader from '@/shared/components/ui/PageHeader';
+import CollapsibleCards from '@/app/purchase-orders/[slug]/components/CollapsibleCards';
 import PortalFrame from '../../components/PortalFrame';
 import AckForm from './AckForm';
+import { ShipmentProvider, CreateShipmentButton, LinesTable } from './ShipmentProvider';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Purchase Order – Stock Buddy', robots: { index: false, follow: false } };
 
-const LABEL = { pending_acknowledgement: 'Needs acknowledgement', waiting_to_ship: 'Waiting to ship', partially_received: 'Partially received', received: 'Received', cancelled: 'Cancelled' };
+function fmtDate(val) {
+  if (!val) return '—';
+  const [yyyy, mm, dd] = String(val).substring(0, 10).split('-');
+  return `${mm}/${dd}/${yyyy}`;
+}
 
 export default async function OrderPage({ params }) {
   const s = await requireSupplier();
   const { id } = await params;
   const { data: po } = await supabase
     .from('purchase_orders')
-    .select(`id, po_number, status, po_date, expected_date, expected_ship_date, currency_code, notes_supplier,
-      location:locations ( name, address1, address2, city, province, zip, country )`)
+    .select(`id, po_number, status, po_date, expected_date, expected_ship_date, currency_code, notes_supplier, released_at,
+      supplier:suppliers!supplier_id ( supplier_name, supplier_number, currency ),
+      location:locations!ship_to_location_id ( name, address1, address2, city, province, zip, country )`)
     .eq('id', id).eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).neq('status', 'draft')
     .maybeSingle();
   if (!po) notFound();
 
-  const { data: lines } = await supabase
+  const { data: rows } = await supabase
     .from('purchase_order_lines')
-    .select('line_no, sku, title, order_qty_units, unit_cost, extended_cost')
+    .select('id, line_no, sku, title, order_qty_units, received_qty_units, unit_cost, extended_cost, variant:variants!variant_id ( display_title, image_src )')
     .eq('purchase_order_id', po.id).order('line_no', { ascending: true });
+  const shipped = await shippedByLine((rows ?? []).map((r) => r.id));
+  const lines = (rows ?? []).map((l) => {
+    const v = Array.isArray(l.variant) ? l.variant[0] : l.variant;
+    return {
+      id: l.id, lineNo: l.line_no, sku: l.sku, title: v?.display_title || l.title, image: v?.image_src ?? null,
+      ordered: l.order_qty_units ?? 0, shipped: shipped[l.id] ?? 0, received: l.received_qty_units ?? 0,
+      unitCost: l.unit_cost, extended: l.extended_cost,
+    };
+  });
+
+  const sup = Array.isArray(po.supplier) ? po.supplier[0] : po.supplier;
   const loc = Array.isArray(po.location) ? po.location[0] : po.location;
-  const cur = po.currency_code || 'USD';
-  const total = (lines ?? []).reduce((t, l) => t + Number(l.extended_cost ?? (l.unit_cost ?? 0) * (l.order_qty_units ?? 0)), 0);
+  const cur = po.currency_code ?? sup?.currency ?? 'USD';
+  const totalUnits = lines.reduce((t, l) => t + l.ordered, 0);
+  const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
+  const canShip = ['waiting_to_ship', 'partially_received'].includes(po.status);
+  const btn = 'px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition';
 
   return (
     <PortalFrame supplierName={s.supplierName} email={s.email}>
-      <Link href="/supplier-portal/orders" className="text-sm text-blue-700 hover:underline">← Back to purchase orders</Link>
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-xl font-semibold text-gray-900">{po.po_number}</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">{LABEL[po.status] ?? po.status}</span>
-            <a href={`/api/supplier-portal/orders/${po.id}/export?format=pdf`} className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">Download PDF</a>
-            <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">Download CSV</a>
-          </div>
+      <ShipmentProvider>
+        <div className="space-y-4">
+          <PageHeader
+            backHref="/supplier-portal/orders"
+            title={po.po_number}
+            badge={<Badge status={po.status} />}
+            actions={<CreateShipmentButton enabled={canShip} hint="Acknowledge this purchase order first" />}
+          />
+
+          <CollapsibleCards
+            summary={[sup?.supplier_name, loc?.name && `Ship to ${loc.name}`, `${lines.length} line${lines.length === 1 ? '' : 's'}`, formatCurrency(totalCost, cur)].filter(Boolean).join(' · ')}
+          >
+            <div className="grid grid-cols-4 gap-4">
+              <Card title="PO Info">
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-500">PO Create Date</span><span className="font-medium text-gray-800">{fmtDate(po.po_date)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Requested Ship Date</span><span className="font-medium text-gray-800">{fmtDate(po.expected_date)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Expected Ship Date</span><span className="font-medium text-gray-800">{fmtDate(po.expected_ship_date)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Currency</span><span className="font-medium text-gray-800">{cur}</span></div>
+                  {po.released_at && <div className="flex justify-between"><span className="text-gray-500">Released</span><span className="font-medium text-gray-800">{fmtDate(po.released_at)}</span></div>}
+                </div>
+              </Card>
+              <Card title="Supplier">
+                <div className="text-sm">
+                  <p className="font-medium text-gray-800">{sup?.supplier_name || '—'}</p>
+                  {sup?.supplier_number && <p className="text-gray-400 text-xs">#{sup.supplier_number}</p>}
+                </div>
+              </Card>
+              <Card title="Ship To">
+                <div className="text-sm space-y-0.5">
+                  <p className="font-medium text-gray-800">{loc?.name || '—'}</p>
+                  {loc?.address1 && <p className="text-gray-500">{loc.address1}</p>}
+                  {loc?.address2 && <p className="text-gray-500">{loc.address2}</p>}
+                  {(loc?.city || loc?.province || loc?.zip) && <p className="text-gray-500">{[loc.city, loc.province, loc.zip].filter(Boolean).join(', ')}</p>}
+                  {loc?.country && <p className="text-gray-500">{loc.country}</p>}
+                </div>
+              </Card>
+              <Card title="Summary">
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-gray-500">Lines</span><span className="font-medium text-gray-800">{lines.length}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Total Units</span><span className="font-medium text-gray-800">{totalUnits.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Total Cost</span><span className="font-medium text-gray-800">{formatCurrency(totalCost, cur)}</span></div>
+                </div>
+              </Card>
+            </div>
+          </CollapsibleCards>
+
+          {po.notes_supplier && (
+            <Card title="Supplier Notes"><p className="text-sm text-gray-700 whitespace-pre-wrap">{po.notes_supplier}</p></Card>
+          )}
+
+          {po.status === 'pending_acknowledgement' ? <AckForm poId={po.id} requestedShipDate={po.expected_ship_date || po.expected_date || ''} /> : null}
+
+          <LinesTable
+            poId={po.id}
+            lines={lines}
+            currency={cur}
+            exportLinks={
+              <div className="flex items-center gap-2">
+                <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className={btn}>Export CSV</a>
+                <a href={`/api/supplier-portal/orders/${po.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer" className={btn}>Export PDF</a>
+              </div>
+            }
+          />
         </div>
-        <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
-          <div><dt className="text-xs text-gray-500">PO Create Date</dt><dd>{fmtDate(po.po_date)}</dd></div>
-          <div><dt className="text-xs text-gray-500">Requested Ship Date</dt><dd>{fmtDate(po.expected_date)}</dd></div>
-          <div><dt className="text-xs text-gray-500">Expected Ship Date</dt><dd>{fmtDate(po.expected_ship_date)}</dd></div>
-          <div><dt className="text-xs text-gray-500">Ship To</dt>
-            <dd>{loc ? [loc.name, loc.address1, loc.address2, [loc.city, loc.province, loc.zip].filter(Boolean).join(', '), loc.country].filter(Boolean).map((t, i) => <span key={i} className="block">{t}</span>) : '—'}</dd></div>
-        </dl>
-        {po.notes_supplier ? <p className="mt-3 text-sm text-gray-700"><span className="text-xs text-gray-500">Notes: </span>{po.notes_supplier}</p> : null}
-      </section>
-      {po.status === 'pending_acknowledgement' ? <AckForm poId={po.id} requestedShipDate={po.expected_ship_date || po.expected_date || ''} /> : null}
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <table className="w-full table-fixed text-sm">
-          <colgroup><col style={{ width: '14%' }} /><col /><col style={{ width: '9%' }} /><col style={{ width: '14%' }} /><col style={{ width: '16%' }} /></colgroup>
-          <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-400">
-            <th className="py-1 font-medium">SKU</th><th className="py-1 font-medium">Description</th>
-            <th className="py-1 font-medium">Qty</th><th className="py-1 font-medium">Unit Cost</th><th className="py-1 font-medium">Extended Cost</th>
-          </tr></thead>
-          <tbody>
-            {(lines ?? []).map((l) => (
-              <tr key={l.line_no} className="border-b border-gray-50 last:border-0">
-                <td className="py-1.5">{l.sku}</td><td className="py-1.5">{l.title}</td><td className="py-1.5">{l.order_qty_units}</td>
-                <td className="py-1.5">{money(l.unit_cost, cur)}</td><td className="py-1.5">{money(l.extended_cost, cur)}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot><tr><td colSpan={4} className="pt-2 text-right text-xs text-gray-500">Total</td><td className="pt-2 font-semibold">{money(total, cur)}</td></tr></tfoot>
-        </table>
-      </section>
+      </ShipmentProvider>
     </PortalFrame>
   );
 }

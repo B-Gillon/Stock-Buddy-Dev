@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier, fmtDate } from '@/lib/supplierPortal';
 import { businessHoursBetween } from '@/lib/businessDays';
 import PortalFrame from './components/PortalFrame';
+import ClickRow from './components/ClickRow';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Supplier – Stock Buddy', robots: { index: false, follow: false } };
@@ -129,14 +130,14 @@ export default async function SupplierDashboard() {
             </tr></thead>
             <tbody>
               {list.slice(0, 10).map((p) => (
-                <tr key={p.id} className="border-b border-gray-50 last:border-0">
+                <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}`} className="border-b border-gray-50 last:border-0">
                   <td className="py-1.5"><Link className="text-blue-700 hover:underline" href={`/supplier-portal/orders/${p.id}`}>{p.po_number}</Link></td>
                   <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
                   <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>
                   <td className="py-1.5 text-gray-700">{fmtDate(p.expected_date)}</td>
                   <td className="py-1.5 text-gray-700">{fmtDate(p.expected_ship_date)}</td>
                   <td className="py-1.5 text-gray-700">{p.status === 'pending_acknowledgement' ? 'Needs acknowledgement' : p.status === 'waiting_to_ship' ? 'Waiting to ship' : 'Partially received'}</td>
-                </tr>
+                </ClickRow>
               ))}
             </tbody>
           </table>

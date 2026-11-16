@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantIdFromHeaders } from "@/lib/tenants";
+import { shippedByLine } from "@/lib/shipments";
 import { formatCurrency } from "@/shared/utils/formatCurrency";
 import AppLayout from "@/shared/components/layout/AppLayout";
 import Badge from "@/shared/components/ui/Badge";
@@ -66,6 +67,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
 
   if (linesError) throw new Error(linesError.message);
 
+  const shippedMap = await shippedByLine((lines ?? []).map((l) => l.id));
   const currencyCode = po.currency_code ?? po.supplier?.currency ?? 'USD';
 
   const flatLines = (lines ?? []).map((l) => ({
@@ -81,6 +83,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
     variant_id:         l.variant_id,
     order_qty_units:    l.order_qty_units,
     received_qty_units: l.received_qty_units ?? 0,
+    shipped_qty_units:  shippedMap[l.id] ?? 0,
     order_qty_cases:    l.order_qty_cases,
     case_pack_qty:      l.case_pack_qty,
     unit_cost:          l.unit_cost,
@@ -93,6 +96,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
     status:             po.status,
     po_date:            po.po_date,
     expected_date:      po.expected_date,
+    expected_ship_date: po.expected_ship_date,
     notes_internal:     po.notes_internal,
     notes_supplier:     po.notes_supplier,
     currency_code:      currencyCode,
@@ -213,6 +217,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                 <th className="text-left px-3 py-2 font-medium">SKU</th>
                 <th className="text-left px-3 py-2 font-medium">Description</th>
                 <th className="text-left px-3 py-2 font-medium">Ordered</th>
+                <th className="text-left px-3 py-2 font-medium">Shipped</th>
                 <th className="text-left px-3 py-2 font-medium">Received</th>
                 <th className="text-left px-3 py-2 font-medium">Open</th>
                 <th className="text-left px-3 py-2 font-medium">Unit Cost</th>
@@ -221,7 +226,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
             </thead>
             <tbody>
               {flatLines.length === 0 ? (
-                <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
+                <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
               ) : flatLines.map((line) => {
                 const open = (line.order_qty_units ?? 0) - (line.received_qty_units ?? 0);
                 return (
@@ -235,6 +240,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                     <td className="px-3 py-2 text-gray-600">{line.sku || "—"}</td>
                     <td className="px-3 py-2 text-gray-800 font-medium">{line.display_title || line.title || "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{line.order_qty_units?.toLocaleString() ?? "—"}</td>
+                    <td className="px-3 py-2 text-gray-800">{(line.shipped_qty_units ?? 0).toLocaleString()}</td>
                     <td className="px-3 py-2 text-gray-800">{(line.received_qty_units ?? 0).toLocaleString()}</td>
                     <td className="px-3 py-2 text-gray-800">{open > 0 ? open.toLocaleString() : "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{formatCurrency(line.unit_cost, currencyCode)}</td>
@@ -249,7 +255,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                   <td className="px-3 py-2" colSpan={3}></td>
                   <td className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
                   <td className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>
-                  <td className="px-3 py-2" colSpan={3}></td>
+                  <td className="px-3 py-2" colSpan={4}></td>
                   <td className="px-3 py-2 font-semibold">{formatCurrency(totalCost, currencyCode)}</td>
                 </tr>
               </tfoot>
