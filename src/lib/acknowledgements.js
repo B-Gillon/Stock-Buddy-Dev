@@ -327,3 +327,48 @@ export async function sendDueReminders() {
 export function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+/**
+ * Acknowledge from the signed-in supplier portal (no emailed link). The PO must belong to the
+ * supplier and tenant of the verified session.
+ */
+export async function submitAckFromPortal({ poId, tenantId, supplierId, userName, shipDate }) {
+  let ship = null;
+  if (shipDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(shipDate) || Number.isNaN(Date.parse(`${shipDate}T00:00:00Z`))) {
+      return { ok: false, code: 'date', error: 'The expected ship date is not a valid date.' };
+    }
+    ship = shipDate;
+  }
+  const { data: po } = await supabase
+    .from('purchase_orders').select('id, status')
+    .eq('id', poId).eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
+  if (!po) return { ok: false, code: 'invalid', error: 'Purchase order not found.' };
+  if (po.status === 'cancelled') return { ok: false, code: 'cancelled', error: 'This purchase order has been cancelled.' };
+
+  const { data: updated, error } = await supabase
+    .from('po_acknowledgements')
+    .update({
+      status: 'acknowledged',
+      acknowledged_at: new Date().toISOString(),
+      acknowledged_by: userName,
+      expected_ship_date: ship,
+      reminder_due_at: null,
+    })
+    .eq('po_id', poId).eq('status', 'pending')
+    .select('id').maybeSingle();
+  if (error) {
+    console.error('[submitAckFromPortal] update failed:', error);
+    return { ok: false, code: 'error', error: 'Something went wrong. Please try again.' };
+  }
+  if (!updated) return { ok: false, code: 'already', error: 'This order has already been acknowledged.' };
+
+  if (ship) await supabase.from('purchase_orders').update({ expected_ship_date: ship }).eq('id', poId);
+  await supabase.from('purchase_orders').update({ status: 'waiting_to_ship' })
+    .eq('id', poId).eq('status', 'pending_acknowledgement');
+  await logPOActivity({
+    poId, tenantId, action: 'acknowledged', userName,
+    comments: `Acknowledged by ${userName} in the supplier portal${ship ? `; expected ship date ${fmtDate(ship)}` : ''}`,
+  });
+  return { ok: true };
+}
