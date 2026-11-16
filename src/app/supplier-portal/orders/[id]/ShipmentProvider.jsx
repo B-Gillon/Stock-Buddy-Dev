@@ -14,6 +14,11 @@ export function ShipmentProvider({ children }) {
   return <Ctx.Provider value={{ creating, setCreating }}>{children}</Ctx.Provider>;
 }
 
+export function HideWhileCreating({ children }) {
+  const { creating } = useContext(Ctx);
+  return creating ? null : children;
+}
+
 export function CreateShipmentButton({ enabled, hint }) {
   const { creating, setCreating } = useContext(Ctx);
   if (creating) return null;
@@ -71,33 +76,40 @@ function CartonFields({ cfg, f, set }) {
 function ShipmentDetails({ cfg, s, set }) {
   const v = (id) => cfg[id].visible; const r = (id) => cfg[id].required;
   const text = (key) => <input className={input} value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
+  const date = (key) => <input className={`${input} w-[8.5rem]`} type="date" value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
-    <div className="grid gap-3 sm:grid-cols-4">
-      <Field label="Ship Date" required><input className={input} type="date" value={s.ship_date ?? ''} onChange={(e) => set({ ship_date: e.target.value })} /></Field>
-      {v('carrier') && <Field label="Carrier" required={r('carrier')}>{text('carrier')}</Field>}
-      {v('service') && <Field label="Shipping Method / Service" required={r('service')}>{text('service')}</Field>}
-      {v('tracking_number') && <Field label="Shipment Tracking / PRO Number" required={r('tracking_number')}>{text('tracking_number')}</Field>}
-      {v('bol_number') && <Field label="BOL Number" required={r('bol_number')}>{text('bol_number')}</Field>}
-      {v('est_delivery_date') && <Field label="Estimated Delivery Date" required={r('est_delivery_date')}><input className={input} type="date" value={s.est_delivery_date ?? ''} onChange={(e) => set({ est_delivery_date: e.target.value })} /></Field>}
-      {v('supplier_reference') && <Field label="Supplier Shipment Reference" required={r('supplier_reference')}>{text('supplier_reference')}</Field>}
-      {v('packing_slip_number') && <Field label="Packing Slip Number" required={r('packing_slip_number')}>{text('packing_slip_number')}</Field>}
-      {v('total_pallets') && <Field label="Total Pallets" required={r('total_pallets')}><input className={input} type="number" min="0" step="1" value={s.total_pallets ?? ''} onChange={(e) => set({ total_pallets: e.target.value })} /></Field>}
-      {v('total_weight') && (
-        <Field label="Total Shipment Weight" required={r('total_weight')}>
-          <div className="flex gap-2">
-            <input className={input} type="number" min="0" step="any" value={s.total_weight ?? ''} onChange={(e) => set({ total_weight: e.target.value })} />
-            <select className={`${input} w-20`} value={s.weight_unit} onChange={(e) => set({ weight_unit: e.target.value })}>{WEIGHT_UNITS.map((u) => <option key={u}>{u}</option>)}</select>
-          </div>
+    <div className="flex items-stretch gap-4">
+      <div className="grid flex-1 content-start gap-x-3 gap-y-3 sm:grid-cols-4">
+        <Field label="Ship Date" required>{date('ship_date')}</Field>
+        {v('ship_method') && <Field label="Ship Method" required={r('ship_method')}>{text('ship_method')}</Field>}
+        {v('tracking_number') && <Field label="Shipment Tracking / PRO Number" required={r('tracking_number')}>{text('tracking_number')}</Field>}
+        {v('bol_number') && <Field label="BOL Number" required={r('bol_number')}>{text('bol_number')}</Field>}
+        {v('est_delivery_date') && <Field label="Estimated Delivery Date" required={r('est_delivery_date')}>{date('est_delivery_date')}</Field>}
+        {v('supplier_reference') && <Field label="Supplier Shipment Reference" required={r('supplier_reference')}>{text('supplier_reference')}</Field>}
+        {v('packing_slip_number') && <Field label="Packing Slip Number" required={r('packing_slip_number')}>{text('packing_slip_number')}</Field>}
+        {v('total_pallets') && <Field label="Total Pallets" required={r('total_pallets')}><input className={input} type="number" min="0" step="1" value={s.total_pallets ?? ''} onChange={(e) => set({ total_pallets: e.target.value })} /></Field>}
+        {v('total_weight') && (
+          <Field label="Total Shipment Weight" required={r('total_weight')}>
+            <div className="flex gap-2">
+              <input className={input} type="number" min="0" step="any" value={s.total_weight ?? ''} onChange={(e) => set({ total_weight: e.target.value })} />
+              <select className={`${input} w-20`} value={s.weight_unit} onChange={(e) => set({ weight_unit: e.target.value })}>{WEIGHT_UNITS.map((u) => <option key={u}>{u}</option>)}</select>
+            </div>
+          </Field>
+        )}
+        <Field label="Total Cartons">
+          <div className="flex h-9 items-center text-sm font-medium text-gray-800">{s._cartons}</div>
         </Field>
+      </div>
+      {v('shipment_notes') && (
+        <label className="flex w-1/3 shrink-0 flex-col text-xs font-medium text-gray-600">
+          <span>Shipment Notes{r('shipment_notes') ? <span className="text-red-600"> *</span> : null}</span>
+          <textarea rows={5} value={s.notes ?? ''} onChange={(e) => set({ notes: e.target.value })}
+            className="mt-1 min-h-[7.25rem] w-full flex-1 resize-none rounded border border-gray-300 bg-white px-2 py-1.5 text-sm" />
+        </label>
       )}
-      <Field label="Total Cartons">
-        <div className="flex h-9 items-center text-sm font-medium text-gray-800">{s._cartons}</div>
-      </Field>
-      {v('shipment_notes') && <Field label="Shipment Notes" required={r('shipment_notes')} wide>{text('notes')}</Field>}
     </div>
   );
 }
-
 
 const th = 'text-left px-3 py-2 font-medium';
 

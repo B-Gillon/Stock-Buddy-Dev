@@ -20,8 +20,7 @@ export const CARTON_FIELDS = [
 ];
 
 export const SHIPMENT_FIELDS = [
-  { id: 'carrier',             label: 'Carrier',                         kind: 'text', hiddenByDefault: false },
-  { id: 'service',             label: 'Shipping Method / Service',       kind: 'text', hiddenByDefault: false },
+  { id: 'ship_method',         label: 'Ship Method',                     kind: 'text', hiddenByDefault: false },
   { id: 'tracking_number',     label: 'Shipment Tracking / PRO Number',  kind: 'text', hiddenByDefault: false },
   { id: 'bol_number',          label: 'BOL Number',                      kind: 'text', hiddenByDefault: false },
   { id: 'est_delivery_date',   label: 'Estimated Delivery Date',         kind: 'date', hiddenByDefault: false },
@@ -87,7 +86,7 @@ function checkField(def, cfg, get, label, errors) {
 
 /**
  * @param config  normalized settings
- * @param shipment  { ship_date, carrier, ..., total_weight, weight_unit, notes }
+ * @param shipment  { ship_date, ship_method, ..., total_weight, weight_unit, notes }
  * @param cartons   [{ supplier_carton_id, sscc, tracking_number, weight, weight_unit, length, width, height, dim_unit, pallet_id, notes, lines:[{lineId, qty}] }]
  * @returns {string[]} error messages (empty = valid)
  */
@@ -98,7 +97,7 @@ export function validateShipment(config, shipment, cartons) {
   else if (!isDate(String(s.ship_date))) errors.push('Ship Date: not a valid date.');
 
   const sget = {
-    carrier: () => ({ value: s.carrier }), service: () => ({ value: s.service }),
+    ship_method: () => ({ value: s.ship_method }),
     tracking_number: () => ({ value: s.tracking_number }), bol_number: () => ({ value: s.bol_number }),
     est_delivery_date: () => ({ value: s.est_delivery_date }), supplier_reference: () => ({ value: s.supplier_reference }),
     packing_slip_number: () => ({ value: s.packing_slip_number }), total_pallets: () => ({ value: s.total_pallets }),

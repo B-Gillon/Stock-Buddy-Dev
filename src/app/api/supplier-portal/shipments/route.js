@@ -65,8 +65,7 @@ export async function POST(request) {
   const shipmentRow = {
     tenant_id: tenantId, po_id: po.id, supplier_id: supplierId, created_by: user.email,
     ship_date: String(sh.ship_date).slice(0, 10),
-    carrier: vs.carrier.visible ? clean(sh.carrier) : null,
-    service: vs.service.visible ? clean(sh.service) : null,
+    ship_method: vs.ship_method.visible ? clean(sh.ship_method) : null,
     tracking_number: vs.tracking_number.visible ? clean(sh.tracking_number) : null,
     bol_number: vs.bol_number.visible ? clean(sh.bol_number) : null,
     est_delivery_date: vs.est_delivery_date.visible ? clean(sh.est_delivery_date) : null,
@@ -128,6 +127,6 @@ export async function POST(request) {
 
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
   await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: user.email,
-    comments: `Shipment ${number} created: ${units} unit${units === 1 ? '' : 's'} in ${cartonsIn.length} carton${cartonsIn.length === 1 ? '' : 's'}${shipmentRow.carrier ? `, carrier ${shipmentRow.carrier}` : ''}, ship date ${shipmentRow.ship_date}` });
+    comments: `Shipment ${number} created: ${units} unit${units === 1 ? '' : 's'} in ${cartonsIn.length} carton${cartonsIn.length === 1 ? '' : 's'}${shipmentRow.ship_method ? `, ship method ${shipmentRow.ship_method}` : ''}, ship date ${shipmentRow.ship_date}` });
   return NextResponse.json({ ok: true, shipmentNumber: number });
 }

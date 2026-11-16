@@ -11,7 +11,7 @@ import PageHeader from '@/shared/components/ui/PageHeader';
 import CollapsibleCards from '@/app/purchase-orders/[slug]/components/CollapsibleCards';
 import PortalFrame from '../../components/PortalFrame';
 import AckForm from './AckForm';
-import { ShipmentProvider, CreateShipmentButton, LinesTable } from './ShipmentProvider';
+import { ShipmentProvider, CreateShipmentButton, HideWhileCreating, LinesTable } from './ShipmentProvider';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Purchase Order – Stock Buddy', robots: { index: false, follow: false } };
@@ -68,6 +68,7 @@ export default async function OrderPage({ params }) {
             actions={<CreateShipmentButton enabled={canShip} hint="Acknowledge this purchase order first" />}
           />
 
+          <HideWhileCreating>
           <CollapsibleCards
             summary={[sup?.supplier_name, loc?.name && `Ship to ${loc.name}`, `${lines.length} line${lines.length === 1 ? '' : 's'}`, formatCurrency(totalCost, cur)].filter(Boolean).join(' · ')}
           >
@@ -105,6 +106,7 @@ export default async function OrderPage({ params }) {
               </Card>
             </div>
           </CollapsibleCards>
+          </HideWhileCreating>
 
           {po.notes_supplier && (
             <Card title="Supplier Notes"><p className="text-sm text-gray-700 whitespace-pre-wrap">{po.notes_supplier}</p></Card>
