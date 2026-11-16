@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { shippedByLine } from '@/lib/shipments';
+import { markRetrieved } from '@/lib/supplierPortal';
 
 export async function POST(request) {
   const supplierId = request.headers.get('x-auth-supplier');
@@ -23,7 +24,7 @@ export async function POST(request) {
   const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status')
     .eq('id', body.poId).eq('tenant_id', sup.tenant_id).eq('supplier_id', supplierId).maybeSingle();
   if (!po) return bad('Purchase order not found.', 404);
-  if (!['waiting_to_ship', 'partially_received'].includes(po.status)) {
+  if (!['waiting_to_ship', 'partially_shipped', 'partially_received'].includes(po.status)) {
     return bad(po.status === 'pending_acknowledgement' ? 'Acknowledge this purchase order before shipping.' : 'This purchase order can’t be shipped.');
   }
 
@@ -62,6 +63,16 @@ export async function POST(request) {
     await supabase.from('shipments').delete().eq('id', sh.id);
     return bad('Could not create the shipment. Please try again.', 500);
   }
+
+  // Status follows the shipments: every line fully shipped -> Shipped, otherwise Partially Shipped.
+  // (A PO the retailer has already started receiving keeps its receiving status.)
+  const after = await shippedByLine([...lineMap.keys()]);
+  const fullyShipped = [...lineMap.values()].every((l) => (after[l.id] ?? 0) >= (l.order_qty_units ?? 0));
+  await supabase.from('purchase_orders')
+    .update({ status: fullyShipped ? 'shipped' : 'partially_shipped' })
+    .eq('id', po.id).in('status', ['waiting_to_ship', 'partially_shipped']);
+  // Shipping implies the supplier has the order
+  await markRetrieved({ poId: po.id, tenantId: sup.tenant_id, supplierId, by: user.email, method: 'shipment' });
 
   const units = wanted.reduce((t, w) => t + w.qty, 0);
   await logPOActivity({ poId: po.id, tenantId: sup.tenant_id, action: 'shipped', userName: user.email,

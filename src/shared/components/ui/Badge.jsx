@@ -13,6 +13,8 @@ const DEFAULT_MAP = {
   draft:              { label: "Draft",              className: "bg-gray-100 text-gray-600" },
   pending_acknowledgement: { label: "Pending Acknowledgement", className: "bg-purple-100 text-purple-700" },
   waiting_to_ship:    { label: "Waiting to Ship",    className: "bg-blue-100 text-blue-700" },
+  partially_shipped:  { label: "Partially Shipped",  className: "bg-sky-100 text-sky-700" },
+  shipped:            { label: "Shipped",            className: "bg-teal-100 text-teal-700" },
   held:               { label: "Held",               className: "bg-amber-100 text-amber-700" },
   partially_received: { label: "Partially Received", className: "bg-amber-100 text-amber-700" },
   received:           { label: "Received",           className: "bg-green-100 text-green-700" },

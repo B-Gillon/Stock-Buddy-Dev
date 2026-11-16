@@ -64,6 +64,8 @@ function StatusBadge({ status }) {
   const map = {
     pending_acknowledgement: { label: "Pending Ack", classes: "bg-purple-100 text-purple-700" },
     waiting_to_ship: { label: "Waiting to Ship", classes: "bg-blue-100 text-blue-700" },
+    partially_shipped: { label: "Partially Shipped", classes: "bg-sky-100 text-sky-700" },
+    shipped: { label: "Shipped", classes: "bg-teal-100 text-teal-700" },
     partially_received: { label: "In Progress", classes: "bg-amber-100 text-amber-700" },
     received: { label: "Received", classes: "bg-green-100 text-green-700" },
   };

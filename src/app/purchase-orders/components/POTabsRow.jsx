@@ -7,6 +7,8 @@ const TABS = [
   { label: 'Drafts',             value: 'draft'              },
   { label: 'Pending Acknowledgement', value: 'pending_acknowledgement' },
   { label: 'Waiting to Ship',    value: 'waiting_to_ship'    },
+  { label: 'Partially Shipped',  value: 'partially_shipped'  },
+  { label: 'Shipped',            value: 'shipped'            },
   { label: 'Partially Received', value: 'partially_received' },
   { label: 'Overdue',            value: 'overdue'            },
   { label: 'Cancelled',          value: 'cancelled'          },

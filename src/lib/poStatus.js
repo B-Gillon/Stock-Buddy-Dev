@@ -4,22 +4,28 @@
 //   draft                    not sent yet
 //   pending_acknowledgement  sent; supplier must acknowledge (supplier has "acknowledgement required")
 //   waiting_to_ship          sent and no acknowledgement needed, or it was acknowledged / the SFTP file was picked up
+//   partially_shipped        some, not all, quantities shipped by the supplier
+//   shipped                  everything shipped
 //   partially_received       some, not all, quantities received
 //   received                 everything received
 //   cancelled                cancelled
-// (Partially Shipped / Shipped are planned for later.)
 
 export const PO_STATUS = {
   DRAFT: 'draft',
   PENDING_ACK: 'pending_acknowledgement',
   WAITING_TO_SHIP: 'waiting_to_ship',
+  PARTIALLY_SHIPPED: 'partially_shipped',
+  SHIPPED: 'shipped',
   PARTIALLY_RECEIVED: 'partially_received',
   RECEIVED: 'received',
   CANCELLED: 'cancelled',
 };
 
 /** Sent to the supplier, nothing received yet. */
-export const SENT_STATUSES = ['pending_acknowledgement', 'waiting_to_ship'];
+export const SENT_STATUSES = ['pending_acknowledgement', 'waiting_to_ship', 'partially_shipped', 'shipped'];
+
+/** Sent, with something still to ship (the supplier's "not shipped" work). */
+export const NOT_FULLY_SHIPPED_STATUSES = ['pending_acknowledgement', 'waiting_to_ship', 'partially_shipped'];
 
 /** Can have goods received against it (and counts as incoming inventory). */
 export const RECEIVABLE_STATUSES = [...SENT_STATUSES, 'partially_received'];
@@ -34,6 +40,8 @@ export const PO_STATUS_LABELS = {
   draft: 'Draft',
   pending_acknowledgement: 'Pending Acknowledgement',
   waiting_to_ship: 'Waiting to Ship',
+  partially_shipped: 'Partially Shipped',
+  shipped: 'Shipped',
   partially_received: 'Partially Received',
   received: 'Received',
   cancelled: 'Cancelled',

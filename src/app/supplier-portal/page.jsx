@@ -2,9 +2,12 @@
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier, fmtDate } from '@/lib/supplierPortal';
+import { NOT_FULLY_SHIPPED_STATUSES } from '@/lib/poStatus';
 import { businessHoursBetween } from '@/lib/businessDays';
 import PortalFrame from './components/PortalFrame';
 import ClickRow from './components/ClickRow';
+
+const STATUS_LABEL = { pending_acknowledgement: 'Needs acknowledgement', waiting_to_ship: 'Waiting to ship', partially_shipped: 'Partially shipped' };
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Supplier – Stock Buddy', robots: { index: false, follow: false } };
@@ -70,10 +73,10 @@ export default async function SupplierDashboard() {
     .from('purchase_orders')
     .select('id, po_number, status, po_date, released_at, supplier_retrieved_at, expected_date, expected_ship_date, location:locations ( name )')
     .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId)
-    .in('status', ['pending_acknowledgement', 'waiting_to_ship', 'partially_received'])
+    .in('status', NOT_FULLY_SHIPPED_STATUSES)
     .order('po_date', { ascending: false }).limit(500);
 
-  // Open = sent and not fully received or cancelled. (Shipping isn't tracked yet, so open means not shipped.)
+  // Open = sent with something still to ship (not fully shipped, received or cancelled)
   const list = pos ?? [];
   const shipDate = (p) => p.expected_ship_date || p.expected_date || null;
   const now = new Date();
@@ -85,7 +88,7 @@ export default async function SupplierDashboard() {
   const OVER = 24; // business hours (weekends and major holidays excluded)
 
   // Not Printed = not yet retrieved (downloaded, emailed, or picked up by the supplier's system), same as the New POs tab
-  const unretrieved = list.filter((p) => p.status !== 'partially_received' && !p.supplier_retrieved_at);
+  const unretrieved = list.filter((p) => !p.supplier_retrieved_at);
   const notPrinted = unretrieved.length;
   const notPrintedRed = unretrieved.some((p) => businessHoursBetween(p.released_at || p.po_date, nowMs) > OVER);
 
@@ -98,7 +101,7 @@ export default async function SupplierDashboard() {
   const notAckRed = list.some((p) => p.status === 'pending_acknowledgement'
     && businessHoursBetween(askedAt.get(p.id) || p.released_at || p.po_date, nowMs) > OVER);
 
-  const waitingToShip = list.length; // shipping isn't tracked yet, so open means not shipped
+  const waitingToShip = list.length;
   const thisWeek = list.filter((p) => shipDate(p) && shipDate(p) >= today && shipDate(p) >= weekStart && shipDate(p) <= weekEnd).length;
   const overdue = list.filter((p) => shipDate(p) && shipDate(p) < today).length;
   const ready = waitingToShip - thisWeek - overdue; // open orders shipping later or with no date
@@ -136,7 +139,7 @@ export default async function SupplierDashboard() {
                   <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>
                   <td className="py-1.5 text-gray-700">{fmtDate(p.expected_date)}</td>
                   <td className="py-1.5 text-gray-700">{fmtDate(p.expected_ship_date)}</td>
-                  <td className="py-1.5 text-gray-700">{p.status === 'pending_acknowledgement' ? 'Needs acknowledgement' : p.status === 'waiting_to_ship' ? 'Waiting to ship' : 'Partially received'}</td>
+                  <td className="py-1.5 text-gray-700">{STATUS_LABEL[p.status] ?? p.status}</td>
                 </ClickRow>
               ))}
             </tbody>

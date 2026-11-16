@@ -8,7 +8,7 @@ import PortalFrame from '../components/PortalFrame';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'New POs – Stock Buddy', robots: { index: false, follow: false } };
 
-const LABEL = { pending_acknowledgement: 'Needs acknowledgement', waiting_to_ship: 'Waiting to ship', partially_received: 'Partially received', received: 'Received', cancelled: 'Cancelled' };
+const LABEL = { partially_shipped: 'Partially shipped', shipped: 'Shipped', pending_acknowledgement: 'Needs acknowledgement', waiting_to_ship: 'Waiting to ship', partially_received: 'Partially received', received: 'Received', cancelled: 'Cancelled' };
 
 export default async function OrdersPage() {
   const s = await requireSupplier();
@@ -17,7 +17,7 @@ export default async function OrdersPage() {
     .from('purchase_orders')
     .select('id, po_number, status, po_date, expected_date, expected_ship_date, location:locations ( name )')
     .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId)
-    .in('status', ['pending_acknowledgement', 'waiting_to_ship'])
+    .in('status', ['pending_acknowledgement', 'waiting_to_ship', 'partially_shipped', 'shipped'])
     .is('supplier_retrieved_at', null)
     .order('po_date', { ascending: false }).limit(300);
   const rows = data ?? [];

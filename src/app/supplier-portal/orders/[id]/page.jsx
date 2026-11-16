@@ -52,7 +52,7 @@ export default async function OrderPage({ params }) {
   const cur = po.currency_code ?? sup?.currency ?? 'USD';
   const totalUnits = lines.reduce((t, l) => t + l.ordered, 0);
   const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
-  const canShip = ['waiting_to_ship', 'partially_received'].includes(po.status);
+  const canShip = ['waiting_to_ship', 'partially_shipped', 'partially_received'].includes(po.status);
   const btn = 'px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition';
 
   return (
