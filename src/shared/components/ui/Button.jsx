@@ -33,6 +33,7 @@ export default function Button({
   children,
   type = "button",
   title,
+  active = false,
 }) {
   const cls = [
     "inline-flex items-center justify-center rounded-lg font-medium transition",
@@ -40,6 +41,7 @@ export default function Button({
     "disabled:cursor-not-allowed",
     variants[variant] ?? variants.primary,
     sizes[size] ?? sizes.md,
+    active ? "!bg-gray-100 !border-gray-400 !text-gray-900" : "",
   ].join(" ");
 
   const handleClick = href
@@ -47,7 +49,7 @@ export default function Button({
     : onClick;
 
   return (
-    <button type={type} className={cls} onClick={handleClick} disabled={disabled} title={title}>
+    <button type={type} className={cls} onClick={handleClick} disabled={disabled} title={title} aria-current={active ? "page" : undefined}>
       {children}
     </button>
   );

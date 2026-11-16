@@ -157,11 +157,14 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   const [error, setError] = useState('');
   const [cols, setCols] = useState(lineColumns);
   const [colsOpen, setColsOpen] = useState(false);
-  const idCols = LINE_COLUMN_DEFS.filter((c) => cols[c.id]);
+  const idCols = LINE_COLUMN_DEFS.filter((c) => cols[c.id] && ['sku','supplier_sku','barcode'].includes(c.id));
+  const visible = LINE_COLUMN_DEFS.filter((c) => cols[c.id]).map((c) => c.id);
+  const order = creating ? visible.flatMap((id) => (id === 'unit_cost' ? ['ship_qty', 'carton_qty', id] : [id])) : visible;
+  if (creating && !order.includes('ship_qty')) order.push('ship_qty', 'carton_qty');
 
   async function toggleCol(id) {
     const next = { ...cols, [id]: !cols[id] };
-    if (!next.sku && !next.supplier_sku && !next.barcode) return; // keep at least one
+    if (!Object.values(next).some(Boolean)) return; // keep at least one
     setCols(next);
     try {
       await fetch('/api/supplier-portal/preferences', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lineColumns: next }) });
@@ -270,8 +273,8 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
               <button type="button" onClick={() => setColsOpen((o) => !o)}
                 className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">Columns</button>
               {colsOpen && (
-                <div className="absolute right-0 z-10 mt-1 w-48 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">Show item columns</p>
+                <div className="absolute right-0 z-10 mt-1 w-52 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                  <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">Show columns</p>
                   {LINE_COLUMN_DEFS.map((c) => (
                     <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-gray-700 hover:bg-gray-50">
                       <input type="checkbox" checked={!!cols[c.id]} onChange={() => toggleCol(c.id)} />{c.label}
@@ -292,52 +295,61 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
-              <th className={th}>#</th><th className={th}></th>{idCols.map((c) => <th key={c.id} className={th}>{c.label}</th>)}<th className={th}>Description</th>
-              <th className={th}>Ordered</th><th className={th}>Shipped</th>
-              <th className={th}>Received</th>
-              {creating && <th className={th}>Shipment Qty</th>}
-              {creating && (
-                <th className={th}>
-                  <button type="button" onClick={fillCurrent} title={`Fill Carton ${curNo} with every remaining unshipped quantity`}
-                    className="cursor-pointer font-medium text-gray-600 hover:text-gray-900">Carton Qty</button>
-                </th>
-              )}
-              <th className={th}>Unit Cost</th><th className={th}>Extended Cost</th>
+              {order.map((id) => {
+                if (id === 'ship_qty') return <th key={id} className={th}>Shipment Qty</th>;
+                if (id === 'carton_qty') return (
+                  <th key={id} className={th}>
+                    <button type="button" onClick={fillCurrent} title={`Fill Carton ${curNo} with every remaining unshipped quantity`}
+                      className="cursor-pointer font-medium text-gray-600 hover:text-gray-900">Carton Qty</button>
+                  </th>
+                );
+                if (id === 'image') return <th key={id} className={th}></th>;
+                return <th key={id} className={th}>{LINE_COLUMN_DEFS.find((c) => c.id === id).label}</th>;
+              })}
             </tr>
           </thead>
           <tbody>
             {lines.length === 0 ? (
-              <tr><td colSpan={(creating ? 10 : 8) + idCols.length} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
+              <tr><td colSpan={order.length} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
             ) : lines.map((l) => {
               const left = leftFor(l, cur);
-              return (
-                <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-3 py-2 text-gray-400">{l.lineNo}</td>
-                  <td className="px-3 py-2">
-                    <div className="w-8 h-8 bg-gray-100 rounded border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {l.image ? <img src={l.image} alt={l.title} className="object-cover w-full h-full" /> : null}
-                    </div>
-                  </td>
-                  {idCols.map((c) => <td key={c.id} className="px-3 py-2 text-gray-600">{idValue(l, c.id)}</td>)}
-                  <td className="px-3 py-2 text-gray-800 font-medium">{l.title || '—'}</td>
-                  <td className="px-3 py-2 text-gray-800">{l.ordered?.toLocaleString() ?? '—'}</td>
-                  <td className="px-3 py-2 text-gray-800">{(l.shipped ?? 0).toLocaleString()}</td>
-                  <td className="px-3 py-2 text-gray-800">{(l.received ?? 0).toLocaleString()}</td>
-                  {creating && (
-                    <td className={`px-3 py-2 font-medium ${(thisShipment[l.id] ?? 0) > remainingBase(l) ? 'text-red-600' : 'text-gray-900'}`}>
+              const cell = (id) => {
+                switch (id) {
+                  case 'line_no': return <td key={id} className="px-3 py-2 text-gray-400">{l.lineNo}</td>;
+                  case 'image': return (
+                    <td key={id} className="px-3 py-2">
+                      <div className="w-8 h-8 bg-gray-100 rounded border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {l.image ? <img src={l.image} alt={l.title} className="object-cover w-full h-full" /> : null}
+                      </div>
+                    </td>
+                  );
+                  case 'sku': case 'supplier_sku': case 'barcode':
+                    return <td key={id} className="px-3 py-2 text-gray-600">{idValue(l, id)}</td>;
+                  case 'description': return <td key={id} className="px-3 py-2 text-gray-800 font-medium">{l.title || '—'}</td>;
+                  case 'ordered': return <td key={id} className="px-3 py-2 text-gray-800">{l.ordered?.toLocaleString() ?? '—'}</td>;
+                  case 'shipped': return <td key={id} className="px-3 py-2 text-gray-800">{(l.shipped ?? 0).toLocaleString()}</td>;
+                  case 'received': return <td key={id} className="px-3 py-2 text-gray-800">{(l.received ?? 0).toLocaleString()}</td>;
+                  case 'ship_qty': return (
+                    <td key={id} className={`px-3 py-2 font-medium ${(thisShipment[l.id] ?? 0) > remainingBase(l) ? 'text-red-600' : 'text-gray-900'}`}>
                       {(thisShipment[l.id] ?? 0).toLocaleString()}
                     </td>
-                  )}
-                  {creating && (
-                    <td className="px-3 py-1.5">
+                  );
+                  case 'carton_qty': return (
+                    <td key={id} className="px-3 py-1.5">
                       <input type="number" min="0" max={left} step="1" inputMode="numeric" disabled={left === 0 && !qtyIn(cur, l.id)}
                         value={cur.q[l.id] ?? ''} onChange={(e) => setCur((c) => ({ ...c, q: { ...c.q, [l.id]: e.target.value } }))}
                         className="h-8 w-24 rounded border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
                     </td>
-                  )}
-                  <td className="px-3 py-2 text-gray-800">{formatCurrency(l.unitCost, currency)}</td>
-                  <td className="px-3 py-2 text-gray-800">{formatCurrency(l.extended, currency)}</td>
+                  );
+                  case 'unit_cost': return <td key={id} className="px-3 py-2 text-gray-800">{formatCurrency(l.unitCost, currency)}</td>;
+                  case 'extended': return <td key={id} className="px-3 py-2 text-gray-800">{formatCurrency(l.extended, currency)}</td>;
+                  default: return null;
+                }
+              };
+              return (
+                <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  {order.map(cell)}
                 </tr>
               );
             })}
@@ -345,11 +357,12 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
           {lines.length > 0 && (
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 text-sm text-gray-800">
-                <td className="px-3 py-2" colSpan={2 + idCols.length}></td>
-                <td className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
-                <td className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>
-                <td className="px-3 py-2" colSpan={creating ? 5 : 3}></td>
-                <td className="px-3 py-2 font-semibold">{formatCurrency(totalCost, currency)}</td>
+                {order.map((id, i) => {
+                  const label = order.includes('description') ? id === 'description' : i === 0;
+                  if (id === 'ordered') return <td key={id} className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>;
+                  if (id === 'extended') return <td key={id} className="px-3 py-2 font-semibold">{formatCurrency(totalCost, currency)}</td>;
+                  return <td key={id} className="px-3 py-2 text-xs text-gray-500 font-medium">{label ? 'Totals' : ''}</td>;
+                })}
               </tr>
             </tfoot>
           )}

@@ -115,7 +115,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
         isSubmitting={isSubmitting}
       />
       <div className="mx-auto max-w-5xl px-4 py-6">
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-4 flex items-center gap-3">
           <button
             onClick={() => router.push(`/purchase-orders/${slug}`)}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
