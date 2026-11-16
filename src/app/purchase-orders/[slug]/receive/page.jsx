@@ -100,7 +100,7 @@ export default async function ReceivePOPage({ params }) {
   };
 
   return (
-    <AppLayout showActionBar={false}>
+    <AppLayout title={flatPO.po_number} showActionBar={false}>
       <ClientReceivePOPage po={flatPO} lines={flatLines} slug={slug} />
     </AppLayout>
   );

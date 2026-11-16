@@ -126,6 +126,6 @@ export async function POST(request) {
 
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
   await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: user.email,
-    comments: `Shipment ${number} created: ${units} unit${units === 1 ? '' : 's'} in ${cartonsIn.length} carton${cartonsIn.length === 1 ? '' : 's'}${shipmentRow.ship_method ? `, ship method ${shipmentRow.ship_method}` : ''}, ship date ${shipmentRow.ship_date}` });
+    comments: `Shipment ${number}` });
   return NextResponse.json({ ok: true, shipmentNumber: number });
 }

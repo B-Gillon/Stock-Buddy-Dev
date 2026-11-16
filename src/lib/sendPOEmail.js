@@ -386,9 +386,8 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
       ? describeDelivery({ recipients, withAttachments: true })
       : null,
     emailError,
-    ack && !emailError ? 'Acknowledgement requested' : null,
-    sftp ? `SFTP: ${sftp.notes}` : null,
-  ].filter(Boolean).join(' | ');
+    sftp ? describeSftp(sftp) : null,
+  ].filter(Boolean).join('\n');
 
   if (emailError || sftpError) {
     return { success: false, error: [emailError, sftpError].filter(Boolean).join(' | '), emailError, notes, sftp, ackRequested: !!ack && !emailError };
@@ -412,11 +411,18 @@ function describeDelivery({ recipients, withAttachments }) {
     let text = `Emailed to ${to.join(', ')}`;
     if (withAttachments) {
       const files = [r.send_pdf && 'PDF', r.send_csv && 'CSV'].filter(Boolean);
-      text += files.length ? ` (${files.join(' + ')})` : ' (no attachments)';
+      text = files.length ? `${files.join(' + ')} emailed to ${to.join(', ')}` : `Emailed to ${to.join(', ')} (no attachments)`;
     }
     if (cc.length)  text += `; cc: ${cc.join(', ')}`;
     if (bcc.length) text += `; bcc: ${bcc.join(', ')}`;
     parts.push(text);
   }
-  return parts.join(' | ');
+  return parts.join('\n');
+}
+
+/** "PDF + CSV sent via SFTP" when every file landed; otherwise the detailed failure notes. */
+function describeSftp(sftp) {
+  if (!sftp.ok) return `SFTP: ${sftp.notes}`;
+  const types = [...new Set(sftp.files.map((f) => f.type.toUpperCase()))];
+  return `${types.join(' + ')} sent via SFTP`;
 }

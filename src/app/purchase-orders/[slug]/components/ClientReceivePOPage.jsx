@@ -4,6 +4,8 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/shared/components/ui/Button";
 import Badge from "@/shared/components/ui/Badge";
+import Card from "@/shared/components/ui/Card";
+import PageHeader from "@/shared/components/ui/PageHeader";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 
 function ConfirmReceiveModal({ isOpen, onClose, onConfirm, receipts, lines, isSubmitting }) {
@@ -114,45 +116,22 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
         lines={lines}
         isSubmitting={isSubmitting}
       />
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        <div className="mb-4 flex items-center gap-3">
-          <button
-            onClick={() => router.push(`/purchase-orders/${slug}`)}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
-          >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
-          <span className="text-gray-300">/</span>
-          <h1 className="text-base font-semibold text-gray-900">Receive Items — {po.po_number}</h1>
+      <div className="space-y-4">
+        <PageHeader backHref={`/purchase-orders/${slug}`} badge={<Badge status={po.status} />} />
+
+        <div className="grid grid-cols-4 gap-4">
+          <Card title="Supplier"><p className="text-sm font-medium text-gray-800">{po.supplier_name || "—"}</p></Card>
+          <Card title="Ship To"><p className="text-sm font-medium text-gray-800">{po.location_name || "—"}</p></Card>
+          <Card title="Expected"><p className="text-sm font-medium text-gray-800">{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "—"}</p></Card>
+          <Card title="Summary">
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><span className="text-gray-500">Lines</span><span className="font-medium text-gray-800">{lines.length}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Units remaining</span><span className="font-medium text-gray-800">{lines.reduce((t, l) => t + Math.max(0, l.remaining_qty ?? 0), 0).toLocaleString()}</span></div>
+            </div>
+          </Card>
         </div>
 
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white px-6 py-4">
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div>
-              <p className="text-xs text-gray-400">Supplier</p>
-              <p className="font-medium text-gray-800">{po.supplier_name}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Ship To</p>
-              <p className="font-medium text-gray-800">{po.location_name || "—"}</p>
-            </div>
-            {po.expected_date && (
-              <div>
-                <p className="text-xs text-gray-400">Expected</p>
-                <p className="font-medium text-gray-800">{new Date(po.expected_date).toLocaleDateString()}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-gray-400">Status</p>
-              <Badge status={po.status} />
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
@@ -212,7 +191,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">
             Click <span className="font-medium text-blue-600">Receive Quantity ↓</span> in the column header to fill all remaining quantities.
           </p>
