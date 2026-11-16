@@ -12,7 +12,7 @@ export default function POStatusBadge({ status }) {
   const s = status?.toLowerCase() ?? 'draft';
   const style = STATUS_STYLES[s] ?? 'bg-gray-100 text-gray-600 border-gray-200';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${style}`}>
+    <span className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium border ${style}`}>
       {s.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
     </span>
   );

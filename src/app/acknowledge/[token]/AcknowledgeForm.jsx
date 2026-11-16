@@ -45,7 +45,7 @@ export default function AcknowledgeForm({ token, stamp, requiredShipDate }) {
       <h2 className="text-base font-semibold text-gray-900">Acknowledgement Required</h2>
       <div className="flex flex-wrap items-start gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Required Ship Date</label>
+          <label className="block text-sm font-medium text-gray-700">Requested Ship Date</label>
           <div style={{ height: 40, boxSizing: "border-box" }} className="mt-1 flex items-center rounded border border-gray-200 bg-gray-50 px-3 text-sm text-gray-800">{requiredShipDate || "TBD"}</div>
         </div>
         <div>

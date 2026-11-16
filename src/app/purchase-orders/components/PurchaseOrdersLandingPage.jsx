@@ -15,7 +15,7 @@ function fmtDate(val) {
 
 function exportCSV(purchaseOrders) {
   if (!purchaseOrders.length) { alert('No purchase orders to export.'); return; }
-  const headers = ['PO Number', 'Supplier', 'Location', 'Status', 'PO Date', 'Expected Date', 'Total Cost'];
+  const headers = ['PO Number', 'Supplier', 'Location', 'Status', 'Create Date', 'Requested Ship Date', 'Expected Ship Date', 'Total Cost'];
   const rows = purchaseOrders.map((po) => [
     po.po_number,
     po.supplier_name ?? '',
@@ -23,6 +23,7 @@ function exportCSV(purchaseOrders) {
     po.status,
     fmtDate(po.po_date),
     fmtDate(po.expected_date),
+    fmtDate(po.expected_ship_date),
     po.total_cost != null ? Number(po.total_cost).toFixed(2) : '',
   ]);
   const csv = [headers, ...rows]

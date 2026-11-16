@@ -200,7 +200,10 @@ export async function submitAck({ token, name, shipDate, stamp, website, ip, use
   }
   if (!updated) return { ok: false, code: 'already', error: 'This order has already been acknowledged.' };
 
-  // Acknowledged → the PO is now waiting for the supplier to ship
+  // The supplier's expected ship date is kept on the PO; acknowledging moves it on to Waiting to Ship
+  if (ship) {
+    await supabase.from('purchase_orders').update({ expected_ship_date: ship }).eq('id', ack.po_id);
+  }
   await supabase.from('purchase_orders')
     .update({ status: 'waiting_to_ship' })
     .eq('id', ack.po_id).eq('status', 'pending_acknowledgement');

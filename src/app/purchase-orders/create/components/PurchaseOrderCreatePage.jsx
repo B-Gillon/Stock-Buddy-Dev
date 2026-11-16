@@ -549,7 +549,7 @@ export default function PurchaseOrderCreatePage({
               {/* Expected Date — auto-populated from supplier lead days */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Required Ship Date <span className="text-red-500">*</span>
+                  Requested Ship Date <span className="text-red-500">*</span>
                   {selectedSupplier?.lead_days && (
                     <span className="ml-1.5 text-xs text-gray-400 font-normal">
                       ({selectedSupplier.lead_days}-day lead)

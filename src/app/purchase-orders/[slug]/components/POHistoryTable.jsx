@@ -40,7 +40,7 @@ const ACTION_STYLES = {
   error:        "bg-red-50 text-red-700",
 };
 
-// MM/DD/YY HH:MM AM/PM TZ  (e.g. 11/13/26 02:05 PM EST)
+// MM/DD/YY HH:MM AM/PM  (e.g. 11/13/26 02:05 PM)
 function fmtDateTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -49,10 +49,9 @@ function fmtDateTime(iso) {
     new Intl.DateTimeFormat("en-US", {
       month: "2-digit", day: "2-digit", year: "2-digit",
       hour: "2-digit", minute: "2-digit", hour12: true,
-      timeZoneName: "short",
     }).formatToParts(d).map((p) => [p.type, p.value])
   );
-  return `${parts.month}/${parts.day}/${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod} ${parts.timeZoneName}`;
+  return `${parts.month}/${parts.day}/${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod}`;
 }
 
 export default function POHistoryTable({ rows, poId, openSftpCount = 0 }) {
@@ -115,7 +114,7 @@ export default function POHistoryTable({ rows, poId, openSftpCount = 0 }) {
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
             <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Date/Time</th>
-            <th className="text-left px-3 py-2 font-medium">Activity</th>
+            <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Activity</th>
             <th className="text-left px-3 py-2 font-medium">User</th>
             <th className="text-left px-3 py-2 font-medium">Notes</th>
           </tr>
@@ -132,8 +131,8 @@ export default function POHistoryTable({ rows, poId, openSftpCount = 0 }) {
               <td className="px-3 py-2 text-gray-700 whitespace-nowrap" suppressHydrationWarning>
                 {fmtDateTime(row.created_at)}
               </td>
-              <td className="px-3 py-2">
-                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${ACTION_STYLES[row.action] ?? "bg-gray-100 text-gray-700"}`}>
+              <td className="px-3 py-2 whitespace-nowrap">
+                <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${ACTION_STYLES[row.action] ?? "bg-gray-100 text-gray-700"}`}>
                   {ACTION_LABELS[row.action] ?? row.action}
                 </span>
               </td>

@@ -156,7 +156,8 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
           <Card title="PO Info">
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">PO Create Date</span><span className="font-medium text-gray-800">{fmtDate(flatPO.po_date)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Required Ship Date</span><span className="font-medium text-gray-800">{fmtDate(flatPO.expected_date)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Requested Ship Date</span><span className="font-medium text-gray-800">{fmtDate(flatPO.expected_date)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-500">Expected Ship Date</span><span className="font-medium text-gray-800">{flatPO.expected_ship_date ? fmtDate(flatPO.expected_ship_date) : "—"}</span></div>
               <div className="flex justify-between"><span className="text-gray-500">Currency</span><span className="font-medium text-gray-800">{currencyCode}</span></div>
               {flatPO.released_at && <div className="flex justify-between"><span className="text-gray-500">Released</span><span className="font-medium text-gray-800">{fmtDate(flatPO.released_at)}</span></div>}
             </div>

@@ -96,7 +96,7 @@ export default async function AcknowledgePage({ params }) {
           <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm text-green-900">
             <p className="text-base font-semibold">This order has been acknowledged.</p>
             <p className="mt-2">By {data.acknowledgedBy}{data.acknowledgedAt ? ` on ${new Date(data.acknowledgedAt).toLocaleDateString('en-US')}` : ''}.</p>
-            <p className="mt-1">Required Ship Date: {day(po.requiredShipDate) || 'TBD'}</p>
+            <p className="mt-1">Requested Ship Date: {day(po.requiredShipDate) || 'TBD'}</p>
             <p>Expected Ship Date: {day(data.expectedShipDate) || 'Not provided'}</p>
           </div>
         ) : (

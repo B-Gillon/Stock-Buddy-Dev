@@ -30,6 +30,7 @@ export default async function Page({ searchParams }) {
       status,
       po_date,
       expected_date,
+      expected_ship_date,
       suppliers ( supplier_name ),
       locations ( name )
     `)
@@ -78,6 +79,7 @@ export default async function Page({ searchParams }) {
     status:              po.status,
     po_date:             po.po_date,
     expected_date:       po.expected_date,
+    expected_ship_date:  po.expected_ship_date,
     total_cost:          totalsMap[po.id] ?? null,
   }));
 

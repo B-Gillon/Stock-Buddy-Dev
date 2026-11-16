@@ -29,13 +29,13 @@ export default function POTable({ purchaseOrders }) {
     <table className="w-full border-collapse" style={{ margin: '0 16px', width: 'calc(100% - 32px)' }}>
       <thead>
         <tr className="border-b border-gray-200 bg-gray-50">
-          <th className={TH}>PO Number</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '1%' }}>PO Number</th>
           <th className={TH}>Supplier</th>
           <th className={TH}>Location</th>
-          <th className={TH} style={{ width: '130px' }}>Status</th>
-          <th className={TH} style={{ width: '130px' }}>PO Create Date</th>
-          <th className={TH} style={{ width: '150px' }}>Required Ship Date</th>
-          <th className={TH} style={{ width: '110px' }}>Total Cost</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '1%' }}>Status</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '1%' }}>Create Date</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '1%' }}>Req Ship Date</th>
+          <th className={`${TH} whitespace-nowrap`} style={{ width: '1%' }}>Exp Ship Date</th>
         </tr>
       </thead>
       <tbody>
@@ -47,19 +47,15 @@ export default function POTable({ purchaseOrders }) {
               i % 2 === 1 ? 'bg-gray-50' : 'bg-white'
             }`}
           >
-            <td className={TD}>{po.po_number}</td>
+            <td className={`${TD} whitespace-nowrap`}>{po.po_number}</td>
             <td className={TD}>{po.supplier_name ?? '—'}</td>
             <td className={TD}>{po.location_name ?? '—'}</td>
-            <td className={TD} style={{ width: '130px' }}>
+            <td className={`${TD} whitespace-nowrap`}>
               <POStatusBadge status={po.status} />
             </td>
-            <td className={TD} style={{ width: '100px' }}>{formatDate(po.po_date)}</td>
-            <td className={TD} style={{ width: '140px' }}>{po.expected_date ? formatDate(po.expected_date) : '—'}</td>
-            <td className={TD} style={{ width: '110px' }}>
-              {po.total_cost != null
-                ? `$${parseFloat(po.total_cost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                : '—'}
-            </td>
+            <td className={`${TD} whitespace-nowrap`}>{formatDate(po.po_date)}</td>
+            <td className={`${TD} whitespace-nowrap`}>{po.expected_date ? formatDate(po.expected_date) : '—'}</td>
+            <td className={`${TD} whitespace-nowrap`}>{po.expected_ship_date ? formatDate(po.expected_ship_date) : '—'}</td>
           </tr>
         ))}
       </tbody>
