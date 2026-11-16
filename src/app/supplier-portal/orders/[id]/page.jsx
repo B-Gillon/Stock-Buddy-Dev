@@ -22,9 +22,10 @@ function fmtDate(val) {
   return `${mm}/${dd}/${yyyy}`;
 }
 
-export default async function OrderPage({ params }) {
+export default async function OrderPage({ params, searchParams }) {
   const s = await requireSupplier();
   const { id } = await params;
+  const { from } = (await searchParams) ?? {};
   const { data: po } = await supabase
     .from('purchase_orders')
     .select(`id, po_number, status, po_date, expected_date, expected_ship_date, currency_code, notes_supplier, released_at,
@@ -54,15 +55,18 @@ export default async function OrderPage({ params }) {
   const cur = po.currency_code ?? sup?.currency ?? 'USD';
   const totalUnits = lines.reduce((t, l) => t + l.ordered, 0);
   const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
+  // Which menu item to highlight: where the user came from, else by what the PO is doing
+  const section = from === 'orders' || from === 'shipping' ? from
+    : ['waiting_to_ship', 'partially_shipped', 'shipped', 'partially_received'].includes(po.status) ? 'shipping' : 'orders';
   const canShip = ['waiting_to_ship', 'partially_shipped', 'partially_received'].includes(po.status);
   const btn = 'px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition';
 
   return (
-    <PortalFrame supplierName={s.supplierName} email={s.email}>
+    <PortalFrame active={section} supplierName={s.supplierName} email={s.email}>
       <ShipmentProvider>
         <div className="space-y-4">
           <PageHeader
-            backHref="/supplier-portal/orders"
+            backHref={`/supplier-portal/${section}`}
             title={po.po_number}
             badge={<Badge status={po.status} />}
             actions={<CreateShipmentButton enabled={canShip} hint="Acknowledge this purchase order first" />}

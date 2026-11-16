@@ -16,12 +16,11 @@ export const CARTON_FIELDS = [
   { id: 'weight',             label: 'Weight (with unit)', kind: 'weight', hiddenByDefault: true },
   { id: 'dimensions',         label: 'Dimensions: Length × Width × Height (with unit)', kind: 'dims', hiddenByDefault: true },
   { id: 'pallet_id',          label: 'Pallet ID',          kind: 'text', hiddenByDefault: true },
-  { id: 'carton_notes',       label: 'Carton Notes',       kind: 'notes', hiddenByDefault: false },
 ];
 
 export const SHIPMENT_FIELDS = [
   { id: 'ship_method',         label: 'Ship Method',                     kind: 'text', hiddenByDefault: false },
-  { id: 'tracking_number',     label: 'Shipment Tracking / PRO Number',  kind: 'text', hiddenByDefault: false },
+  { id: 'tracking_number',     label: 'PRO/Tracking Number',  kind: 'text', hiddenByDefault: false },
   { id: 'bol_number',          label: 'BOL Number',                      kind: 'text', hiddenByDefault: false },
   { id: 'est_delivery_date',   label: 'Estimated Delivery Date',         kind: 'date', hiddenByDefault: false },
   { id: 'supplier_reference',  label: 'Supplier Shipment Reference',     kind: 'text', hiddenByDefault: false },
@@ -122,7 +121,7 @@ export function validateShipment(config, shipment, cartons) {
       supplier_carton_id: () => ({ value: c.supplier_carton_id }), sscc: () => ({ value: c.sscc }),
       carton_tracking: () => ({ value: c.tracking_number }), weight: () => ({ value: c.weight, unit: c.weight_unit }),
       dimensions: () => ({ length: c.length, width: c.width, height: c.height, unit: c.dim_unit }),
-      pallet_id: () => ({ value: c.pallet_id }), carton_notes: () => ({ value: c.notes }),
+      pallet_id: () => ({ value: c.pallet_id }),
     };
     for (const def of CARTON_FIELDS) {
       const g = cget[def.id]();

@@ -9,14 +9,14 @@ const gradientStyle = {
   WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
 };
 const TABS = [
-  { href: '/supplier-portal', label: 'Dashboard', exact: true },
-  { href: '/supplier-portal/orders', label: 'New POs' },
-  { href: '/supplier-portal/shipping', label: 'Shipping' },
-  { href: '/supplier-portal/invoicing', label: 'Invoicing' },
-  { href: '/supplier-portal/inventory', label: 'Inventory' },
+  { key: 'dashboard', href: '/supplier-portal', label: 'Dashboard', exact: true },
+  { key: 'orders', href: '/supplier-portal/orders', label: 'New POs' },
+  { key: 'shipping', href: '/supplier-portal/shipping', label: 'Shipping' },
+  { key: 'invoicing', href: '/supplier-portal/invoicing', label: 'Invoicing' },
+  { key: 'inventory', href: '/supplier-portal/inventory', label: 'Inventory' },
 ];
 
-export default function PortalFrame({ supplierName, email, children }) {
+export default function PortalFrame({ supplierName, email, active: activeKey, children }) {
   const pathname = usePathname();
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6">
@@ -35,7 +35,7 @@ export default function PortalFrame({ supplierName, email, children }) {
               <span className="text-xs text-gray-400">{supplierName}{email ? ` · ${email}` : ''}</span>
               <nav className="flex items-center gap-0.5">
                 {TABS.map((t) => {
-                  const active = t.exact ? pathname === t.href : pathname?.startsWith(t.href);
+                  const active = activeKey ? activeKey === t.key : t.exact ? pathname === t.href : pathname?.startsWith(t.href);
                   return (
                     <Link key={t.href} href={t.href}
                       className={`whitespace-nowrap rounded-md px-2 py-1.5 text-sm font-medium transition ${active ? 'bg-white/20 text-white' : 'text-gray-200 hover:bg-white/10 hover:text-white'}`}>

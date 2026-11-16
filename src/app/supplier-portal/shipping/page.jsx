@@ -45,7 +45,7 @@ export default async function ShippingPage() {
               {rows.map((p) => {
                 const due = p.expected_ship_date || p.expected_date;
                 return (
-                  <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}`} className="border-b border-gray-50 last:border-0">
+                  <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}?from=shipping`} className="border-b border-gray-50 last:border-0">
                     <td className="py-1.5 text-blue-700">{p.po_number}</td>
                     <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
                     <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>

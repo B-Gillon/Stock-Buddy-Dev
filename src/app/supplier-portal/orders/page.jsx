@@ -31,7 +31,7 @@ export default async function OrdersPage() {
       </tr></thead>
       <tbody>
         {items.map((p) => (
-          <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}`} className="border-b border-gray-50 last:border-0">
+          <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}?from=orders`} className="border-b border-gray-50 last:border-0">
             <td className="py-1.5"><Link className="text-blue-700 hover:underline" href={`/supplier-portal/orders/${p.id}`}>{p.po_number}</Link></td>
             <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
             <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>

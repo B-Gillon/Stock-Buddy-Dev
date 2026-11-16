@@ -68,7 +68,6 @@ function CartonFields({ cfg, f, set }) {
         </Field>
       )}
       {v('pallet_id') && <Field label="Pallet ID" required={r('pallet_id')}>{text('pallet_id')}</Field>}
-      {v('carton_notes') && <Field label="Notes" required={r('carton_notes')} wide>{text('notes')}</Field>}
     </div>
   );
 }
@@ -76,13 +75,13 @@ function CartonFields({ cfg, f, set }) {
 function ShipmentDetails({ cfg, s, set }) {
   const v = (id) => cfg[id].visible; const r = (id) => cfg[id].required;
   const text = (key) => <input className={input} value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
-  const date = (key) => <input className={`${input} w-[8.5rem]`} type="date" value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
+  const date = (key) => <input className={`${input} w-[7.5rem] px-1`} type="date" value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
     <div className="flex items-stretch gap-4">
       <div className="grid flex-1 content-start gap-x-3 gap-y-3 sm:grid-cols-4">
         <Field label="Ship Date" required>{date('ship_date')}</Field>
         {v('ship_method') && <Field label="Ship Method" required={r('ship_method')}>{text('ship_method')}</Field>}
-        {v('tracking_number') && <Field label="Shipment Tracking / PRO Number" required={r('tracking_number')}>{text('tracking_number')}</Field>}
+        {v('tracking_number') && <Field label="PRO/Tracking Number" required={r('tracking_number')}>{text('tracking_number')}</Field>}
         {v('bol_number') && <Field label="BOL Number" required={r('bol_number')}>{text('bol_number')}</Field>}
         {v('est_delivery_date') && <Field label="Estimated Delivery Date" required={r('est_delivery_date')}>{date('est_delivery_date')}</Field>}
         {v('supplier_reference') && <Field label="Supplier Shipment Reference" required={r('supplier_reference')}>{text('supplier_reference')}</Field>}
