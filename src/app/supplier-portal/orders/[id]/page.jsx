@@ -36,7 +36,11 @@ export default async function OrderPage({ params }) {
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-xl font-semibold text-gray-900">{po.po_number}</h1>
-          <span className="text-sm text-gray-600">{LABEL[po.status] ?? po.status}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600">{LABEL[po.status] ?? po.status}</span>
+            <a href={`/api/supplier-portal/orders/${po.id}/export?format=pdf`} className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">Download PDF</a>
+            <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100">Download CSV</a>
+          </div>
         </div>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-4">
           <div><dt className="text-xs text-gray-500">PO Create Date</dt><dd>{fmtDate(po.po_date)}</dd></div>

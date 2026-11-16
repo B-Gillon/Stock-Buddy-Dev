@@ -283,6 +283,10 @@ export async function refreshSftpStatus({ poId, tenantId, settings }) {
 
   // The supplier's system has picked the file up: a PO waiting on acknowledgement moves on to Waiting to Ship.
   if (retrieved.length || deleted.length) {
+    // Automated retrieval: the PO no longer counts as "new" in the supplier portal
+    await supabase.from('purchase_orders')
+      .update({ supplier_retrieved_at: new Date().toISOString(), supplier_retrieved_by: 'SFTP' })
+      .eq('id', poId).eq('tenant_id', tenantId).is('supplier_retrieved_at', null);
     await supabase.from('purchase_orders')
       .update({ status: 'waiting_to_ship' })
       .eq('id', poId).eq('tenant_id', tenantId).eq('status', 'pending_acknowledgement');

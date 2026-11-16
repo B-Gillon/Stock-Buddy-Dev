@@ -9,8 +9,8 @@ export const metadata = { title: 'Supplier – Stock Buddy', robots: { index: fa
 
 function Card({ title, value, href }) {
   const body = (
-    <div className="flex h-full flex-col items-center justify-center rounded-lg border border-gray-200 bg-white p-4 text-center shadow-sm hover:border-gray-300">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</p>
+    <div className="flex h-full flex-col items-center justify-center rounded-lg border border-gray-200 bg-white px-2 py-4 text-center shadow-sm hover:border-gray-300">
+      <p className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-gray-500">{title}</p>
       <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
     </div>
   );
@@ -23,7 +23,7 @@ export default async function SupplierDashboard() {
 
   const { data: pos } = await supabase
     .from('purchase_orders')
-    .select('id, po_number, status, po_date, released_at, expected_date, expected_ship_date, location:locations ( name )')
+    .select('id, po_number, status, po_date, supplier_retrieved_at, expected_date, expected_ship_date, location:locations ( name )')
     .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId)
     .in('status', ['pending_acknowledgement', 'waiting_to_ship', 'partially_received'])
     .order('po_date', { ascending: false }).limit(500);
@@ -35,9 +35,9 @@ export default async function SupplierDashboard() {
   const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7)));
   const weekStart = monday.toISOString().slice(0, 10);
   const weekEnd = new Date(monday.getTime() + 6 * 864e5).toISOString().slice(0, 10);
-  const weekAgo = new Date(now.getTime() - 7 * 864e5).toISOString();
 
-  const newPOs = list.filter((p) => (p.released_at || p.po_date || '') >= weekAgo).length;
+  // New POs = not yet retrieved (downloaded, or picked up by the supplier's system), same as the New POs tab
+  const newPOs = list.filter((p) => p.status !== 'partially_received' && !p.supplier_retrieved_at).length;
   const notAck = list.filter((p) => p.status === 'pending_acknowledgement').length;
   const notShipped = list.length;
   const thisWeek = list.filter((p) => shipDate(p) && shipDate(p) >= today && shipDate(p) >= weekStart && shipDate(p) <= weekEnd).length;
@@ -46,7 +46,7 @@ export default async function SupplierDashboard() {
 
   return (
     <PortalFrame supplierName={s.supplierName} email={s.email}>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-6 gap-3">
         <Card title="New POs" value={newPOs} href="/supplier-portal/orders" />
         <Card title="Not Acknowledged" value={notAck} href="/supplier-portal/orders" />
         <Card title="Not Shipped" value={notShipped} href="/supplier-portal/shipping" />

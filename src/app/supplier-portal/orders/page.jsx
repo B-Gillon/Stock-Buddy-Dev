@@ -11,15 +11,15 @@ const LABEL = { pending_acknowledgement: 'Needs acknowledgement', waiting_to_shi
 
 export default async function OrdersPage() {
   const s = await requireSupplier();
+  // New POs = sent to the supplier but not yet retrieved (downloaded or picked up by their system)
   const { data } = await supabase
     .from('purchase_orders')
     .select('id, po_number, status, po_date, expected_date, expected_ship_date, location:locations ( name )')
     .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId)
-    .neq('status', 'draft')
+    .in('status', ['pending_acknowledgement', 'waiting_to_ship'])
+    .is('supplier_retrieved_at', null)
     .order('po_date', { ascending: false }).limit(300);
   const rows = data ?? [];
-  const needs = rows.filter((r) => r.status === 'pending_acknowledgement');
-  const rest = rows.filter((r) => r.status !== 'pending_acknowledgement');
 
   const Table = ({ items }) => (
     <table className="w-full text-sm">
@@ -46,12 +46,8 @@ export default async function OrdersPage() {
   return (
     <PortalFrame supplierName={s.supplierName} email={s.email}>
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Needs acknowledgement ({needs.length})</h2>
-        {needs.length === 0 ? <p className="text-sm text-gray-400">Nothing waiting for you.</p> : <Table items={needs} />}
-      </section>
-      <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">All other purchase orders</h2>
-        {rest.length === 0 ? <p className="text-sm text-gray-400">No other purchase orders.</p> : <Table items={rest} />}
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">New POs ({rows.length})</h2>
+        {rows.length === 0 ? <p className="text-sm text-gray-400">No new purchase orders.</p> : <Table items={rows} />}
       </section>
     </PortalFrame>
   );
