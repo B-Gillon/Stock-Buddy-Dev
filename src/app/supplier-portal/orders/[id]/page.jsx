@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier } from '@/lib/supplierPortal';
 import { shippedByLine } from '@/lib/shipments';
+import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import Badge from '@/shared/components/ui/Badge';
 import Card from '@/shared/components/ui/Card';
@@ -37,6 +38,7 @@ export default async function OrderPage({ params }) {
     .from('purchase_order_lines')
     .select('id, line_no, sku, title, order_qty_units, received_qty_units, unit_cost, extended_cost, variant:variants!variant_id ( display_title, image_src )')
     .eq('purchase_order_id', po.id).order('line_no', { ascending: true });
+  const shipConfig = await loadShipmentConfig(s.tenantId);
   const shipped = await shippedByLine((rows ?? []).map((r) => r.id));
   const lines = (rows ?? []).map((l) => {
     const v = Array.isArray(l.variant) ? l.variant[0] : l.variant;
@@ -114,6 +116,7 @@ export default async function OrderPage({ params }) {
             poId={po.id}
             lines={lines}
             currency={cur}
+            config={shipConfig}
             exportLinks={
               <div className="flex items-center gap-2">
                 <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className={btn}>Export CSV</a>

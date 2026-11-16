@@ -5,6 +5,7 @@ import AppLayout from '@/shared/components/layout/AppLayout';
 import PDFTab from './PDFTab';
 import CSVTab from './CSVTab';
 import UsersTab from './UsersTab';
+import ShipmentSettingsTab from './ShipmentSettingsTab';
 
 // ── Shared UI helpers ──────────────────────────────────────────────────────────
 
@@ -357,7 +358,7 @@ function PurchaseOrdersTab({ poNextNumber: initialPoNextNumber }) {
 
 // ── Main Settings component ────────────────────────────────────────────────────
 
-const TABS = ['PDF', 'CSV', 'Email', 'Purchase Orders', 'Users'];
+const TABS = ['PDF', 'CSV', 'Email', 'Purchase Orders', 'Shipment Settings', 'Users'];
 
 export default function SettingsClient({ suppliers, locations, poNextNumber }) {
   const [activeTab, setActiveTab] = useState('PDF');
@@ -394,6 +395,7 @@ export default function SettingsClient({ suppliers, locations, poNextNumber }) {
             {activeTab === 'CSV'             && <CSVTab />}
             {activeTab === 'Email'           && <EmailTab />}
             {activeTab === 'Purchase Orders' && <PurchaseOrdersTab poNextNumber={poNextNumber} />}
+            {activeTab === 'Shipment Settings' && <ShipmentSettingsTab />}
             {activeTab === 'Users'           && <UsersTab />}
           </div>
         )}
