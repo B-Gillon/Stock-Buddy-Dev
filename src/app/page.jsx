@@ -1,7 +1,7 @@
 // src/app/page.jsx
 // Root route.
 // - If loaded inside Shopify (host + shop params present): redirect to /dashboard
-// - Otherwise: redirect to /request-access (public landing page)
+// - Otherwise: redirect to /login (the proxy sends signed-in users to their own home)
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +17,6 @@ export default async function RootPage({ searchParams }) {
     redirect(`/dashboard?shop=${shop}&host=${host}`);
   }
 
-  // Otherwise send to the request-access intro page
-  redirect("/request-access");
+  // Otherwise: the website. Signed-in users go to their home; everyone else to the login page.
+  redirect("/login");
 }

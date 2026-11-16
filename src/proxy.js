@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SESSION_COOKIE, readSessionValue } from "@/lib/auth/session";
 
 /**
  * src/proxy.js
@@ -79,12 +80,58 @@ export function proxy(request) {
     pathname.startsWith("/api/admin") ||
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/acknowledge/") ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/set-password") ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/acknowledge") ||
     pathname.startsWith("/api/shopify/set-shop-cookie") ||
     pathname.startsWith("/admin");
 
   if (isPublicRoute) {
     return NextResponse.next();
+  }
+
+  // ── Website login session ──────────────────────────────────────────────────
+  // Headers that say who the user is are only ever set here, from a verified session cookie.
+  // Anything a visitor sends under those names is discarded.
+  const session = readSessionValue(request.cookies.get(SESSION_COOKIE)?.value);
+  const isApi = pathname.startsWith("/api");
+
+  if (session) {
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL(session.role === "supplier" ? "/supplier-portal" : "/dashboard", request.url));
+    }
+    // Supplier users only get the supplier portal. Everything else (the retailer's app) is closed to them.
+    if (session.role === "supplier") {
+      const allowed =
+        pathname.startsWith("/supplier-portal") || pathname.startsWith("/api/supplier-portal");
+      if (!allowed) {
+        return isApi
+          ? NextResponse.json({ error: "Forbidden" }, { status: 403 })
+          : NextResponse.redirect(new URL("/supplier-portal", request.url));
+      }
+    }
+
+    const sessionHeaders = new Headers(request.headers);
+    sessionHeaders.delete("x-auth-user");
+    sessionHeaders.delete("x-auth-role");
+    sessionHeaders.delete("x-auth-supplier");
+    sessionHeaders.set("x-shop-domain", session.shop);
+    sessionHeaders.set("x-auth-user", session.uid);
+    sessionHeaders.set("x-auth-role", session.role);
+    if (session.sid) sessionHeaders.set("x-auth-supplier", session.sid);
+
+    // Retailer on a phone gets the mobile screens, as in Shopify
+    if (
+      session.role === "retailer" &&
+      isMobileUserAgent(request.headers.get("user-agent")) &&
+      DESKTOP_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix)) &&
+      !isApi
+    ) {
+      return NextResponse.redirect(new URL("/mobile", request.url));
+    }
+    return NextResponse.next({ request: { headers: sessionHeaders } });
   }
 
   // ── Mobile redirect ────────────────────────────────────────────────────────
@@ -159,11 +206,16 @@ export function proxy(request) {
     request.nextUrl.searchParams.get("host");
 
   if (!shopDomain) {
+    // Not inside Shopify and not signed in: send page visits to the website login
+    if (!isApi) return NextResponse.redirect(new URL("/login", request.url));
     return NextResponse.next();
   }
 
   // Forward shop domain and host as clean headers for downstream use
   const requestHeaders = new Headers(request.headers);
+  requestHeaders.delete("x-auth-user");
+  requestHeaders.delete("x-auth-role");
+  requestHeaders.delete("x-auth-supplier");
   requestHeaders.set("x-shop-domain", shopDomain);
 
   if (host) {

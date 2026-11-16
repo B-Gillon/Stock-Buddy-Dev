@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import SignOutButton from "@/app/components/SignOutButton";
 
 
 const NAV_ITEMS = [
@@ -104,6 +105,13 @@ export default function Header({
   lastSyncedAt,
   formatTimestamp,
 }) {
+  // Only the website login (not Shopify) has a session to end
+  const [webUser, setWebUser] = useState(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/auth/me").then((r) => r.json()).then((j) => { if (live) setWebUser(j.user ?? null); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   const pathname = usePathname();
 
   return (
@@ -185,6 +193,9 @@ export default function Header({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </Link>
+            {webUser && (
+              <SignOutButton className="ml-2 rounded-md border border-white/30 px-2.5 py-1 text-xs text-gray-200 hover:bg-white/10 transition" />
+            )}
           </nav>
         </div>
 
