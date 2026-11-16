@@ -22,7 +22,7 @@ export function CreateShipmentButton({ enabled, hint }) {
 
 const input = 'h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm';
 const today = () => new Date().toLocaleDateString('en-CA');
-const newCarton = () => ({ key: Math.random().toString(36).slice(2), f: { weight_unit: 'lb', dim_unit: 'in' }, q: {} });
+const blankCarton = () => ({ f: { weight_unit: 'lb', dim_unit: 'in' }, q: {} });
 
 function Field({ label, required, children, wide }) {
   return (
@@ -98,63 +98,112 @@ function ShipmentDetails({ cfg, s, set }) {
   );
 }
 
+
+const th = 'text-left px-3 py-2 font-medium';
+
+function ItemQtyTable({ lines, carton, leftFor, onQty }) {
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
+          <th className="py-1 pr-3 font-medium">SKU</th><th className="py-1 pr-3 font-medium">Description</th>
+          <th className="py-1 pr-3 font-medium">Left to Ship</th><th className="py-1 font-medium">Carton Qty</th>
+        </tr>
+      </thead>
+      <tbody>
+        {lines.map((l) => {
+          const mine = Number(carton.q[l.id] || 0) || 0;
+          const left = leftFor(l);
+          return (
+            <tr key={l.id} className="border-b border-gray-50 last:border-0">
+              <td className="py-1.5 pr-3 text-gray-600">{l.sku || '—'}</td>
+              <td className="py-1.5 pr-3 text-gray-800">{l.title}</td>
+              <td className="py-1.5 pr-3 text-gray-800">{Math.max(0, left - mine)}</td>
+              <td className="py-1">
+                <input type="number" min="0" max={left} step="1" inputMode="numeric" disabled={left === 0 && !mine}
+                  value={carton.q[l.id] ?? ''} onChange={(e) => onQty(l.id, e.target.value)}
+                  className="h-8 w-24 rounded border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 export function LinesTable({ poId, lines, currency, exportLinks, config }) {
   const router = useRouter();
   const { creating, setCreating } = useContext(Ctx);
-  const [cartons, setCartons] = useState([newCarton()]);
-  const [active, setActive] = useState(0);
+  const [saved, setSaved] = useState([]);          // cartons already saved, in order
+  const [cur, setCur] = useState(blankCarton());   // the carton being filled in
+  const [editIdx, setEditIdx] = useState(null);    // a saved carton open for editing
   const [ship, setShip] = useState({ ship_date: today(), weight_unit: 'lb' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const remainingBase = (l) => Math.max(0, (l.ordered ?? 0) - (l.shipped ?? 0));
   const qtyIn = (c, id) => Number(c.q[id] || 0) || 0;
+  const hasQty = (c) => lines.some((l) => qtyIn(c, l.id) > 0);
+  const remainingBase = (l) => Math.max(0, (l.ordered ?? 0) - (l.shipped ?? 0));
+
   const thisShipment = useMemo(() => {
     const t = {};
-    for (const c of cartons) for (const l of lines) t[l.id] = (t[l.id] ?? 0) + qtyIn(c, l.id);
+    for (const c of [...saved, cur]) for (const l of lines) t[l.id] = (t[l.id] ?? 0) + qtyIn(c, l.id);
     return t;
-  }, [cartons, lines]);
-  const leftFor = (l, idx) => remainingBase(l) - ((thisShipment[l.id] ?? 0) - qtyIn(cartons[idx], l.id));
+  }, [saved, cur, lines]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What a given carton can still take: remaining, minus what every OTHER carton already holds
+  const leftFor = (l, own) => remainingBase(l) - ((thisShipment[l.id] ?? 0) - qtyIn(own, l.id));
 
+  const curNo = saved.length + 1;
   const totalUnits = lines.reduce((t, l) => t + (l.ordered ?? 0), 0);
   const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
+  const cartonCount = saved.length + (hasQty(cur) ? 1 : 0);
 
-  const setCarton = (idx, patch) => setCartons((cs) => cs.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
-  const setCartonFields = (idx) => (patch) => setCarton(idx, { f: { ...cartons[idx].f, ...patch } });
-  const setQty = (idx, lineId, value) => setCarton(idx, { q: { ...cartons[idx].q, [lineId]: value } });
+  const cartonPayload = (c) => ({ ...c.f, lines: lines.map((l) => ({ lineId: l.id, qty: qtyIn(c, l.id) })).filter((x) => x.qty) });
+  function cartonErrors(c, n) {
+    return validateShipment(config, { ship_date: '2000-01-01' }, [cartonPayload(c)])
+      .filter((e) => e.startsWith('Carton 1'))
+      .map((e) => e.replace('Carton 1', `Carton ${n}`));
+  }
 
-  function fillActive() {
+  function fillCurrent() {
     const q = {};
-    for (const l of lines) { const left = leftFor(l, active); if (left > 0) q[l.id] = String(left); }
-    setCarton(active, { q });
+    for (const l of lines) { const left = leftFor(l, cur); if (left > 0) q[l.id] = String(left); }
+    setCur((c) => ({ ...c, q }));
   }
-  function addCarton() {
-    const cur = cartons[active];
-    if (!lines.some((l) => qtyIn(cur, l.id) > 0)) { setError(`Enter a quantity for at least one item in Carton ${active + 1} before adding another.`); return; }
-    setError('');
-    setCartons((cs) => [...cs, newCarton()]);
-    setActive(cartons.length);
-  }
-  function removeCarton(idx) {
-    if (cartons.length === 1) { setCartons([newCarton()]); setActive(0); return; }
-    setCartons((cs) => cs.filter((_, i) => i !== idx));
-    setActive((a) => (idx < a ? a - 1 : idx === a ? Math.max(0, idx - 1) : a));
-  }
-  function cancel() { setCreating(false); setCartons([newCarton()]); setActive(0); setShip({ ship_date: today(), weight_unit: 'lb' }); setError(''); }
 
-  function payload() {
-    const { _cartons, ...shipment } = ship;
-    return {
-      poId,
-      shipment,
-      cartons: cartons.map((c) => ({ ...c.f, lines: lines.map((l) => ({ lineId: l.id, qty: qtyIn(c, l.id) })).filter((x) => x.qty) })),
-    };
+  function saveAndAddAnother() {
+    const errs = cartonErrors(cur, curNo);
+    if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
+    setError('');
+    setSaved((cs) => [...cs, cur]);
+    setCur(blankCarton());
+  }
+  const patchSaved = (i, patch) => setSaved((cs) => cs.map((c, k) => (k === i ? { ...c, ...patch } : c)));
+  function removeSaved(i) {
+    setSaved((cs) => cs.filter((_, k) => k !== i));
+    setEditIdx((e) => (e == null ? null : e === i ? null : e > i ? e - 1 : e));
+  }
+  function doneEditing(i) {
+    const errs = cartonErrors(saved[i], i + 1);
+    if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
+    setError(''); setEditIdx(null);
+  }
+
+  function cancel() {
+    setCreating(false); setSaved([]); setCur(blankCarton()); setEditIdx(null);
+    setShip({ ship_date: today(), weight_unit: 'lb' }); setError('');
   }
 
   async function save() {
     setError('');
-    const body = payload();
+    const all = hasQty(cur) ? [...saved, cur] : saved;
+    const { ...shipment } = ship;
+    const body = { poId, shipment, cartons: all.map(cartonPayload) };
     const errs = validateShipment(config, body.shipment, body.cartons);
+    if (!hasQty(cur) && Object.values(cur.f).some((v) => v && !['lb', 'in'].includes(v))) {
+      errs.push(`Carton ${curNo}: enter a quantity for at least one item, or clear its fields.`);
+    }
     for (const l of lines) if ((thisShipment[l.id] ?? 0) > remainingBase(l)) errs.push(`${l.sku || `Line ${l.lineNo}`}: more than the ${remainingBase(l)} remaining unshipped.`);
     if (errs.length) { setError(errs.slice(0, 4).join(' ') + (errs.length > 4 ? ` (and ${errs.length - 4} more)` : '')); return; }
     setBusy(true);
@@ -166,34 +215,49 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
     } catch { setError('Something went wrong.'); setBusy(false); }
   }
 
-  const th = 'text-left px-3 py-2 font-medium';
-  const actions = (
+  const buttons = (
     <div className="flex items-center gap-2">
       <Button variant="secondary" onClick={cancel} disabled={busy}>Cancel</Button>
+      <Button variant="secondary" onClick={saveAndAddAnother} disabled={busy}>Save Carton / Add Another</Button>
       <Button onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save Shipment'}</Button>
     </div>
   );
 
   return (
     <div className="space-y-4">
+      {creating && (
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">Shipment Details</h2>
+          <div className="p-4">
+            <ShipmentDetails cfg={config.shipment} s={{ ...ship, _cartons: cartonCount }} set={(p) => setShip((s) => ({ ...s, ...p }))} />
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
-            {creating ? 'Create Shipment' : 'Line Items'}<span className="ml-2 text-xs font-normal text-gray-400">({lines.length})</span>
+            {creating ? `Create Shipment · Carton ${curNo}` : 'Line Items'}<span className="ml-2 text-xs font-normal text-gray-400">({lines.length})</span>
           </h2>
-          {creating ? actions : exportLinks}
+          {creating ? buttons : exportLinks}
         </div>
         {error ? <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p> : null}
+        {creating && (
+          <div className="border-b border-gray-200 p-4">
+            <CartonFields cfg={config.carton} f={cur.f} set={(patch) => setCur((c) => ({ ...c, f: { ...c.f, ...patch } }))} />
+          </div>
+        )}
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
               <th className={th}>#</th><th className={th}></th><th className={th}>SKU</th><th className={th}>Description</th>
               <th className={th}>Ordered</th><th className={th}>Shipped</th>
               <th className={th}>Received</th><th className={th}>Open</th>
+              {creating && <th className={th}>Shipment Qty</th>}
               {creating && (
                 <th className={th}>
-                  <button type="button" onClick={fillActive} title={`Fill Carton ${active + 1} with every remaining unshipped quantity`}
-                    className="cursor-pointer font-medium text-gray-600 hover:text-gray-900">Shipped Qty</button>
+                  <button type="button" onClick={fillCurrent} title={`Fill Carton ${curNo} with every remaining unshipped quantity`}
+                    className="cursor-pointer font-medium text-gray-600 hover:text-gray-900">Carton Qty</button>
                 </th>
               )}
               <th className={th}>Unit Cost</th><th className={th}>Extended Cost</th>
@@ -201,9 +265,10 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
           </thead>
           <tbody>
             {lines.length === 0 ? (
-              <tr><td colSpan={creating ? 11 : 10} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
+              <tr><td colSpan={creating ? 12 : 10} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
             ) : lines.map((l) => {
               const open = (l.ordered ?? 0) - (l.received ?? 0);
+              const left = leftFor(l, cur);
               return (
                 <tr key={l.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-3 py-2 text-gray-400">{l.lineNo}</td>
@@ -224,6 +289,13 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
                       {(thisShipment[l.id] ?? 0).toLocaleString()}
                     </td>
                   )}
+                  {creating && (
+                    <td className="px-3 py-1.5">
+                      <input type="number" min="0" max={left} step="1" inputMode="numeric" disabled={left === 0 && !qtyIn(cur, l.id)}
+                        value={cur.q[l.id] ?? ''} onChange={(e) => setCur((c) => ({ ...c, q: { ...c.q, [l.id]: e.target.value } }))}
+                        className="h-8 w-24 rounded border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
+                    </td>
+                  )}
                   <td className="px-3 py-2 text-gray-800">{formatCurrency(l.unitCost, currency)}</td>
                   <td className="px-3 py-2 text-gray-800">{formatCurrency(l.extended, currency)}</td>
                 </tr>
@@ -236,7 +308,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
                 <td className="px-3 py-2" colSpan={3}></td>
                 <td className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
                 <td className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>
-                <td className="px-3 py-2" colSpan={creating ? 5 : 4}></td>
+                <td className="px-3 py-2" colSpan={creating ? 6 : 4}></td>
                 <td className="px-3 py-2 font-semibold">{formatCurrency(totalCost, currency)}</td>
               </tr>
             </tfoot>
@@ -244,74 +316,42 @@ export function LinesTable({ poId, lines, currency, exportLinks, config }) {
         </table>
       </div>
 
-      {creating && (
-        <>
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-            <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">Shipment Details</h2>
-            <div className="p-4">
-              <ShipmentDetails cfg={config.shipment} s={{ ...ship, _cartons: cartons.length }} set={(p) => setShip((s) => ({ ...s, ...p }))} />
+      {creating && saved.map((c, i) => {
+        const units = lines.reduce((t, l) => t + qtyIn(c, l.id), 0);
+        const editing = editIdx === i;
+        const bits = [c.f.supplier_carton_id && `ID ${c.f.supplier_carton_id}`, c.f.tracking_number && `Tracking ${c.f.tracking_number}`, c.f.sscc && `SSCC ${c.f.sscc}`].filter(Boolean);
+        return (
+          <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between px-4 py-3">
+              <p className="text-sm font-semibold text-gray-900">
+                Carton {i + 1}
+                <span className="ml-3 text-xs font-normal text-gray-500">{units} unit{units === 1 ? '' : 's'}{bits.length ? ` · ${bits.join(' · ')}` : ''}</span>
+              </p>
+              <div className="flex items-center gap-3 text-sm">
+                {editing
+                  ? <button type="button" className="text-blue-700 hover:underline" onClick={() => doneEditing(i)}>Done</button>
+                  : <button type="button" className="text-blue-700 hover:underline" onClick={() => { setEditIdx(i); setError(''); }}>Edit</button>}
+                <button type="button" className="text-red-600 hover:underline" onClick={() => removeSaved(i)}>Remove</button>
+              </div>
+            </div>
+            <div className="border-t border-gray-100 px-4 py-3">
+              {editing ? (
+                <div className="space-y-4">
+                  <CartonFields cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
+                  <ItemQtyTable lines={lines} carton={c} leftFor={(l) => leftFor(l, c)}
+                    onQty={(lineId, v) => patchSaved(i, { q: { ...c.q, [lineId]: v } })} />
+                </div>
+              ) : (
+                <ul className="text-sm text-gray-700">
+                  {lines.filter((l) => qtyIn(c, l.id) > 0).map((l) => (
+                    <li key={l.id} className="flex gap-3"><span className="w-28 text-gray-500">{l.sku || '—'}</span><span className="flex-1">{l.title}</span><span className="font-medium">{qtyIn(c, l.id)}</span></li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-            <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <h2 className="text-sm font-semibold text-gray-800">Cartons<span className="ml-2 text-xs font-normal text-gray-400">({cartons.length})</span></h2>
-              <Button variant="secondary" onClick={addCarton}>Add Carton</Button>
-            </div>
-            <div className="divide-y divide-gray-100">
-              {cartons.map((c, idx) => {
-                const units = lines.reduce((t, l) => t + qtyIn(c, l.id), 0);
-                const isActive = idx === active;
-                return (
-                  <div key={c.key} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-900">
-                        Carton {idx + 1}
-                        <span className="ml-3 text-xs font-normal text-gray-500">{units} unit{units === 1 ? '' : 's'}{c.f.supplier_carton_id ? ` · ${c.f.supplier_carton_id}` : ''}</span>
-                      </p>
-                      <div className="flex items-center gap-3 text-sm">
-                        {!isActive && <button type="button" className="text-blue-700 hover:underline" onClick={() => { setActive(idx); setError(''); }}>Edit</button>}
-                        <button type="button" className="text-red-600 hover:underline" onClick={() => removeCarton(idx)}>{cartons.length === 1 ? 'Clear' : 'Remove'}</button>
-                      </div>
-                    </div>
-                    {isActive && (
-                      <div className="mt-3 space-y-4">
-                        <CartonFields cfg={config.carton} f={c.f} set={setCartonFields(idx)} />
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
-                              <th className="py-1 pr-3 font-medium">SKU</th><th className="py-1 pr-3 font-medium">Description</th>
-                              <th className="py-1 pr-3 font-medium">Left to Ship</th><th className="py-1 font-medium">Qty in Carton {idx + 1}</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {lines.map((l) => {
-                              const left = leftFor(l, idx);
-                              return (
-                                <tr key={l.id} className="border-b border-gray-50 last:border-0">
-                                  <td className="py-1.5 pr-3 text-gray-600">{l.sku || '—'}</td>
-                                  <td className="py-1.5 pr-3 text-gray-800">{l.title}</td>
-                                  <td className="py-1.5 pr-3 text-gray-800">{Math.max(0, left - qtyIn(c, l.id)) }</td>
-                                  <td className="py-1">
-                                    <input type="number" min="0" max={left} step="1" inputMode="numeric" disabled={left === 0 && !qtyIn(c, l.id)}
-                                      value={c.q[l.id] ?? ''} onChange={(e) => setQty(idx, l.id, e.target.value)}
-                                      className="h-8 w-24 rounded border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex justify-end gap-2 border-t border-gray-200 px-4 py-3">{actions}</div>
-          </div>
-        </>
-      )}
+        );
+      })}
     </div>
   );
 }
