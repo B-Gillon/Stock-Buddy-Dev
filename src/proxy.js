@@ -66,7 +66,9 @@ export async function proxy(request) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
-    pathname.startsWith("/public")
+    pathname.startsWith("/public") ||
+    // Public image assets (logos) must load on the login page for signed-out visitors
+    /\.(png|jpe?g|gif|svg|webp|ico)$/i.test(pathname)
   ) {
     return NextResponse.next();
   }
