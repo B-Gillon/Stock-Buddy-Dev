@@ -71,6 +71,8 @@ export function CartonFields({ cfg, f, set, autoSscc }) {
         </Field>
       )}
       {v('pallet_id') && <Field label="Pallet ID" required={r('pallet_id')}>{text('pallet_id')}</Field>}
+      {v('lot_number') && <Field label="Lot Number" required={r('lot_number')}>{text('lot_number')}</Field>}
+      {v('expiration_date') && <Field label="Expiration Date" required={r('expiration_date')}><input className={input} type="date" value={f.expiration_date ?? ''} onChange={(e) => set({ expiration_date: e.target.value })} /></Field>}
     </div>
   );
 }
@@ -146,7 +148,7 @@ export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
   );
 }
 
-const labelUrl = (sscc) => `/supplier-portal/labels?sscc=${sscc}`;
+const labelUrl = (sscc, c) => `/supplier-portal/labels?sscc=${sscc}${c?.f?.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c?.f?.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`;
 const SSCC_PLACEHOLDER = '000000000000000000';
 
 export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels }) {
@@ -222,7 +224,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
       try {
         const sscc = await reserve(curNo);
         carton = { ...cur, f: { ...cur.f, sscc } };
-        if (w) w.location.href = labelUrl(sscc);
+        if (w) w.location.href = labelUrl(sscc, cur);
       } catch (e) { w?.close(); setError(e.message); setBusy(false); return; }
       setBusy(false);
     }
@@ -271,7 +273,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
       const res = await fetch('/api/supplier-portal/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) { w?.close(); setError(data.error || 'Something went wrong.'); setBusy(false); return; }
-      if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc);
+      if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc, cartons[cartons.length - 1]);
       cancel(); setBusy(false); router.refresh();
     } catch (e) { w?.close(); setError(e?.message || 'Something went wrong.'); setBusy(false); }
   }
@@ -416,7 +418,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
                 {editing
                   ? <button type="button" className="text-blue-700 hover:underline" onClick={() => doneEditing(i)}>Done</button>
                   : <button type="button" className="text-blue-700 hover:underline" onClick={() => { setEditIdx(i); setError(''); }}>Edit</button>}
-                {c.f.sscc && <a className="text-blue-700 hover:underline" href={labelUrl(c.f.sscc)} target="_blank" rel="noopener noreferrer">Print label</a>}
+                {c.f.sscc && <a className="text-blue-700 hover:underline" href={labelUrl(c.f.sscc, c)} target="_blank" rel="noopener noreferrer">Print label</a>}
                 <button type="button" className="text-red-600 hover:underline" onClick={() => removeSaved(i)}>Remove</button>
               </div>
             </div>

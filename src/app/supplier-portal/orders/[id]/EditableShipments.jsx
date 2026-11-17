@@ -15,7 +15,7 @@ const toDraft = (c, cartonLines) => ({
     supplier_carton_id: s2(c.supplier_carton_id), sscc: s2(c.sscc), tracking_number: s2(c.tracking_number),
     weight: s2(c.weight), weight_unit: c.weight_unit || 'lb',
     length: s2(c.length), width: s2(c.width), height: s2(c.height), dim_unit: c.dim_unit || 'in',
-    pallet_id: s2(c.pallet_id),
+    pallet_id: s2(c.pallet_id), lot_number: s2(c.lot_number), expiration_date: s2(c.expiration_date),
   },
   q: Object.fromEntries(cartonLines.map((l) => [l.po_line_id, String(l.shipped_qty)])),
 });

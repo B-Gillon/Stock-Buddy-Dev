@@ -112,6 +112,8 @@ export async function POST(request) {
       length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,
       dim_unit: hasD ? c.dim_unit : null,
       pallet_id: vc.pallet_id.visible ? clean(c.pallet_id) : null,
+      lot_number: vc.lot_number.visible ? clean(c.lot_number) : null,
+      expiration_date: vc.expiration_date.visible ? clean(c.expiration_date) : null,
     };
   });
   const { data: cartonIds, error: cErr } = await supabase.from('shipment_cartons').insert(cartonRows).select('id, carton_no');

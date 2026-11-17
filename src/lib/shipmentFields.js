@@ -16,6 +16,8 @@ export const CARTON_FIELDS = [
   { id: 'weight',             label: 'Weight (with unit)', kind: 'weight', hiddenByDefault: true },
   { id: 'dimensions',         label: 'Dimensions: Length × Width × Height (with unit)', kind: 'dims', hiddenByDefault: true },
   { id: 'pallet_id',          label: 'Pallet ID',          kind: 'text', hiddenByDefault: true },
+  { id: 'lot_number',         label: 'Lot Number',         kind: 'text', hiddenByDefault: true },
+  { id: 'expiration_date',    label: 'Expiration Date',    kind: 'date', hiddenByDefault: true },
 ];
 
 export const SHIPMENT_FIELDS = [
@@ -122,6 +124,7 @@ export function validateShipment(config, shipment, cartons) {
       carton_tracking: () => ({ value: c.tracking_number }), weight: () => ({ value: c.weight, unit: c.weight_unit }),
       dimensions: () => ({ length: c.length, width: c.width, height: c.height, unit: c.dim_unit }),
       pallet_id: () => ({ value: c.pallet_id }),
+      lot_number: () => ({ value: c.lot_number }), expiration_date: () => ({ value: c.expiration_date }),
     };
     for (const def of CARTON_FIELDS) {
       const g = cget[def.id]();

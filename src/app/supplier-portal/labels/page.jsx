@@ -13,23 +13,27 @@ const barcode = (sscc) => bwipjs.toSVG({ bcid: 'gs1-128', text: `(00)${sscc}`, s
 
 export default async function LabelsPage({ searchParams }) {
   const s = await requireSupplier();
-  const { shipment: shipmentId, sscc: ssccParam } = (await searchParams) ?? {};
+  const { shipment: shipmentId, sscc: ssccParam, lot: lotParam, exp: expParam } = (await searchParams) ?? {};
   let labels = []; // { sscc, cartonNo, total, poId, shipmentNumber }
 
   if (shipmentId) {
     const { data: sh } = await supabase.from('shipments').select('id, po_id, shipment_number, total_cartons')
       .eq('id', shipmentId).eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).maybeSingle();
     if (!sh) notFound();
-    const { data: cartons } = await supabase.from('shipment_cartons').select('carton_no, sscc')
+    const { data: cartons } = await supabase.from('shipment_cartons').select('carton_no, sscc, lot_number, expiration_date')
       .eq('shipment_id', sh.id).order('carton_no');
-    labels = (cartons ?? []).filter((c) => c.sscc).map((c) => ({ sscc: c.sscc, cartonNo: c.carton_no, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
+    labels = (cartons ?? []).filter((c) => c.sscc).map((c) => ({ sscc: c.sscc, cartonNo: c.carton_no, lot: c.lot_number, exp: c.expiration_date, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
   } else if (ssccParam) {
     const { data: r } = await supabase.from('supplier_ssccs').select('sscc, po_id, carton_no, shipment_id')
       .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).eq('sscc', String(ssccParam)).is('voided_at', null).maybeSingle();
     if (!r) notFound();
     let sh = null;
     if (r.shipment_id) ({ data: sh } = await supabase.from('shipments').select('shipment_number, total_cartons').eq('id', r.shipment_id).maybeSingle());
-    labels = [{ sscc: r.sscc, cartonNo: r.carton_no, total: sh?.total_cartons ?? null, poId: r.po_id, shipmentNumber: sh?.shipment_number ?? null }];
+    // Saved carton: use its stored lot/expiry; not saved yet: use what the supplier just entered
+    const { data: saved } = r.shipment_id ? await supabase.from('shipment_cartons').select('lot_number, expiration_date').eq('tenant_id', s.tenantId).eq('sscc', r.sscc).maybeSingle() : { data: null };
+    const lot = saved ? saved.lot_number : String(lotParam ?? '').slice(0, 40) || null;
+    const exp = saved ? saved.expiration_date : /^\d{4}-\d{2}-\d{2}$/.test(String(expParam ?? '')) ? expParam : null;
+    labels = [{ lot, exp, sscc: r.sscc, cartonNo: r.carton_no, total: sh?.total_cartons ?? null, poId: r.po_id, shipmentNumber: sh?.shipment_number ?? null }];
   }
   if (!labels.length) notFound();
 
@@ -75,6 +79,12 @@ export default async function LabelsPage({ searchParams }) {
             <div><h4>PO</h4><div className="big">{po.po_number}</div>{l.shipmentNumber && <div style={{ fontSize: 11 }}>{l.shipmentNumber}</div>}</div>
             <div style={{ textAlign: 'right' }}><h4>Carton</h4><div className="big">{l.cartonNo}{l.total ? ` of ${l.total}` : ''}</div></div>
           </div>
+          {(l.lot || l.exp) && (
+            <div className="blk" style={{ display: 'flex', gap: 24 }}>
+              {l.lot && <div><h4>Lot</h4><div style={{ fontWeight: 700 }}>{l.lot}</div></div>}
+              {l.exp && <div><h4>Expires</h4><div style={{ fontWeight: 700 }}>{`${String(l.exp).slice(5, 7)}/${String(l.exp).slice(8, 10)}/${String(l.exp).slice(0, 4)}`}</div></div>}
+            </div>
+          )}
           <div className="bar">
             <h4 style={{ textAlign: 'left' }}>SSCC</h4>
             <div dangerouslySetInnerHTML={{ __html: barcode(l.sscc) }} />

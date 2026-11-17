@@ -87,6 +87,8 @@ export async function PATCH(request, { params }) {
     length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,
     dim_unit: hasD ? c.dim_unit : null,
     pallet_id: vc.pallet_id.visible ? clean(c.pallet_id) : null,
+    lot_number: vc.lot_number.visible ? clean(c.lot_number) : null,
+    expiration_date: vc.expiration_date.visible ? clean(c.expiration_date) : null,
   }).eq('id', carton.id);
   if (upErr) { console.error('[carton edit] update failed:', upErr); return bad('Could not save the carton. Please try again.', 500); }
 

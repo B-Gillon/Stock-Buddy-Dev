@@ -60,6 +60,8 @@ export default async function ShipmentsView({ poId, lines }) {
           has("weight") && { key: "weight", head: "Weight", get: (c) => (c.weight != null ? `${Number(c.weight)} ${c.weight_unit ?? ""}` : null) },
           has("length") && { key: "dims", head: "Dimensions", get: (c) => (c.length != null ? `${Number(c.length)} × ${Number(c.width)} × ${Number(c.height)} ${c.dim_unit ?? ""}` : null) },
           has("pallet_id") && { key: "pallet_id", head: "Pallet ID", get: (c) => c.pallet_id },
+          has("lot_number") && { key: "lot_number", head: "Lot Number", get: (c) => c.lot_number },
+          has("expiration_date") && { key: "expiration_date", head: "Expires", get: (c) => (c.expiration_date ? fmtDate(c.expiration_date) : null) },
         ].filter(Boolean);
 
         return (
