@@ -4,11 +4,21 @@ import bwipjs from 'bwip-js';
 import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier } from '@/lib/supplierPortal';
 import PrintNow from './PrintNow';
+import { LOT_RE } from '@/lib/shipmentFields';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Carton Labels – Stock Buddy', robots: { index: false, follow: false } };
 
 const fmt = (s) => `${s[0]} ${s.slice(1, 8)} ${s.slice(8, 17)} ${s[17]}`;
+// GS1-128 for the expiry (AI 17, YYMMDD) and lot (AI 10, variable length so it goes last)
+function lotBarcode(lot, exp) {
+  const parts = [];
+  if (exp && /^\d{4}-\d{2}-\d{2}$/.test(String(exp))) parts.push(`(17)${exp.slice(2, 4)}${exp.slice(5, 7)}${exp.slice(8, 10)}`);
+  if (lot && LOT_RE.test(String(lot))) parts.push(`(10)${lot}`);
+  if (!parts.length) return null;
+  try { return { svg: bwipjs.toSVG({ bcid: 'gs1-128', text: parts.join(''), scale: 2, height: 12, includetext: false }), text: parts.join(' ') }; }
+  catch { return null; }
+}
 const barcode = (sscc) => bwipjs.toSVG({ bcid: 'gs1-128', text: `(00)${sscc}`, scale: 3, height: 22, includetext: false });
 
 export default async function LabelsPage({ searchParams }) {
@@ -56,6 +66,10 @@ export default async function LabelsPage({ searchParams }) {
         .label .big { font-size: 20px; font-weight: 700; }
         .label .bar { margin-top: auto; text-align: center; }
         .label .bar svg { width: 100%; height: 1.4in; }
+        .label .bar.small svg { height: 1.0in; }
+        .label .bar2 { text-align: center; margin-top: 6px; }
+        .label .bar2 svg { width: 100%; height: 0.55in; }
+        .label .bar2 .num { font-size: 11px; margin-top: 2px; }
         .label .num { text-align: center; font-size: 15px; font-weight: 700; letter-spacing: .04em; margin-top: 4px; }
         .noprint { text-align: center; padding: 12px; font-family: Arial, sans-serif; font-size: 14px; }
         @media print { body { background: #fff; } .label { margin: 0; } .noprint { display: none; } }
@@ -85,11 +99,24 @@ export default async function LabelsPage({ searchParams }) {
               {l.exp && <div><h4>Expires</h4><div style={{ fontWeight: 700 }}>{`${String(l.exp).slice(5, 7)}/${String(l.exp).slice(8, 10)}/${String(l.exp).slice(0, 4)}`}</div></div>}
             </div>
           )}
-          <div className="bar">
+          {(() => {
+            const lb = lotBarcode(l.lot, l.exp);
+            return (
+              <>
+                {lb && (
+                  <div className="bar2" style={{ marginTop: 'auto' }}>
+                    <div dangerouslySetInnerHTML={{ __html: lb.svg }} />
+                    <div className="num">{lb.text}</div>
+                  </div>
+                )}
+                <div className={`bar${lb ? ' small' : ''}`} style={lb ? { marginTop: 6 } : undefined}>
             <h4 style={{ textAlign: 'left' }}>SSCC</h4>
             <div dangerouslySetInnerHTML={{ __html: barcode(l.sscc) }} />
             <div className="num">(00) {fmt(l.sscc)}</div>
-          </div>
+                </div>
+              </>
+            );
+          })()}
         </div>
       ))}
       <PrintNow />

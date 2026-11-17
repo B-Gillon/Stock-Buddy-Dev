@@ -5,6 +5,9 @@
 // Always required, not configurable: the automatic carton number, at least one item with a positive
 // quantity in every carton, and the ship date.
 
+// A lot number must fit a GS1-128 barcode (AI 10): up to 20 characters from the GS1 set, no spaces or parentheses.
+export const LOT_RE = /^[A-Za-z0-9!"%&'*+,\-./:;<=>?_]{1,20}$/;
+
 export const WEIGHT_UNITS = ['lb', 'kg'];
 export const DIM_UNITS = ['in', 'cm'];
 
@@ -126,6 +129,9 @@ export function validateShipment(config, shipment, cartons) {
       pallet_id: () => ({ value: c.pallet_id }),
       lot_number: () => ({ value: c.lot_number }), expiration_date: () => ({ value: c.expiration_date }),
     };
+    if (config.carton.lot_number.visible && !blank(c.lot_number) && !LOT_RE.test(String(c.lot_number).trim())) {
+      errors.push(`${n}, Lot Number: up to 20 letters, numbers or - . / _ (no spaces).`);
+    }
     for (const def of CARTON_FIELDS) {
       const g = cget[def.id]();
       checkField(def, config.carton[def.id], (k) => g[k], `${n}, ${def.label.replace(/ \(with unit\)/, '').replace(/:.*/, '')}`, errors);
