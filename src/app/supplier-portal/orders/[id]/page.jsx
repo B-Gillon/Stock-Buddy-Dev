@@ -6,6 +6,7 @@ import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { normalizeLineColumns } from '@/lib/supplierColumns';
 import { loadLabelSettings } from '@/lib/sscc';
+import EditableShipments from './EditableShipments';
 import { formatCurrency } from '@/shared/utils/formatCurrency';
 import Badge from '@/shared/components/ui/Badge';
 import Card from '@/shared/components/ui/Card';
@@ -44,8 +45,11 @@ export default async function OrderPage({ params, searchParams }) {
   const shipConfig = await loadShipmentConfig(s.tenantId);
   const labelSettings = await loadLabelSettings(s.tenantId, s.supplierId);
   const { data: shipRows } = await supabase.from('shipments')
-    .select('id, shipment_number, ship_date, total_cartons, shipment_cartons ( sscc )')
+    .select('id, shipment_number, ship_date, total_cartons, shipment_cartons ( id, carton_no, supplier_carton_id, sscc, tracking_number, weight, weight_unit, length, width, height, dim_unit, pallet_id, received_at )')
     .eq('po_id', po.id).eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).order('created_at', { ascending: true });
+  const { data: shipLineRows } = (shipRows ?? []).length
+    ? await supabase.from('shipment_lines').select('carton_id, po_line_id, shipped_qty').in('shipment_id', shipRows.map((r) => r.id))
+    : { data: [] };
   const shipped = await shippedByLine((rows ?? []).map((r) => r.id));
   const svIds = [...new Set((rows ?? []).map((r) => r.supplier_variant_id).filter(Boolean))];
   const { data: svs } = svIds.length
@@ -125,6 +129,43 @@ export default async function OrderPage({ params, searchParams }) {
               </Card>
             </div>
           </CollapsibleCards>
+          </HideWhileCreating>
+
+          {po.notes_supplier && (
+            <Card title="Supplier Notes"><p className="text-sm text-gray-700 whitespace-pre-wrap">{po.notes_supplier}</p></Card>
+          )}
+
+          {po.status === 'pending_acknowledgement' ? <AckForm poId={po.id} requestedShipDate={po.expected_ship_date || po.expected_date || ''} /> : null}
+
+          <LinesTable
+            poId={po.id}
+            lines={lines}
+            currency={cur}
+            config={shipConfig}
+            lineColumns={lineColumns}
+            labels={{ enabled: labelSettings.enabled, printMode: labelSettings.printMode }}
+            exportLinks={
+              <div className="flex items-center gap-2">
+                <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className={btn}>Export CSV</a>
+                <a href={`/api/supplier-portal/orders/${po.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer" className={btn}>Export PDF</a>
+              </div>
+            }
+          />
+
+          <HideWhileCreating>
+            {(shipRows ?? []).length > 0 && (
+              <EditableShipments
+                shipments={shipRows.map((sh) => ({
+                  id: sh.id, shipment_number: sh.shipment_number, ship_date: sh.ship_date,
+                  cartons: [...(sh.shipment_cartons ?? [])].sort((a, b) => a.carton_no - b.carton_no)
+                    .map((c) => ({ ...c, lines: (shipLineRows ?? []).filter((x) => x.carton_id === c.id) })),
+                }))}
+                lines={lines}
+                config={shipConfig}
+                lineColumns={lineColumns}
+                labels={{ enabled: labelSettings.enabled, printMode: labelSettings.printMode }}
+              />
+            )}
           </HideWhileCreating>
 
           {po.notes_supplier && (

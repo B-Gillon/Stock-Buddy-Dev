@@ -25,7 +25,7 @@ export default async function LabelsPage({ searchParams }) {
     labels = (cartons ?? []).filter((c) => c.sscc).map((c) => ({ sscc: c.sscc, cartonNo: c.carton_no, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
   } else if (ssccParam) {
     const { data: r } = await supabase.from('supplier_ssccs').select('sscc, po_id, carton_no, shipment_id')
-      .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).eq('sscc', String(ssccParam)).maybeSingle();
+      .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).eq('sscc', String(ssccParam)).is('voided_at', null).maybeSingle();
     if (!r) notFound();
     let sh = null;
     if (r.shipment_id) ({ data: sh } = await supabase.from('shipments').select('shipment_number, total_cartons').eq('id', r.shipment_id).maybeSingle());

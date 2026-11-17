@@ -41,7 +41,7 @@ function Field({ label, required, children, wide }) {
   );
 }
 
-function CartonFields({ cfg, f, set, autoSscc }) {
+export function CartonFields({ cfg, f, set, autoSscc }) {
   const v = (id) => cfg[id].visible; const r = (id) => cfg[id].required;
   const text = (key) => <input className={input} value={f[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
@@ -115,7 +115,7 @@ function ShipmentDetails({ cfg, s, set }) {
 
 const th = 'text-left px-3 py-2 font-medium';
 
-function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
+export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
   return (
     <table className="w-full text-sm">
       <thead>

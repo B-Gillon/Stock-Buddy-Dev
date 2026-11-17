@@ -21,6 +21,10 @@ export async function GET(request, { params }) {
     const { data: cartons } = await supabase.from('shipment_cartons')
       .select('id, carton_no, received_at, shipment:shipments!shipment_id ( po_id, shipment_number )')
       .eq('tenant_id', tenantId).eq('sscc', sscc);
+    if (!cartons?.length) {
+      const { data: old } = await supabase.from('supplier_ssccs').select('id').eq('tenant_id', tenantId).eq('sscc', sscc).not('voided_at', 'is', null).maybeSingle();
+      if (old) return NextResponse.json({ result: 'voided', message: 'That label was replaced when the carton was edited. Scan the new label.' });
+    }
     if (!cartons?.length) return NextResponse.json({ result: 'not_found', message: `No carton with SSCC ${sscc} was found.` });
 
     const mine = cartons.filter((c) => (Array.isArray(c.shipment) ? c.shipment[0] : c.shipment)?.po_id === poId);
