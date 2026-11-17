@@ -9,6 +9,7 @@
  */
 import { NextResponse } from "next/server";
 import { getTenantId } from "@/lib/tenants";
+import { supabase } from "@/lib/supabaseClient";
 import { receiveInStockBuddy } from "@/lib/sync/po/receivePO";
 import { logPOActivity } from "@/lib/logPOActivity";
 import { logError } from "@/lib/logError";
@@ -19,12 +20,24 @@ export async function POST(request, { params }) {
     const { id: poId } = await params;
     const body = await request.json();
     const { lines } = body;
+    const cartonIds = Array.isArray(body.cartonIds) ? body.cartonIds : [];
 
     if (!Array.isArray(lines) || lines.length === 0) {
       return NextResponse.json(
         { success: false, error: "lines array is required" },
         { status: 400 }
       );
+    }
+
+    // Scanned cartons must belong to this PO and not already be received
+    if (cartonIds.length) {
+      const { data: found } = await supabase.from('shipment_cartons')
+        .select('id, received_at, shipment:shipments!shipment_id ( po_id )')
+        .eq('tenant_id', tenantId).in('id', cartonIds);
+      const okCarton = (c) => (Array.isArray(c.shipment) ? c.shipment[0] : c.shipment)?.po_id === poId && !c.received_at;
+      if ((found ?? []).length !== cartonIds.length || !(found ?? []).every(okCarton)) {
+        return NextResponse.json({ success: false, error: "A scanned carton was already received or isn't on this PO. Rescan and try again." }, { status: 409 });
+      }
     }
 
     const results = [];
@@ -49,7 +62,11 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, results }, { status: 500 });
     }
 
-    await logPOActivity({ poId, tenantId, action: "received", request });
+    if (cartonIds.length && results.every((r) => r.success)) {
+      await supabase.from('shipment_cartons').update({ received_at: new Date().toISOString() }).eq('tenant_id', tenantId).in('id', cartonIds);
+    }
+
+    await logPOActivity({ poId, tenantId, action: "received", request, comments: cartonIds.length ? `${cartonIds.length} carton${cartonIds.length === 1 ? "" : "s"} received by scan` : undefined });
 
     return NextResponse.json({ success: true, results });
   } catch (err) {

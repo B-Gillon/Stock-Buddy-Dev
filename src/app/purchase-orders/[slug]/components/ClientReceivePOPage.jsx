@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/shared/components/ui/Button";
 import Badge from "@/shared/components/ui/Badge";
@@ -65,6 +65,43 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
   );
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [scanText, setScanText] = useState("");
+  const [scanMsg, setScanMsg] = useState(null);     // { ok, text }
+  const [scanned, setScanned] = useState([]);       // cartons received by scan
+  const scanRef = useRef(null);
+
+  async function handleScan() {
+    const raw = scanText.trim();
+    if (!raw) return;
+    setScanText("");
+    const digits = raw.replace(/\D/g, "");
+    const sscc = digits.length === 20 && digits.startsWith("00") ? digits.slice(2) : digits;
+    if (scanned.some((c) => c.sscc === sscc)) { setScanMsg({ ok: false, text: "That carton is already scanned." }); scanRef.current?.focus(); return; }
+    try {
+      const res = await fetch(`/api/purchase-orders/${po.id}/scan?sscc=${encodeURIComponent(raw)}`);
+      const j = await res.json();
+      if (j.result !== "ok") { setScanMsg({ ok: false, text: j.message ?? "Could not read that label." }); }
+      else {
+        setScanned((cs) => [...cs, { id: j.carton.id, sscc: j.sscc, cartonNo: j.carton.cartonNo, shipmentNumber: j.carton.shipmentNumber, lines: j.carton.lines }]);
+        setQtyInputs((prev) => {
+          const next = { ...prev };
+          for (const l of j.carton.lines) if (l.lineId in next) next[l.lineId] = String((parseInt(next[l.lineId], 10) || 0) + l.qty);
+          return next;
+        });
+        setScanMsg({ ok: true, text: `Carton ${j.carton.cartonNo} of ${j.carton.shipmentNumber} added.` });
+      }
+    } catch { setScanMsg({ ok: false, text: "Could not look up that label." }); }
+    scanRef.current?.focus();
+  }
+
+  function removeScanned(c) {
+    setScanned((cs) => cs.filter((x) => x.id !== c.id));
+    setQtyInputs((prev) => {
+      const next = { ...prev };
+      for (const l of c.lines) if (l.lineId in next) { const v = (parseInt(next[l.lineId], 10) || 0) - l.qty; next[l.lineId] = v > 0 ? String(v) : ""; }
+      return next;
+    });
+  }
 
   const handleFillAll = useCallback(() => {
     setQtyInputs(Object.fromEntries(lines.map((l) => [l.id, String(l.remaining_qty)])));
@@ -90,7 +127,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
       const res = await fetch(`/api/purchase-orders/${po.id}/receive`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines: receipts.map((r) => ({ lineId: r.lineId, qtyToReceive: r.receivedQty })) }),
+        body: JSON.stringify({ lines: receipts.map((r) => ({ lineId: r.lineId, qtyToReceive: r.receivedQty })), cartonIds: scanned.map((c) => c.id) }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? "Unknown error");
@@ -129,6 +166,28 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
               <div className="flex justify-between"><span className="text-gray-500">Units remaining</span><span className="font-medium text-gray-800">{lines.reduce((t, l) => t + Math.max(0, l.remaining_qty ?? 0), 0).toLocaleString()}</span></div>
             </div>
           </Card>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Scan carton label</label>
+          <input
+            ref={scanRef} autoFocus type="text" inputMode="numeric" value={scanText}
+            onChange={(e) => setScanText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleScan(); } }}
+            placeholder="Scan the SSCC barcode (or type it and press Enter)"
+            className="mt-2 h-9 w-full max-w-md rounded border border-gray-300 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {scanMsg && <p className={`mt-2 text-xs ${scanMsg.ok ? "text-green-700" : "text-red-600"}`}>{scanMsg.text}</p>}
+          {scanned.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {scanned.map((c) => (
+                <li key={c.id} className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700">
+                  Carton {c.cartonNo} · {c.shipmentNumber}
+                  <button type="button" onClick={() => removeScanned(c)} className="text-gray-400 hover:text-red-600" aria-label="Remove">×</button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
