@@ -63,7 +63,7 @@ export default async function ShipmentsView({ poId, lines }) {
         ].filter(Boolean);
 
         return (
-          <Card key={s.id} title={`${s.shipment_number} · ${units.toLocaleString()} unit${units === 1 ? "" : "s"}`}>
+          <Card key={s.id} title={`${s.shipment_number} · ${units.toLocaleString()} unit${units === 1 ? "" : "s"}${cs.length ? ` · ${cs.filter((c) => c.received_at).length} of ${cs.length} cartons received` : ""}`}>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
                 <Item label="Ship Date">{fmtDate(s.ship_date)}</Item>
@@ -89,6 +89,7 @@ export default async function ShipmentsView({ poId, lines }) {
                       {cols.map((c) => <th key={c.key} className="px-3 py-2 font-medium">{c.head}</th>)}
                       <th className="px-3 py-2 font-medium">SKU</th>
                       <th className="px-3 py-2 font-medium">Quantity</th>
+                      <th className="px-3 py-2 font-medium">Received</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -103,6 +104,9 @@ export default async function ShipmentsView({ poId, lines }) {
                           </td>
                           <td className="px-3 py-2 text-gray-800">
                             {ci.map((i) => <div key={i.po_line_id}>{i.shipped_qty}</div>)}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                            {c.received_at ? <span className="text-green-700">{fmtDateTime(c.received_at)}</span> : "—"}
                           </td>
                         </tr>
                       );
