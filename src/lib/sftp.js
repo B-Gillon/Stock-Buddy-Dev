@@ -271,14 +271,12 @@ export async function refreshSftpStatus({ poId, tenantId, settings }) {
     }
   });
 
-  const names = (rows) => [...new Set(rows.map((r) => `${r.file_type.toUpperCase()} ${r.file_name}`))].join('; ');
-  if (retrieved.length) {
-    await logPOActivity({ poId, tenantId, userName: 'System', action: 'sftp_retrieved',
-      comments: `${names(retrieved)} (server access time changed after upload)` });
+  // One History entry per file, so each shows as "PDF Retrieved" / "CSV Retrieved"
+  for (const r of retrieved) {
+    await logPOActivity({ poId, tenantId, userName: 'System', action: 'sftp_retrieved', comments: `${r.file_name} retrieved by supplier` });
   }
-  if (deleted.length) {
-    await logPOActivity({ poId, tenantId, userName: 'System', action: 'sftp_deleted',
-      comments: `${names(deleted)} no longer on the SFTP site (removed by the supplier's system)` });
+  for (const r of deleted) {
+    await logPOActivity({ poId, tenantId, userName: 'System', action: 'sftp_deleted', comments: `${r.file_name} retrieved and deleted by supplier` });
   }
 
   // The supplier's system has picked the file up: a PO waiting on acknowledgement moves on to Waiting to Ship.

@@ -44,15 +44,24 @@ const ACTION_STYLES = {
   error:        "bg-red-50 text-red-700",
 };
 
+// A file the supplier picked up from the SFTP site is shown as "PDF Retrieved" / "CSV Retrieved"
+function activityLabel(row) {
+  if (row.action === "sftp_retrieved" || row.action === "sftp_deleted") {
+    const m = /\.(pdf|csv)\b/i.exec(row.comments ?? "");
+    if (m) return `${m[1].toUpperCase()} Retrieved`;
+  }
+  return ACTION_LABELS[row.action] ?? row.action;
+}
+
 // MM/DD/YY HH:MM AM/PM  (e.g. 11/13/26 02:05 PM)
-function fmtDateTime(iso) {
+function fmtDateTime(iso, timeZone) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
       month: "2-digit", day: "2-digit", year: "2-digit",
-      hour: "2-digit", minute: "2-digit", hour12: true,
+      hour: "2-digit", minute: "2-digit", hour12: true, timeZone,
     }).formatToParts(d).map((p) => [p.type, p.value])
   );
   return `${parts.month}/${parts.day}/${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod}`;
@@ -60,6 +69,9 @@ function fmtDateTime(iso) {
 
 export default function POHistoryTable({ rows: allRows, poId, openSftpCount = 0 }) {
   const [newestFirst, setNewestFirst] = useState(false);
+  // Render in UTC first (matches the server), then switch to the viewer's own time zone
+  const [tz, setTz] = useState("UTC");
+  useEffect(() => { try { setTz(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"); } catch { /* stay UTC */ } }, []);
   // "SFTP Uploaded" is already covered by the Released / Resent entry, so it isn't listed separately
   const rows = allRows
     .filter((r) => r.action !== "sftp_uploaded")
@@ -141,12 +153,12 @@ export default function POHistoryTable({ rows: allRows, poId, openSftpCount = 0 
             </tr>
           ) : rows.map((row) => (
             <tr key={row.id} className="border-b border-gray-100 align-top hover:bg-gray-50">
-              <td className="px-3 py-2 text-gray-700 whitespace-nowrap" suppressHydrationWarning>
-                {fmtDateTime(row.created_at)}
+              <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
+                {fmtDateTime(row.created_at, tz)}
               </td>
               <td className="px-3 py-2 whitespace-nowrap">
                 <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${ACTION_STYLES[row.action] ?? "bg-gray-100 text-gray-700"}`}>
-                  {ACTION_LABELS[row.action] ?? row.action}
+                  {activityLabel(row)}
                 </span>
               </td>
               <td className="px-3 py-2 text-gray-700">{row.user_name || <span className="text-gray-400">Unknown</span>}</td>
