@@ -209,7 +209,7 @@ function ReportDonut({ poReport }) {
         return el;
       })}
       <text x="60" y="58" textAnchor="middle" className="fill-gray-800" style={{ fontSize: 22, fontWeight: 700 }}>{total}</text>
-      <text x="60" y="74" textAnchor="middle" className="fill-gray-400" style={{ fontSize: 9 }}>purchase orders</text>
+      <text x="60" y="74" textAnchor="middle" className="fill-gray-400" style={{ fontSize: 12 }}>POs</text>
     </svg>
   );
 }
