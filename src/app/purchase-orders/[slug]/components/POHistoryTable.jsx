@@ -14,7 +14,7 @@ const ACTION_LABELS = {
   reminder_sent:  "Reminder Sent",
   retrieved:      "Retrieved",
   shipped:        "Shipped",
-  created:      "Created",
+  created:      "Draft Created",
   edited:       "Edited",
   released:     "Released",
   resent:       "Resent",
@@ -58,7 +58,12 @@ function fmtDateTime(iso) {
   return `${parts.month}/${parts.day}/${parts.year} ${parts.hour}:${parts.minute} ${parts.dayPeriod}`;
 }
 
-export default function POHistoryTable({ rows, poId, openSftpCount = 0 }) {
+export default function POHistoryTable({ rows: allRows, poId, openSftpCount = 0 }) {
+  const [newestFirst, setNewestFirst] = useState(false);
+  // "SFTP Uploaded" is already covered by the Released / Resent entry, so it isn't listed separately
+  const rows = allRows
+    .filter((r) => r.action !== "sftp_uploaded")
+    .sort((a, b) => (new Date(a.created_at) - new Date(b.created_at)) * (newestFirst ? -1 : 1));
   const router = useRouter();
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState(null);
@@ -117,7 +122,11 @@ export default function POHistoryTable({ rows, poId, openSftpCount = 0 }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
-            <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Date/Time</th>
+            <th className="text-left px-3 py-2 font-medium whitespace-nowrap">
+              <button type="button" onClick={() => setNewestFirst((v) => !v)} className="inline-flex items-center gap-1 font-medium hover:text-gray-900" title={newestFirst ? "Showing newest first" : "Showing oldest first"}>
+                Date/Time <span aria-hidden>{newestFirst ? "↓" : "↑"}</span>
+              </button>
+            </th>
             <th className="text-left px-3 py-2 font-medium whitespace-nowrap">Activity</th>
             <th className="text-left px-3 py-2 font-medium">User</th>
             <th className="text-left px-3 py-2 font-medium">Notes</th>
