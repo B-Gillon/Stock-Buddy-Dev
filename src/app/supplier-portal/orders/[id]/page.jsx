@@ -167,55 +167,6 @@ export default async function OrderPage({ params, searchParams }) {
               />
             )}
           </HideWhileCreating>
-
-          {po.notes_supplier && (
-            <Card title="Supplier Notes"><p className="text-sm text-gray-700 whitespace-pre-wrap">{po.notes_supplier}</p></Card>
-          )}
-
-          {po.status === 'pending_acknowledgement' ? <AckForm poId={po.id} requestedShipDate={po.expected_ship_date || po.expected_date || ''} /> : null}
-
-          <LinesTable
-            poId={po.id}
-            lines={lines}
-            currency={cur}
-            config={shipConfig}
-            lineColumns={lineColumns}
-            labels={{ enabled: labelSettings.enabled, printMode: labelSettings.printMode }}
-            exportLinks={
-              <div className="flex items-center gap-2">
-                <a href={`/api/supplier-portal/orders/${po.id}/export?format=csv`} className={btn}>Export CSV</a>
-                <a href={`/api/supplier-portal/orders/${po.id}/export?format=pdf`} target="_blank" rel="noopener noreferrer" className={btn}>Export PDF</a>
-              </div>
-            }
-          />
-
-          <HideWhileCreating>
-            {(shipRows ?? []).length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">Shipments</h2>
-                <table className="w-full text-sm">
-                  <thead><tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
-                    <th className="text-left px-3 py-2 font-medium">Shipment</th><th className="text-left px-3 py-2 font-medium">Ship Date</th>
-                    <th className="text-left px-3 py-2 font-medium">Cartons</th><th className="px-3 py-2"></th>
-                  </tr></thead>
-                  <tbody>
-                    {shipRows.map((sh) => (
-                      <tr key={sh.id} className="border-b border-gray-100">
-                        <td className="px-3 py-2 font-medium text-gray-800">{sh.shipment_number}</td>
-                        <td className="px-3 py-2 text-gray-700">{fmtDate(sh.ship_date)}</td>
-                        <td className="px-3 py-2 text-gray-700">{sh.total_cartons ?? '—'}</td>
-                        <td className="px-3 py-2 text-right">
-                          {(sh.shipment_cartons ?? []).some((c) => c.sscc) && (
-                            <a className={btn} href={`/supplier-portal/labels?shipment=${sh.id}`} target="_blank" rel="noopener noreferrer">Print labels</a>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </HideWhileCreating>
         </div>
       </ShipmentProvider>
     </PortalFrame>
