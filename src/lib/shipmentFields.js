@@ -8,6 +8,19 @@
 // A lot number must fit a GS1-128 barcode (AI 10): up to 20 characters from the GS1 set, no spaces or parentheses.
 export const LOT_RE = /^[A-Za-z0-9!"%&'*+,\-./:;<=>?_]{1,20}$/;
 
+// SSCC: 18 digits whose last digit is the GS1 mod-10 check digit. A scanner's 20-digit form ("00" + SSCC) is accepted and stored as 18.
+export function normalizeSscc(v) {
+  const d = String(v ?? '').replace(/[\s-]+/g, '');
+  return /^00\d{18}$/.test(d) ? d.slice(2) : d;
+}
+export function isValidSscc(v) {
+  const d = normalizeSscc(v);
+  if (!/^\d{18}$/.test(d)) return false;
+  let sum = 0;
+  for (let i = 0; i < 17; i++) sum += Number(d[16 - i]) * (i % 2 === 0 ? 3 : 1);
+  return (10 - (sum % 10)) % 10 === Number(d[17]);
+}
+
 export const WEIGHT_UNITS = ['lb', 'kg'];
 export const DIM_UNITS = ['in', 'cm'];
 
@@ -82,7 +95,7 @@ function checkField(def, cfg, get, label, errors) {
       if (blank(v)) { need(!req, 'required.'); return; }
       if (def.kind === 'date') need(isDate(String(v)), 'not a valid date.');
       if (def.kind === 'int') need(/^\d+$/.test(String(v).trim()), 'enter a whole number.');
-      if (def.kind === 'sscc') need(/^\d{18}$/.test(String(v).replace(/\s+/g, '')), 'an SSCC is 18 digits.');
+      if (def.kind === 'sscc') need(isValidSscc(v), 'enter a valid 18-digit SSCC (its last digit is a check digit). A 20-digit value starting with 00 is also accepted.');
       need(String(v).length <= (def.kind === 'notes' ? 1000 : 100), 'too long.');
     }
   }

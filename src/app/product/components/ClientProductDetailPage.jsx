@@ -121,6 +121,39 @@ function ColumnToggleMenu({ columns, visibility, onChange }) {
   );
 }
 
+// Low-stock threshold: variants of this product show on the dashboard's Low Stock card at or below this quantity.
+const DEFAULT_LOW_STOCK = 5;
+function LowStockThreshold({ productId, initial, onToast }) {
+  const [value, setValue] = useState(initial == null ? "" : String(initial));
+  const [saved, setSaved] = useState(initial == null ? "" : String(initial));
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/products/${productId}/low-stock`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ threshold: value.trim() === "" ? null : Number(value) }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error ?? "Save failed");
+      const v = j.threshold == null ? "" : String(j.threshold);
+      setValue(v); setSaved(v); onToast("Low stock threshold saved.");
+    } catch (err) { onToast(err.message); }
+    setBusy(false);
+  }
+  return (
+    <div className="flex items-center text-sm">
+      <div className="font-semibold w-36 shrink-0 text-gray-500">Low Stock Threshold:</div>
+      <input
+        type="text" inputMode="numeric" value={value} placeholder={`Default ${DEFAULT_LOW_STOCK}`}
+        onChange={(e) => /^\d{0,7}$/.test(e.target.value) && setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && value !== saved) save(); }}
+        className="h-7 w-24 rounded border border-gray-300 px-2 text-sm"
+      />
+      {value !== saved && (
+        <button type="button" onClick={save} disabled={busy} className="ml-2 text-xs text-blue-700 hover:underline disabled:opacity-50">{busy ? "Saving…" : "Save"}</button>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function ClientProductDetailPage({ product, variants, shopDomain = "" }) {
@@ -222,6 +255,7 @@ export default function ClientProductDetailPage({ product, variants, shopDomain 
           )}
           <div className="space-y-1.5">
             <Detail label="Vendor"     value={product.vendor} />
+            <LowStockThreshold productId={product.id} initial={product.low_stock_threshold} onToast={showToast} />
             <Detail label="Type"       value={product.product_type} />
             <Detail label="Category"   value={formatCategory(product.category)} />
             <Detail label="Collection" value={product.collection} />

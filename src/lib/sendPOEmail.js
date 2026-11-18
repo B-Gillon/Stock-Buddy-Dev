@@ -270,7 +270,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
     poDate:         po.po_date,
   });
   const subject  = isResend
-    ? `Purchase Order ${po.po_number} (Resent)`
+    ? `Purchase Order ${po.po_number} (Revised)`
     : `Purchase Order ${po.po_number}`;
   // ── Acknowledgement (set per supplier on the Transmission tab) ─────────────
   // Only applies to emailed POs; SFTP-only suppliers have no one to send a link to.
@@ -287,7 +287,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   const ackUrl = ack ? buildAckUrl(ack.id) : null;
 
   const introLine = isResend
-    ? `Please find attached a resent copy of Purchase Order ${po.po_number}.`
+    ? `Please find attached a revised copy of Purchase Order ${po.po_number}.`
     : `Please find attached Purchase Order ${po.po_number}.`;
   const poDateLine = `PO Date: ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-US') : ''}`;
   const expectedLine = `Requested Ship Date: ${po.expected_date ? new Date(po.expected_date).toLocaleDateString('en-US') : 'TBD'}`;

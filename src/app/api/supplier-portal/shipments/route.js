@@ -9,6 +9,7 @@ import { markRetrieved } from '@/lib/supplierPortal';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { validateShipment } from '@/lib/shipmentFields';
 import { loadLabelSettings, validSscc } from '@/lib/sscc';
+import { normalizeSscc } from '@/lib/shipmentFields';
 
 const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
 const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -107,7 +108,7 @@ export async function POST(request) {
     return {
       tenant_id: tenantId, shipment_id: created.id, carton_no: i + 1,
       supplier_carton_id: vc.supplier_carton_id.visible ? clean(c.supplier_carton_id) : null,
-      sscc: (vc.sscc.visible || labels.enabled) && clean(c.sscc) ? String(c.sscc).replace(/\s+/g, '') : null,
+      sscc: (vc.sscc.visible || labels.enabled) && clean(c.sscc) ? normalizeSscc(c.sscc) : null,
       tracking_number: vc.carton_tracking.visible ? clean(c.tracking_number) : null,
       weight: hasW ? numOrNull(c.weight) : null, weight_unit: hasW ? c.weight_unit : null,
       length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,

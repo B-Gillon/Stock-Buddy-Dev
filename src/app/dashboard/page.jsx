@@ -1,4 +1,6 @@
-import { OPEN_STATUSES } from '@/lib/poStatus';
+import { OPEN_STATUSES, NOT_FULLY_SHIPPED_STATUSES } from '@/lib/poStatus';
+
+const DEFAULT_LOW_STOCK = 5; // used when a product has no low-stock threshold of its own
 // /src/app/dashboard/page.jsx
 
 import { headers } from "next/headers";
@@ -27,9 +29,17 @@ export default async function DashboardPage() {
 
   const { data: variants } = await supabase
     .from("variants")
-    .select("id, display_title, title, sku")
+    .select("id, product_id, display_title, title, sku")
     .eq("tenant_id", tenantId)
     .limit(2000);
+
+  const { data: thresholdRows } = await supabase
+    .from("products")
+    .select("id, low_stock_threshold")
+    .eq("tenant_id", tenantId)
+    .not("low_stock_threshold", "is", null)
+    .limit(5000);
+  const thresholdByProduct = Object.fromEntries((thresholdRows ?? []).map((r) => [r.id, r.low_stock_threshold]));
 
   const availByItem = {};
   for (const level of inventoryLevels ?? []) {
@@ -61,7 +71,9 @@ export default async function DashboardPage() {
       title:      variantMap[variantId]?.display_title || variantMap[variantId]?.title || "—",
       sku:        variantMap[variantId]?.sku ?? "—",
       available,
+      threshold: thresholdByProduct[variantMap[variantId]?.product_id] ?? DEFAULT_LOW_STOCK,
     }))
+    .filter((v) => v.available <= v.threshold)
     .sort((a, b) => a.available - b.available)
     .slice(0, 10);
 
@@ -82,6 +94,44 @@ export default async function DashboardPage() {
     expected_date: po.expected_date,
     supplier_name: po.suppliers?.supplier_name ?? "—",
   }));
+
+  // ── Purchase order report: overdue / due this week / due later / drafts ────
+  const { data: reportPOs } = await supabase
+    .from("purchase_orders")
+    .select("id, status, expected_date, expected_ship_date")
+    .eq("tenant_id", tenantId)
+    .in("status", OPEN_STATUSES)
+    .limit(5000);
+
+  const costByPO = {};
+  if ((reportPOs ?? []).length) {
+    const { data: reportLines } = await supabase
+      .from("purchase_order_lines")
+      .select("purchase_order_id, order_qty_units, unit_cost, purchase_orders!inner(status)")
+      .eq("tenant_id", tenantId)
+      .in("purchase_orders.status", OPEN_STATUSES)
+      .range(0, 19999);
+    for (const l of reportLines ?? []) {
+      costByPO[l.purchase_order_id] = (costByPO[l.purchase_order_id] ?? 0) + (l.order_qty_units ?? 0) * Number(l.unit_cost ?? 0);
+    }
+  }
+
+  // Week = Monday to Sunday (same as the supplier dashboard)
+  const dow = (new Date(today + "T00:00:00Z").getUTCDay() + 6) % 7; // Monday = 0
+  const weekEnd = new Date(new Date(today + "T00:00:00Z").getTime() + (6 - dow) * 864e5).toISOString().slice(0, 10);
+
+  const report = {
+    overdue: { count: 0, cost: 0 }, thisWeek: { count: 0, cost: 0 },
+    later: { count: 0, cost: 0 }, drafts: { count: 0, cost: 0 },
+  };
+  const add = (k, po) => { report[k].count += 1; report[k].cost += costByPO[po.id] ?? 0; };
+  for (const po of reportPOs ?? []) {
+    if (po.status === "draft") { add("drafts", po); continue; }
+    if (po.expected_date && po.expected_date < today) { add("overdue", po); continue; } // same rule as the Overdue card
+    if (!NOT_FULLY_SHIPPED_STATUSES.includes(po.status)) continue; // already shipped: nothing left to ship
+    const ship = po.expected_ship_date || po.expected_date;
+    if (ship && ship <= weekEnd) add("thisWeek", po); else add("later", po);
+  }
 
   // ── Card 4: Incoming Inventory ─────────────────────────────────────────────
   const { data: openPOLines } = await supabase
@@ -147,6 +197,7 @@ export default async function DashboardPage() {
     <ClientDashboard
       lowStock={lowStock}
       overduePOs={overdueFlat}
+      poReport={report}
       totalIncoming={totalIncoming}
       topIncoming={topIncoming}
       lastSyncedAt={syncStatus?.last_synced_at ?? null}

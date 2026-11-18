@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
-import { validateShipment } from '@/lib/shipmentFields';
+import { validateShipment, normalizeSscc } from '@/lib/shipmentFields';
 import { loadLabelSettings, reserveSscc } from '@/lib/sscc';
 
 const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
@@ -75,7 +75,7 @@ export async function PATCH(request, { params }) {
       ssccChanged = true;
     }
   } else if (vc.sscc.visible) {
-    sscc = clean(c.sscc) ? String(c.sscc).replace(/\s+/g, '') : null;
+    sscc = clean(c.sscc) ? normalizeSscc(c.sscc) : null;
   }
 
   const hasW = vc.weight.visible && numOrNull(c.weight) != null;

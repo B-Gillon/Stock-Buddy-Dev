@@ -178,6 +178,45 @@ function GettingStartedCard({ onNavigate }) {
   );
 }
 
+// ── Purchase Order Report ──────────────────────────────────────────────────
+
+const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n ?? 0);
+
+function POReportCard({ poReport, onNavigate }) {
+  const rows = [
+    { key: "overdue",  label: "Overdue",                  tone: "text-red-600",   href: "/purchase-orders?status=overdue" },
+    { key: "thisWeek", label: "Due to ship this week",    tone: "text-amber-600" },
+    { key: "later",    label: "Due to ship after this week", tone: "text-gray-800" },
+    { key: "drafts",   label: "Drafts",                   tone: "text-gray-500",  href: "/purchase-orders?status=draft" },
+  ];
+  return (
+    <DashCard title="Purchase Order Report">
+      <table className="w-full text-sm border-collapse dashboard-table">
+        <thead>
+          <tr className="border-b border-gray-100 text-xs text-gray-400">
+            <th className="text-left py-1 font-medium">Status</th>
+            <th className="text-right py-1 font-medium">POs</th>
+            <th className="text-right py-1 font-medium">Total Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key} className="border-b border-gray-50 last:border-0" style={{height:"22px"}}>
+              <td className="py-1 pr-3 text-xs text-gray-700">
+                {r.href ? (
+                  <button onClick={() => onNavigate(r.href)} className="text-left hover:underline">{r.label}</button>
+                ) : r.label}
+              </td>
+              <td className={`py-1 text-right text-xs font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</td>
+              <td className="py-1 text-right text-xs text-gray-600">{money(poReport[r.key].cost)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DashCard>
+  );
+}
+
 // ── Card 4 — Incoming Inventory ────────────────────────────────────────────
 
 function IncomingInventoryCard({ totalIncoming, topIncoming, onClick }) {
@@ -228,6 +267,7 @@ function IncomingInventoryCard({ totalIncoming, topIncoming, onClick }) {
 export default function ClientDashboard({
   lowStock,
   overduePOs,
+  poReport,
   totalIncoming,
   topIncoming,
   lastSyncedAt,
@@ -262,17 +302,16 @@ export default function ClientDashboard({
     >
       <div className="grid grid-cols-2 gap-4">
         <style>{'.dashboard-table tbody tr { height: 22px !important; } .dashboard-table tbody td { padding-top: 2px !important; padding-bottom: 2px !important; }'}</style>
-        <LowStockCard
-          lowStock={lowStock}
-          onClick={() => router.push("/inventory")}
-        />
         <OverduePOsCard
           overduePOs={overduePOs}
           onClick={() => router.push("/purchase-orders?status=overdue")}
         />
-        <GettingStartedCard
-          onNavigate={(href) => router.push(href)}
+        <POReportCard poReport={poReport} onNavigate={(href) => router.push(href)} />
+        <LowStockCard
+          lowStock={lowStock}
+          onClick={() => router.push("/inventory")}
         />
+        {/* "Getting Started" card is hidden (not removed): <GettingStartedCard onNavigate={(href) => router.push(href)} /> */}
         <IncomingInventoryCard
           totalIncoming={totalIncoming}
           topIncoming={topIncoming}

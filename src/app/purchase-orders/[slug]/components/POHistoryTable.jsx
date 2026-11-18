@@ -17,7 +17,7 @@ const ACTION_LABELS = {
   created:      "Draft Created",
   edited:       "Edited",
   released:     "Released",
-  resent:       "Resent",
+  resent:       "Revised",
   acknowledged: "Acknowledged",
   cancelled:    "Cancelled",
   received:     "Received",
