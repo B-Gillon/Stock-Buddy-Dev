@@ -2,6 +2,7 @@
 // SERVER COMPONENT — no "use client"
 
 import { headers } from "next/headers";
+import CollapsibleCards from "./components/CollapsibleCards";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantIdFromHeaders } from "@/lib/tenants";
@@ -149,6 +150,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
         />
 
         {view === "details" && (<>
+        <CollapsibleCards summary={`Supplier: ${flatPO.supplier_name || "—"} · Deliver to: ${flatPO.location_name || "—"}`}>
         <div className="grid grid-cols-4 gap-4">
           <Card title="PO Info">
             <div className="space-y-1.5 text-sm">
@@ -182,6 +184,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
             </div>
           </Card>
         </div>
+        </CollapsibleCards>
 
         {(flatPO.notes_internal || flatPO.notes_supplier) && (
           <div className="grid grid-cols-2 gap-4">
