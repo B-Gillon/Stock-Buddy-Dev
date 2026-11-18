@@ -13,6 +13,8 @@ const STATUS_OPTIONS = [
   { value: 'partially_received',      label: 'Partially Received' },
   { value: 'received',                label: 'Received' },
   { value: 'overdue',                 label: 'Overdue' },
+  { value: 'ship_this_week',          label: 'Due to Ship This Week' },
+  { value: 'ship_later',              label: 'Due to Ship After This Week' },
   { value: 'cancelled',               label: 'Cancelled' },
 ];
 

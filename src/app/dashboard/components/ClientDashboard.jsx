@@ -184,92 +184,72 @@ const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currenc
 
 const REPORT_ROWS = [
   { key: "overdue",  label: "Overdue",                     color: "#dc2626", tone: "text-red-600",   href: "/purchase-orders?status=overdue" },
-  { key: "thisWeek", label: "Due to ship this week",       color: "#f59e0b", tone: "text-amber-600" },
-  { key: "later",    label: "Due to ship after this week", color: "#16a34a", tone: "text-green-700" },
+  { key: "thisWeek", label: "Due to ship this week",       color: "#f59e0b", tone: "text-amber-600", href: "/purchase-orders?status=ship_this_week" },
+  { key: "later",    label: "Due to ship after this week", color: "#16a34a", tone: "text-green-700", href: "/purchase-orders?status=ship_later" },
   { key: "drafts",   label: "Drafts",                      color: "#2563eb", tone: "text-blue-700",  href: "/purchase-orders?status=draft" },
 ];
-const VIEW_KEY = "dashboard_po_report_view";
 
-function ReportDonut({ poReport }) {
+function ReportDonut({ poReport, onNavigate }) {
+  const [hover, setHover] = useState(null); // { key, x, y }
   const total = REPORT_ROWS.reduce((t, r) => t + poReport[r.key].count, 0);
-  const R = 42, C = 2 * Math.PI * R;
+  const R = 46, C = 2 * Math.PI * R;
   let offset = 0;
+  const move = (r) => (e) => {
+    const box = e.currentTarget.ownerSVGElement.parentElement.getBoundingClientRect();
+    setHover({ key: r.key, x: e.clientX - box.left, y: e.clientY - box.top });
+  };
+  const hovered = hover && REPORT_ROWS.find((r) => r.key === hover.key);
   return (
-    <svg viewBox="0 0 120 120" className="h-36 w-36 shrink-0" role="img" aria-label="Purchase orders by status">
-      <circle cx="60" cy="60" r={R} fill="none" stroke="#f3f4f6" strokeWidth="16" />
-      {total > 0 && REPORT_ROWS.map((r) => {
-        const n = poReport[r.key].count;
-        if (!n) return null;
-        const len = (n / total) * C;
-        const el = (
-          <circle key={r.key} cx="60" cy="60" r={R} fill="none" stroke={r.color} strokeWidth="16"
-            strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" />
-        );
-        offset += len;
-        return el;
-      })}
-      <text x="60" y="58" textAnchor="middle" className="fill-gray-800" style={{ fontSize: 22, fontWeight: 700 }}>{total}</text>
-      <text x="60" y="74" textAnchor="middle" className="fill-gray-400" style={{ fontSize: 12 }}>POs</text>
-    </svg>
+    <div className="relative shrink-0" onMouseLeave={() => setHover(null)}>
+      <svg viewBox="0 0 120 120" className="h-44 w-44" role="img" aria-label="Purchase orders by status">
+        <circle cx="60" cy="60" r={R} fill="none" stroke="#f3f4f6" strokeWidth="16" />
+        {total > 0 && REPORT_ROWS.map((r) => {
+          const n = poReport[r.key].count;
+          if (!n) return null;
+          const len = (n / total) * C;
+          const el = (
+            <circle key={r.key} cx="60" cy="60" r={R} fill="none" stroke={r.color} strokeWidth="16"
+              strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)"
+              style={{ cursor: "pointer", opacity: hover && hover.key !== r.key ? 0.55 : 1 }}
+              onMouseMove={move(r)} onMouseLeave={() => setHover(null)} onClick={() => onNavigate(r.href)} />
+          );
+          offset += len;
+          return el;
+        })}
+        <text x="60" y="60" textAnchor="middle" dominantBaseline="central" style={{ pointerEvents: "none" }}>
+          <tspan className="fill-gray-800" style={{ fontSize: 24, fontWeight: 700 }}>{total}</tspan>
+          <tspan className="fill-gray-500" style={{ fontSize: 13, fontWeight: 700 }} dx="3">POs</tspan>
+        </text>
+      </svg>
+      {hovered && (
+        <div className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white shadow"
+          style={{ left: hover.x + 10, top: hover.y + 10 }}>
+          {hovered.label}: <span className="font-semibold">{poReport[hovered.key].count}</span> · {money(poReport[hovered.key].cost)}
+        </div>
+      )}
+    </div>
   );
 }
 
 function POReportCard({ poReport, onNavigate }) {
-  const [view, setView] = useState("donut");
-  useEffect(() => {
-    try { const v = localStorage.getItem(VIEW_KEY); if (v === "donut" || v === "bar") setView(v); } catch {}
-  }, []);
-  const choose = (v) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
-
-  const toggle = (
-    <div className="inline-flex overflow-hidden rounded-md border border-gray-300 text-xs" onClick={(e) => e.stopPropagation()}>
-      {[["donut", "Donut"], ["bar", "Bar"]].map(([v, label]) => (
-        <button key={v} type="button" onClick={() => choose(v)} aria-pressed={view === v}
-          className={`px-2.5 py-1 ${view === v ? "bg-gray-100 font-semibold text-gray-900" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-
-  const label = (r) => r.href
-    ? <button onClick={() => onNavigate(r.href)} className="p-0 text-left hover:underline">{r.label}</button>
-    : r.label;
-
   return (
-    <DashCard title="Purchase Order Report" headerRight={toggle}>
-      {view === "donut" ? (
-        <div className="flex items-center gap-5">
-          <ReportDonut poReport={poReport} />
-          <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
-            {REPORT_ROWS.map((r) => (
-              <li key={r.key} className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} />
-                <span className="flex-1 truncate text-gray-700">{label(r)}</span>
-                <span className={`font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : (
-        <ul className="space-y-2.5">
-          {REPORT_ROWS.map((r) => {
-            const n = poReport[r.key].count;
-            const max = Math.max(1, ...REPORT_ROWS.map((x) => poReport[x.key].count));
-            return (
-              <li key={r.key} className="text-xs" title={`${n} PO${n === 1 ? "" : "s"} · ${money(poReport[r.key].cost)}`}>
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-gray-700">{label(r)}</span>
-                  <span className={`font-semibold ${n > 0 ? r.tone : "text-gray-300"}`}>{n}</span>
-                </div>
-                <div className="h-3 w-full rounded bg-gray-100">
-                  <div className="h-3 rounded" style={{ width: `${(n / max) * 100}%`, background: r.color }} />
-                </div>
-              </li>
-            );
-          })}
+    <DashCard title="Purchase Order Report">
+      <div className="flex items-center gap-5">
+        <ReportDonut poReport={poReport} onNavigate={onNavigate} />
+        <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
+          {REPORT_ROWS.map((r) => (
+            <li key={r.key} className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} />
+              <button type="button" onClick={() => onNavigate(r.href)}
+                className="min-w-0 flex-1 truncate text-left text-xs text-gray-700 hover:underline"
+                style={{ padding: 0, margin: 0, font: "inherit", fontSize: "0.75rem", lineHeight: "inherit" }}>
+                {r.label}
+              </button>
+              <span className={`font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</span>
+            </li>
+          ))}
         </ul>
-      )}
+      </div>
     </DashCard>
   );
 }

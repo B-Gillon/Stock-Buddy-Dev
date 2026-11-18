@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { supabase } from '@/lib/supabaseClient';
 import { getTenantIdFromHeaders } from "@/lib/tenants";
+import { NOT_FULLY_SHIPPED_STATUSES } from '@/lib/poStatus';
 import PurchaseOrdersLandingPage from './components/PurchaseOrdersLandingPage';
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,12 @@ export default async function Page({ searchParams }) {
     query = query
       .lt('expected_date', today)
       .not('status', 'in', '("draft","cancelled","received")');
+  } else if (status === 'ship_this_week' || status === 'ship_later') {
+    // same buckets as the dashboard report: not overdue, still something to ship
+    const today = new Date().toISOString().split('T')[0];
+    query = query
+      .in('status', NOT_FULLY_SHIPPED_STATUSES)
+      .or(`expected_date.is.null,expected_date.gte.${today}`);
   } else if (status) {
     query = query.eq('status', status);
   } else {
@@ -54,7 +61,18 @@ export default async function Page({ searchParams }) {
   if (dateTo)     query = query.lte('po_date', dateTo);
   if (search)     query = query.or(`po_number.ilike.%${search}%`);
 
-  const { data: posRaw } = await query;
+  let { data: posRaw } = await query;
+
+  if (status === 'ship_this_week' || status === 'ship_later') {
+    const today = new Date().toISOString().split('T')[0];
+    const dow = (new Date(today + 'T00:00:00Z').getUTCDay() + 6) % 7; // Monday = 0
+    const weekEnd = new Date(new Date(today + 'T00:00:00Z').getTime() + (6 - dow) * 864e5).toISOString().slice(0, 10);
+    posRaw = (posRaw ?? []).filter((po) => {
+      const ship = po.expected_ship_date || po.expected_date;
+      const thisWeek = !!ship && ship <= weekEnd;
+      return status === 'ship_this_week' ? thisWeek : !thisWeek;
+    });
+  }
 
   const poIds = (posRaw ?? []).map((p) => p.id);
   let totalsMap = {};
