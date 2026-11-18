@@ -3,7 +3,7 @@
 // /src/app/dashboard/components/ClientDashboard.jsx
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AppLayout from "@/shared/components/layout/AppLayout";
 
 // ── Shared card shell ──────────────────────────────────────────────────────
@@ -182,37 +182,95 @@ function GettingStartedCard({ onNavigate }) {
 
 const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n ?? 0);
 
-function POReportCard({ poReport, onNavigate }) {
-  const rows = [
-    { key: "overdue",  label: "Overdue",                  tone: "text-red-600",   href: "/purchase-orders?status=overdue" },
-    { key: "thisWeek", label: "Due to ship this week",    tone: "text-amber-600" },
-    { key: "later",    label: "Due to ship after this week", tone: "text-gray-800" },
-    { key: "drafts",   label: "Drafts",                   tone: "text-gray-500",  href: "/purchase-orders?status=draft" },
-  ];
+const REPORT_ROWS = [
+  { key: "overdue",  label: "Overdue",                     color: "#dc2626", tone: "text-red-600",   href: "/purchase-orders?status=overdue" },
+  { key: "thisWeek", label: "Due to ship this week",       color: "#f59e0b", tone: "text-amber-600" },
+  { key: "later",    label: "Due to ship after this week", color: "#2563eb", tone: "text-blue-700" },
+  { key: "drafts",   label: "Drafts",                      color: "#9ca3af", tone: "text-gray-500",  href: "/purchase-orders?status=draft" },
+];
+const VIEW_KEY = "dashboard_po_report_view";
+
+function ReportDonut({ poReport }) {
+  const total = REPORT_ROWS.reduce((t, r) => t + poReport[r.key].count, 0);
+  const R = 42, C = 2 * Math.PI * R;
+  let offset = 0;
   return (
-    <DashCard title="Purchase Order Report">
-      <table className="w-full text-sm border-collapse dashboard-table">
-        <thead>
-          <tr className="border-b border-gray-100 text-xs text-gray-400">
-            <th className="text-left py-1 font-medium">Status</th>
-            <th className="text-right py-1 font-medium">POs</th>
-            <th className="text-right py-1 font-medium">Total Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key} className="border-b border-gray-50 last:border-0" style={{height:"22px"}}>
-              <td className="py-1 pr-3 text-xs text-gray-700">
-                {r.href ? (
-                  <button onClick={() => onNavigate(r.href)} className="text-left hover:underline">{r.label}</button>
-                ) : r.label}
-              </td>
-              <td className={`py-1 text-right text-xs font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</td>
-              <td className="py-1 text-right text-xs text-gray-600">{money(poReport[r.key].cost)}</td>
+    <svg viewBox="0 0 120 120" className="h-36 w-36 shrink-0" role="img" aria-label="Purchase orders by status">
+      <circle cx="60" cy="60" r={R} fill="none" stroke="#f3f4f6" strokeWidth="16" />
+      {total > 0 && REPORT_ROWS.map((r) => {
+        const n = poReport[r.key].count;
+        if (!n) return null;
+        const len = (n / total) * C;
+        const el = (
+          <circle key={r.key} cx="60" cy="60" r={R} fill="none" stroke={r.color} strokeWidth="16"
+            strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)" />
+        );
+        offset += len;
+        return el;
+      })}
+      <text x="60" y="58" textAnchor="middle" className="fill-gray-800" style={{ fontSize: 22, fontWeight: 700 }}>{total}</text>
+      <text x="60" y="74" textAnchor="middle" className="fill-gray-400" style={{ fontSize: 9 }}>purchase orders</text>
+    </svg>
+  );
+}
+
+function POReportCard({ poReport, onNavigate }) {
+  const [view, setView] = useState("donut");
+  useEffect(() => {
+    try { const v = localStorage.getItem(VIEW_KEY); if (v === "donut" || v === "table") setView(v); } catch {}
+  }, []);
+  const choose = (v) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch {} };
+
+  const toggle = (
+    <div className="inline-flex overflow-hidden rounded-md border border-gray-300 text-xs" onClick={(e) => e.stopPropagation()}>
+      {[["donut", "Chart"], ["table", "Table"]].map(([v, label]) => (
+        <button key={v} type="button" onClick={() => choose(v)} aria-pressed={view === v}
+          className={`px-2.5 py-1 ${view === v ? "bg-gray-100 font-semibold text-gray-900" : "bg-white text-gray-500 hover:bg-gray-50"}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const label = (r) => r.href
+    ? <button onClick={() => onNavigate(r.href)} className="p-0 text-left hover:underline">{r.label}</button>
+    : r.label;
+
+  return (
+    <DashCard title="Purchase Order Report" headerRight={toggle}>
+      {view === "donut" ? (
+        <div className="flex items-center gap-5">
+          <ReportDonut poReport={poReport} />
+          <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
+            {REPORT_ROWS.map((r) => (
+              <li key={r.key} className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} />
+                <span className="flex-1 truncate text-gray-700">{label(r)}</span>
+                <span className={`font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <table className="w-full text-sm border-collapse dashboard-table">
+          <thead>
+            <tr className="border-b border-gray-100 text-xs text-gray-400">
+              <th className="text-left py-1 font-medium">Status</th>
+              <th className="text-right py-1 font-medium">POs</th>
+              <th className="text-right py-1 font-medium">Total Cost</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {REPORT_ROWS.map((r) => (
+              <tr key={r.key} className="border-b border-gray-50 last:border-0" style={{height:"22px"}}>
+                <td className="py-1 pr-3 text-xs text-gray-700">{label(r)}</td>
+                <td className={`py-1 text-right text-xs font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</td>
+                <td className="py-1 text-right text-xs text-gray-600">{money(poReport[r.key].cost)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </DashCard>
   );
 }
