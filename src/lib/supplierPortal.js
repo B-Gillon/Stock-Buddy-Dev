@@ -11,7 +11,7 @@ export async function requireSupplier() {
   const userId = h.get('x-auth-user');
   const [{ data: sup }, { data: user }] = await Promise.all([
     supabase.from('suppliers').select('supplier_name, tenant_id').eq('id', supplierId).maybeSingle(),
-    supabase.from('app_users').select('email').eq('id', userId).maybeSingle(),
+    supabase.from('app_users').select('email, username').eq('id', userId).maybeSingle(),
   ]);
   if (!sup) redirect('/login');
   return { tenantId: sup.tenant_id, supplierId, userId, email: user?.email ?? '', supplierName: sup.supplier_name };

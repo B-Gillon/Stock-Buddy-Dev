@@ -1,5 +1,6 @@
 // Signed-in supplier creates a shipment (with cartons) against one of their POs.
 // The retailer's Shipment Settings (visible / required fields) are enforced here.
+import { userLabel } from '@/lib/userLabel';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
@@ -24,7 +25,7 @@ export async function POST(request) {
 
   const [{ data: sup }, { data: user }] = await Promise.all([
     supabase.from('suppliers').select('tenant_id').eq('id', supplierId).maybeSingle(),
-    supabase.from('app_users').select('email').eq('id', userId).maybeSingle(),
+    supabase.from('app_users').select('email, username').eq('id', userId).maybeSingle(),
   ]);
   if (!sup || !user) return bad('Forbidden', 403);
   const tenantId = sup.tenant_id;
@@ -76,7 +77,7 @@ export async function POST(request) {
   // Keep only the fields the retailer shows; hidden fields are dropped
   const vs = config.shipment; const vc = config.carton;
   const shipmentRow = {
-    tenant_id: tenantId, po_id: po.id, supplier_id: supplierId, created_by: user.email,
+    tenant_id: tenantId, po_id: po.id, supplier_id: supplierId, created_by: userLabel(user),
     ship_date: String(sh.ship_date).slice(0, 10),
     ship_method: vs.ship_method.visible ? clean(sh.ship_method) : null,
     tracking_number: vs.tracking_number.visible ? clean(sh.tracking_number) : null,
@@ -138,10 +139,10 @@ export async function POST(request) {
   await supabase.from('purchase_orders')
     .update({ status: fullyShipped ? 'shipped' : 'partially_shipped' })
     .eq('id', po.id).in('status', ['waiting_to_ship', 'partially_shipped']);
-  await markRetrieved({ poId: po.id, tenantId, supplierId, by: user.email, method: 'shipment' });
+  await markRetrieved({ poId: po.id, tenantId, supplierId, by: userLabel(user), method: 'shipment' });
 
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
-  await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: user.email,
+  await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: userLabel(user),
     comments: `Shipment ${number}` });
   return NextResponse.json({ ok: true, shipmentNumber: number, shipmentId: created.id });
 }

@@ -12,13 +12,20 @@ export async function PATCH(request, { params }) {
   try {
     tenantId = await getTenantId(request);
     const { id } = await params;
-    const { action } = await request.json();
+    const { action, username: newName } = await request.json();
 
     const { data: user } = await supabase.from('app_users')
       .select('id, email, status, password_hash, supplier:suppliers ( supplier_name )')
       .eq('id', id).eq('tenant_id', tenantId).maybeSingle();
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
+    if (action === 'username') {
+      const name = String(newName ?? '').trim().replace(/\s+/g, ' ');
+      if (!/^[A-Za-z0-9][A-Za-z0-9 ._'-]{1,39}$/.test(name)) return NextResponse.json({ error: 'Enter a username (2–40 characters: letters, numbers, spaces, . _ - \').' }, { status: 400 });
+      const { error } = await supabase.from('app_users').update({ username: name }).eq('id', id).eq('tenant_id', tenantId);
+      if (error) return NextResponse.json({ error: error.code === '23505' ? 'That username is already in use.' : 'Could not save.' }, { status: error.code === '23505' ? 409 : 500 });
+      return NextResponse.json({ success: true });
+    }
     if (action === 'disable') {
       await supabase.from('app_users').update({ status: 'disabled' }).eq('id', id);
       return NextResponse.json({ success: true });

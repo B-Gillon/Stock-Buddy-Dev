@@ -1,5 +1,6 @@
 // Supplier edits a saved carton: its fields and item quantities. If the label is generated, the label data is recreated:
 // a changed carton content gets a NEW SSCC (the old one is voided); other edits keep the SSCC and just refresh the label.
+import { userLabel } from '@/lib/userLabel';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
@@ -21,7 +22,7 @@ export async function PATCH(request, { params }) {
 
   const [{ data: sup }, { data: user }] = await Promise.all([
     supabase.from('suppliers').select('tenant_id').eq('id', supplierId).maybeSingle(),
-    supabase.from('app_users').select('email').eq('id', userId).maybeSingle(),
+    supabase.from('app_users').select('email, username').eq('id', userId).maybeSingle(),
   ]);
   if (!sup || !user) return bad('Forbidden', 403);
   const tenantId = sup.tenant_id;
@@ -112,7 +113,7 @@ export async function PATCH(request, { params }) {
     await supabase.from('purchase_orders').update({ status: fully ? 'shipped' : 'partially_shipped' }).eq('id', po.id).in('status', ['shipped', 'partially_shipped']);
   }
 
-  await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: user.email,
+  await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: userLabel(user),
     comments: `Shipment ${shipment.shipment_number} carton ${carton.carton_no} edited${ssccChanged ? ' (new SSCC issued)' : ''}` });
   return NextResponse.json({ ok: true, sscc, ssccChanged });
 }

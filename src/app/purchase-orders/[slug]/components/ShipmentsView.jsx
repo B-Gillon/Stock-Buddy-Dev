@@ -54,14 +54,14 @@ export default async function ShipmentsView({ poId, lines }) {
         // Show only the carton columns someone actually filled in
         const has = (k) => cs.some((c) => c[k] != null && c[k] !== "");
         const cols = [
-          has("supplier_carton_id") && { key: "supplier_carton_id", head: "Supplier Carton ID", get: (c) => c.supplier_carton_id },
+          has("supplier_carton_id") && { key: "supplier_carton_id", head: "SSCC Case Number", get: (c) => c.supplier_carton_id },
           has("sscc") && { key: "sscc", head: "SSCC", get: (c) => c.sscc },
           has("tracking_number") && { key: "tracking_number", head: "Tracking Number", get: (c) => c.tracking_number },
           has("weight") && { key: "weight", head: "Weight", get: (c) => (c.weight != null ? `${Number(c.weight)} ${c.weight_unit ?? ""}` : null) },
           has("length") && { key: "dims", head: "Dimensions", get: (c) => (c.length != null ? `${Number(c.length)} × ${Number(c.width)} × ${Number(c.height)} ${c.dim_unit ?? ""}` : null) },
           has("pallet_id") && { key: "pallet_id", head: "Pallet ID", get: (c) => c.pallet_id },
           has("lot_number") && { key: "lot_number", head: "Lot Number", get: (c) => c.lot_number },
-          has("expiration_date") && { key: "expiration_date", head: "Expires", get: (c) => (c.expiration_date ? fmtDate(c.expiration_date) : null) },
+          has("expiration_date") && { key: "expiration_date", head: "Lot Expire", get: (c) => (c.expiration_date ? fmtDate(c.expiration_date) : null) },
         ].filter(Boolean);
 
         return (

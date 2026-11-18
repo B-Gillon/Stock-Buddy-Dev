@@ -46,7 +46,7 @@ export function CartonFields({ cfg, f, set, autoSscc }) {
   const text = (key) => <input className={input} value={f[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      {v('supplier_carton_id') && <Field label="Supplier Carton ID" required={r('supplier_carton_id')}>{text('supplier_carton_id')}</Field>}
+      {v('supplier_carton_id') && <Field label="SSCC Case Number" required={r('supplier_carton_id')}>{text('supplier_carton_id')}</Field>}
       {v('sscc') && <Field label="SSCC" required={r('sscc')}><input className={input} inputMode="numeric" placeholder={autoSscc ? 'Assigned when saved' : '18 digits'} disabled={!!autoSscc} value={f.sscc ?? ''} onChange={(e) => set({ sscc: e.target.value })} /></Field>}
       {v('carton_tracking') && <Field label="Carton Tracking Number" required={r('carton_tracking')}>{text('tracking_number')}</Field>}
       {v('weight') && (

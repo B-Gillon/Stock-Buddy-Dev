@@ -16,7 +16,9 @@ export default function UsersTab() {
   const [users, setUsers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ role: 'retailer', supplier_id: '', email: '' });
+  const [form, setForm] = useState({ role: 'retailer', supplier_id: '', username: '', email: '' });
+  const [editId, setEditId] = useState(null);
+  const [editName, setEditName] = useState('');
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
 
@@ -31,7 +33,7 @@ export default function UsersTab() {
   }, [showToast]);
   useEffect(() => { load(); }, [load]);
 
-  const canAdd = form.email.trim() && (form.role === 'retailer' || form.supplier_id);
+  const canAdd = form.email.trim() && form.username.trim() && (form.role === 'retailer' || form.supplier_id);
 
   async function add(e) {
     e.preventDefault();
@@ -39,15 +41,26 @@ export default function UsersTab() {
     try {
       const res = await fetch('/api/users', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: form.role, supplier_id: form.role === 'supplier' ? form.supplier_id : null, email: form.email }),
+        body: JSON.stringify({ role: form.role, supplier_id: form.role === 'supplier' ? form.supplier_id : null, username: form.username, email: form.email }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? 'Could not add user');
       showToast(json.emailSent ? 'User added. A link to create a password was emailed.' : 'User added, but the email could not be sent. Use Resend.', json.emailSent ? 'success' : 'warning');
-      setForm({ role: form.role, supplier_id: '', email: '' });
+      setForm({ role: form.role, supplier_id: '', username: '', email: '' });
       load();
     } catch (err) { showToast(err.message, 'error'); }
     finally { setSaving(false); }
+  }
+
+  async function saveName(id) {
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'username', username: editName }) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Failed');
+      showToast('Username saved.'); setEditId(null); load();
+    } catch (err) { showToast(err.message, 'error'); }
+    finally { setBusyId(null); }
   }
 
   async function act(id, action, okMsg) {
@@ -84,6 +97,10 @@ export default function UsersTab() {
             </div>
           )}
           <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Username</label>
+            <input className={inputClass} value={form.username} maxLength={40} placeholder="Shown in PO History" onChange={(e) => setForm({ ...form, username: e.target.value })} />
+          </div>
+          <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Email Address</label>
             <input type="email" className={inputClass} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </div>
@@ -100,6 +117,7 @@ export default function UsersTab() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-xs text-gray-600">
+              <th className="px-3 py-2 text-left font-medium">Username</th>
               <th className="px-3 py-2 text-left font-medium">Email</th>
               <th className="px-3 py-2 text-left font-medium">Type</th>
               <th className="px-3 py-2 text-left font-medium">Supplier</th>
@@ -110,13 +128,26 @@ export default function UsersTab() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-400">Loading…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">Loading…</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-8 text-center text-gray-400">No users yet.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-gray-400">No users yet.</td></tr>
             ) : users.map((u) => {
               const st = STATUS[u.status] ?? STATUS.invited;
               return (
                 <tr key={u.id} className="border-b border-gray-100">
+                  <td className="whitespace-nowrap px-3 py-2 text-gray-800">
+                    {editId === u.id ? (
+                      <span className="flex items-center gap-1">
+                        <input className="w-36 rounded border border-gray-300 px-2 py-1 text-sm" value={editName} maxLength={40} autoFocus onChange={(e) => setEditName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveName(u.id); if (e.key === 'Escape') setEditId(null); }} />
+                        <button className="text-xs text-blue-700 hover:underline" disabled={busyId === u.id} onClick={() => saveName(u.id)}>Save</button>
+                        <button className="text-xs text-gray-500 hover:underline" onClick={() => setEditId(null)}>Cancel</button>
+                      </span>
+                    ) : u.username ? (
+                      <button className="hover:underline" title="Edit username" onClick={() => { setEditId(u.id); setEditName(u.username); }}>{u.username}</button>
+                    ) : (
+                      <button className="text-xs text-blue-700 hover:underline" onClick={() => { setEditId(u.id); setEditName(''); }}>Set username</button>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-gray-800">{u.email}</td>
                   <td className="px-3 py-2 text-gray-700">{u.role === 'supplier' ? 'Supplier' : 'Retailer'}</td>
                   <td className="px-3 py-2 text-gray-700">{u.supplier_name ?? '—'}</td>

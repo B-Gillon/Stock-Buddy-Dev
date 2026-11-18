@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantIdFromHeaders } from "@/lib/tenants";
 import AppLayout from "@/shared/components/layout/AppLayout";
+import { shippedByLine } from '@/lib/shipments';
 import ClientReceivePOPage from "../components/ClientReceivePOPage";
 
 export default async function ReceivePOPage({ params }) {
@@ -73,6 +74,8 @@ export default async function ReceivePOPage({ params }) {
     });
   }
 
+  const shipped = await shippedByLine((lines ?? []).map((l) => l.id));
+
   // Flatten for client component
   const flatLines = (lines ?? []).map((l) => ({
     id: l.id,
@@ -85,6 +88,8 @@ export default async function ReceivePOPage({ params }) {
     order_qty_units: l.order_qty_units,
     received_qty_units: l.received_qty_units ?? 0,
     remaining_qty: l.order_qty_units - (l.received_qty_units ?? 0),
+    shipped_qty: shipped[l.id] ?? 0,
+    receivable_qty: Math.max(0, Math.min(l.order_qty_units - (l.received_qty_units ?? 0), (shipped[l.id] ?? 0) - (l.received_qty_units ?? 0))),
     unit_cost: l.unit_cost,
     shopify_inventory_item_id: inventoryMap[l.variant_id] ?? null,
   }));

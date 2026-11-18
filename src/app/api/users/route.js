@@ -7,6 +7,7 @@ import { sendPasswordLinkEmail, appUrl } from '@/lib/auth/inviteEmail';
 import { logError } from '@/lib/logError';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const USERNAME = /^[A-Za-z0-9][A-Za-z0-9 ._'-]{1,39}$/;
 const forbidden = (request) => request.headers.get('x-auth-role') === 'supplier';
 
 export async function GET(request) {
@@ -16,7 +17,7 @@ export async function GET(request) {
     tenantId = await getTenantId(request);
     const [{ data: users }, { data: suppliers }] = await Promise.all([
       supabase.from('app_users')
-        .select('id, email, role, supplier_id, status, last_login_at, created_at, supplier:suppliers ( supplier_name )')
+        .select('id, email, username, role, supplier_id, status, last_login_at, created_at, supplier:suppliers ( supplier_name )')
         .eq('tenant_id', tenantId).order('created_at', { ascending: false }),
       supabase.from('suppliers').select('id, supplier_name').eq('tenant_id', tenantId).order('supplier_name'),
     ]);
@@ -38,6 +39,8 @@ export async function POST(request) {
     const b = await request.json();
     const role = b.role === 'supplier' ? 'supplier' : b.role === 'retailer' ? 'retailer' : null;
     const email = String(b.email ?? '').trim().toLowerCase();
+    const username = String(b.username ?? '').trim().replace(/\s+/g, ' ');
+    if (!USERNAME.test(username)) return NextResponse.json({ error: 'Enter a username (2–40 characters: letters, numbers, spaces, . _ - \').' }, { status: 400 });
     if (!role) return NextResponse.json({ error: 'Choose a user type.' }, { status: 400 });
     if (!EMAIL.test(email) || email.length > 200) return NextResponse.json({ error: 'Enter a valid email address.' }, { status: 400 });
 
@@ -50,10 +53,10 @@ export async function POST(request) {
     }
 
     const { data: user, error } = await supabase.from('app_users')
-      .insert({ tenant_id: tenantId, email, role, supplier_id: supplier?.id ?? null })
+      .insert({ tenant_id: tenantId, email, username, role, supplier_id: supplier?.id ?? null })
       .select('id').single();
     if (error) {
-      if (error.code === '23505') return NextResponse.json({ error: 'That email address already has an account.' }, { status: 409 });
+      if (error.code === '23505') return NextResponse.json({ error: /username/i.test(error.message) ? 'That username is already in use.' : 'That email address already has an account.' }, { status: 409 });
       throw error;
     }
 

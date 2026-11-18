@@ -104,7 +104,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
   }
 
   const handleFillAll = useCallback(() => {
-    setQtyInputs(Object.fromEntries(lines.map((l) => [l.id, String(l.remaining_qty)])));
+    setQtyInputs(Object.fromEntries(lines.map((l) => [l.id, l.receivable_qty > 0 ? String(l.receivable_qty) : ""])));
   }, [lines]);
 
   const handleQtyChange = (lineId, value) => {
@@ -119,7 +119,9 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
       .filter((r) => !isNaN(r.receivedQty) && r.receivedQty > 0);
 
   const receipts = buildReceipts();
-  const hasAnyQty = receipts.length > 0;
+  const overShipped = receipts.some((r) => r.receivedQty > (lines.find((l) => l.id === r.lineId)?.receivable_qty ?? 0));
+  const nothingShipped = lines.every((l) => (l.shipped_qty ?? 0) === 0);
+  const hasAnyQty = receipts.length > 0 && !overShipped;
 
   const handleConfirm = async () => {
     setIsSubmitting(true);
@@ -198,6 +200,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
                 <th className="px-4 py-3 text-left font-medium">SKU</th>
                 <th className="px-4 py-3 text-left font-medium">Description</th>
                 <th className="px-4 py-3 text-left font-medium">Ordered</th>
+                <th className="px-4 py-3 text-left font-medium">Shipped</th>
                 <th className="px-4 py-3 text-left font-medium">Received</th>
                 <th className="px-4 py-3 text-left font-medium">Remaining</th>
                 <th
@@ -211,13 +214,14 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
             </thead>
             <tbody>
               {lines.map((line, idx) => {
-                const isOverReceiving = parseInt(qtyInputs[line.id] ?? "", 10) > line.remaining_qty;
+                const isOverReceiving = parseInt(qtyInputs[line.id] ?? "", 10) > line.receivable_qty;
                 return (
                   <tr key={line.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-gray-400">{line.line_no ?? idx + 1}</td>
                     <td className="px-4 py-3 text-gray-600">{line.sku}</td>
                     <td className="px-4 py-3 text-gray-800 font-medium">{line.display_title || line.title}</td>
                     <td className="px-4 py-3 text-gray-700">{line.order_qty_units}</td>
+                    <td className="px-4 py-3 text-gray-700">{line.shipped_qty ?? 0}</td>
                     <td className="px-4 py-3 text-gray-500">{line.received_qty_units ?? 0}</td>
                     <td className="px-4 py-3">
                       <span className={line.remaining_qty <= 0 ? "text-gray-400" : "font-medium text-gray-800"}>
@@ -239,7 +243,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
                           }`}
                         />
                         {isOverReceiving && (
-                          <span className="text-xs text-amber-500" title="Over-receiving">⚠</span>
+                          <span className="text-xs text-amber-500" title={`Only ${line.receivable_qty} shipped and not yet received`}>⚠</span>
                         )}
                       </div>
                     </td>
@@ -249,6 +253,13 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
             </tbody>
           </table>
         </div>
+
+        {nothingShipped && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Nothing on this purchase order has been shipped yet. Items can only be received after the supplier ships them.
+          </div>
+        )}
+        {overShipped && <p className="text-sm text-red-600">A quantity is more than what has been shipped and not yet received.</p>}
 
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">

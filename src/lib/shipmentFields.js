@@ -13,7 +13,7 @@ export const DIM_UNITS = ['in', 'cm'];
 
 // kind: text | notes | date | int | weight | dims
 export const CARTON_FIELDS = [
-  { id: 'supplier_carton_id', label: 'Supplier Carton ID', kind: 'text', hiddenByDefault: false },
+  { id: 'supplier_carton_id', label: 'SSCC Case Number', kind: 'text', hiddenByDefault: false },
   { id: 'sscc',               label: 'SSCC',               kind: 'sscc', hiddenByDefault: true },
   { id: 'carton_tracking',    label: 'Carton Tracking Number', kind: 'text', hiddenByDefault: false },
   { id: 'weight',             label: 'Weight (with unit)', kind: 'weight', hiddenByDefault: true },

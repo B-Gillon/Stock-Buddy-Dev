@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { receiveInStockBuddy } from "@/lib/sync/po/receivePO";
 import { logPOActivity } from "@/lib/logPOActivity";
 import { logError } from "@/lib/logError";
+import { shippedByLine } from "@/lib/shipments";
 
 export async function POST(request, { params }) {
   try {
@@ -27,6 +28,23 @@ export async function POST(request, { params }) {
         { success: false, error: "lines array is required" },
         { status: 400 }
       );
+    }
+
+    // Nothing can be received until the supplier has shipped it: per line, received can't pass shipped
+    const { data: poLines } = await supabase.from("purchase_order_lines")
+      .select("id, sku, title, received_qty_units").eq("purchase_order_id", poId);
+    const lineById = new Map((poLines ?? []).map((l) => [l.id, l]));
+    const shipped = await shippedByLine([...lineById.keys()]);
+    for (const { lineId, qtyToReceive } of lines) {
+      const l = lineById.get(lineId);
+      if (!l) return NextResponse.json({ success: false, error: "A line does not belong to this purchase order." }, { status: 400 });
+      const canReceive = Math.max(0, (shipped[lineId] ?? 0) - (l.received_qty_units ?? 0));
+      if ((Number(qtyToReceive) || 0) > canReceive) {
+        return NextResponse.json({
+          success: false,
+          error: `${l.sku || l.title}: only ${canReceive} unit${canReceive === 1 ? "" : "s"} can be received. Items must be shipped by the supplier before they can be received (shipped ${shipped[lineId] ?? 0}, already received ${l.received_qty_units ?? 0}).`,
+        }, { status: 409 });
+      }
     }
 
     // Scanned cartons must belong to this PO and not already be received

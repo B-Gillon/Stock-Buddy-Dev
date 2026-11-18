@@ -1,5 +1,6 @@
 // Supplier downloads a PO as PDF or CSV. Ownership is checked against the verified session,
 // then the existing export handlers build the file, and the PO is marked as retrieved.
+import { userLabel } from '@/lib/userLabel';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { markRetrieved } from '@/lib/supplierPortal';
@@ -17,7 +18,7 @@ export async function GET(request, { params }) {
 
   const [{ data: sup }, { data: user }] = await Promise.all([
     supabase.from('suppliers').select('tenant_id').eq('id', supplierId).maybeSingle(),
-    supabase.from('app_users').select('email').eq('id', userId).maybeSingle(),
+    supabase.from('app_users').select('email, username').eq('id', userId).maybeSingle(),
   ]);
   if (!sup || !user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { data: po } = await supabase.from('purchase_orders').select('id')
@@ -26,7 +27,7 @@ export async function GET(request, { params }) {
 
   const res = await (format === 'csv' ? csv : pdf)(request, { params: Promise.resolve({ id }) });
   if (res.ok) {
-    await markRetrieved({ poId: id, tenantId: sup.tenant_id, supplierId, by: user.email, method: format.toUpperCase() });
+    await markRetrieved({ poId: id, tenantId: sup.tenant_id, supplierId, by: userLabel(user), method: format.toUpperCase() });
   }
   return res;
 }

@@ -1,4 +1,5 @@
 // Signed-in supplier acknowledges a PO. Identity comes only from the verified session headers.
+import { userLabel } from '@/lib/userLabel';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { submitAckFromPortal } from '@/lib/acknowledgements';
@@ -15,13 +16,13 @@ export async function POST(request) {
 
   const [{ data: sup }, { data: user }] = await Promise.all([
     supabase.from('suppliers').select('tenant_id').eq('id', supplierId).maybeSingle(),
-    supabase.from('app_users').select('email').eq('id', userId).maybeSingle(),
+    supabase.from('app_users').select('email, username').eq('id', userId).maybeSingle(),
   ]);
   if (!sup || !user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const result = await submitAckFromPortal({
     poId: body.poId, tenantId: sup.tenant_id, supplierId,
-    userName: user.email, shipDate: body.shipDate || null,
+    userName: userLabel(user), shipDate: body.shipDate || null,
   });
   return NextResponse.json(result, { status: result.ok ? 200 : result.code === 'error' ? 500 : 400 });
 }

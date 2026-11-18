@@ -1,6 +1,7 @@
 // /src/lib/logPOActivity.js
 import { supabase } from '@/lib/supabaseClient';
 import { readUserCookie } from '@/lib/shopify/userCookie';
+import { userLabel } from '@/lib/userLabel';
 
 /**
  * Logs an activity entry for a purchase order.
@@ -16,7 +17,13 @@ import { readUserCookie } from '@/lib/shopify/userCookie';
  */
 export async function logPOActivity({ poId, tenantId, action, comments, request, userName }) {
   try {
-    const user = userName ? { name: userName, id: null } : (request ? readUserCookie(request) : null);
+    let user = userName ? { name: userName, id: null } : (request ? readUserCookie(request) : null);
+    // A website (non-Shopify) user: use their username
+    const webUserId = !user && request?.headers?.get?.('x-auth-user');
+    if (webUserId) {
+      const { data: u } = await supabase.from('app_users').select('email, username').eq('id', webUserId).maybeSingle();
+      if (u) user = { name: userLabel(u), id: null };
+    }
     const { error } = await supabase
       .from('po_activity_log')
       .insert({
