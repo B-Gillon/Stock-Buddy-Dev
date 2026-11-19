@@ -49,6 +49,27 @@ export async function POST(request, { params }) {
       }
     }
 
+    // Mixed Locations Allowed (default yes). When off: no bin that already holds inventory, and no bin shared by two SKUs.
+    const { data: cfg } = await supabase.from("po_settings").select("mixed_locations_allowed").eq("tenant_id", tenantId).maybeSingle();
+    if (cfg && cfg.mixed_locations_allowed === false) {
+      const skuByLine = new Map((poLines ?? []).map((l) => [l.id, l.sku || l.title]));
+      const skusByBin = {};
+      for (const r of rows) (skusByBin[r.bin_location] ??= new Set()).add(skuByLine.get(r.po_line_id));
+      for (const [bin, skus] of Object.entries(skusByBin)) {
+        if (skus.size > 1) return bad(`Bin Location ${bin} is used for more than one SKU. Mixed locations aren't allowed.`, 409);
+      }
+      const { data: po } = await supabase.from("purchase_orders").select("ship_to_location_id").eq("id", poId).eq("tenant_id", tenantId).single();
+      const bins = Object.keys(skusByBin);
+      const { data: used, error: usedErr } = await supabase.from("po_line_putaways")
+        .select("bin_location, qty, po:purchase_orders!po_id!inner ( ship_to_location_id )")
+        .eq("tenant_id", tenantId).in("bin_location", bins).eq("po.ship_to_location_id", po?.ship_to_location_id);
+      if (usedErr) throw new Error(usedErr.message);
+      const occupied = [...new Set((used ?? []).filter((u) => (u.qty ?? 0) > 0).map((u) => u.bin_location))];
+      if (occupied.length) {
+        return bad(`Bin Location ${occupied.join(", ")} already has inventory in it. Choose an empty Bin Location (mixed locations aren't allowed).`, 409);
+      }
+    }
+
     const { error: insErr } = await supabase.from("po_line_putaways").insert(rows);
     if (insErr) throw new Error(insErr.message);
     for (const [lineId, total] of Object.entries(totals)) {
@@ -59,8 +80,10 @@ export async function POST(request, { params }) {
       if (error) throw new Error(error.message);
     }
 
-    const units = rows.reduce((t, r) => t + r.qty, 0);
-    await logPOActivity({ poId, tenantId, action: "putaway", request, comments: `${units} unit${units === 1 ? "" : "s"} put away` });
+    for (const r of rows) {
+      await logPOActivity({ poId, tenantId, action: "putaway", request,
+        comments: `${r.qty} unit${r.qty === 1 ? "" : "s"} put away in Bin Location ${r.bin_location}` });
+    }
     return NextResponse.json({ success: true });
   } catch (err) {
     await logError({ source: "putaway", error: err, tenantId: null });

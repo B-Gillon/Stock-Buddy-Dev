@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Button from "@/shared/components/ui/Button";
 import Badge from "@/shared/components/ui/Badge";
 import Card from "@/shared/components/ui/Card";
+import POInfoCards from "./POInfoCards";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 
@@ -161,17 +162,15 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
       <div className="space-y-4">
         <PageHeader backHref={`/purchase-orders/${slug}`} badge={<Badge status={po.status} />} />
 
-        <div className="grid grid-cols-4 gap-4">
-          <Card title="Supplier"><p className="text-sm font-medium text-gray-800">{po.supplier_name || "—"}</p></Card>
-          <Card title="Ship To"><p className="text-sm font-medium text-gray-800">{po.location_name || "—"}</p></Card>
-          <Card title="Expected"><p className="text-sm font-medium text-gray-800">{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "—"}</p></Card>
-          <Card title="Summary">
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Lines</span><span className="font-medium text-gray-800">{lines.length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Units remaining</span><span className="font-medium text-gray-800">{lines.reduce((t, l) => t + Math.max(0, l.remaining_qty ?? 0), 0).toLocaleString()}</span></div>
-            </div>
-          </Card>
-        </div>
+        <POInfoCards
+          po={po}
+          lineCount={lines.length}
+          totalUnits={lines.reduce((t, l) => t + (l.order_qty_units ?? 0), 0)}
+          totalCost={lines.reduce((t, l) => t + (parseFloat(l.extended_cost) || 0), 0)}
+          currencyCode={po.currency_code ?? "USD"}
+          defaultCollapsed
+          storageKey="po_action_cards_collapsed"
+        />
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500">Scan carton label</label>
@@ -221,7 +220,7 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
                 return (
                   <tr key={line.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-gray-400">{line.line_no ?? idx + 1}</td>
-                    <td className="px-4 py-3 text-gray-600">{line.sku}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{line.sku}</td>
                     <td className="px-4 py-3 text-gray-800 font-medium">{line.display_title || line.title}</td>
                     <td className="px-4 py-3 text-gray-700">{line.order_qty_units}</td>
                     <td className="px-4 py-3 text-gray-700">{line.shipped_qty ?? 0}</td>

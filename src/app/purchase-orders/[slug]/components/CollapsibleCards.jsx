@@ -6,14 +6,16 @@
 
 import { useState, useEffect } from "react";
 
-const STORAGE_KEY = "po_detail_cards_collapsed";
+const DEFAULT_KEY = "po_detail_cards_collapsed";
 
-export default function CollapsibleCards({ summary, children }) {
-  const [collapsed, setCollapsed] = useState(false);
+export default function CollapsibleCards({ summary, children, defaultCollapsed = false, storageKey = DEFAULT_KEY }) {
+  const STORAGE_KEY = storageKey;
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(STORAGE_KEY) === "1") setCollapsed(true);
+      const v = localStorage.getItem(STORAGE_KEY);
+      if (v === "1") setCollapsed(true); else if (v === "0") setCollapsed(false);
     } catch { /* storage unavailable: stay expanded */ }
   }, []);
 

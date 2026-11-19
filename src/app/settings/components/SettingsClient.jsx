@@ -265,6 +265,24 @@ function PurchaseOrdersTab({ poNextNumber: initialPoNextNumber }) {
   const [poFormat, setPoFormat]         = useState('PO-{DATE}-{NUM}');
   const [nextPoNumber, setNextPoNumber] = useState('');
   const poNumberLocked                  = !!initialPoNextNumber;
+  const [mixedAllowed, setMixedAllowed] = useState(null);
+  const [mixedSaving, setMixedSaving]   = useState(false);
+  const [mixedError, setMixedError]     = useState(null);
+
+  useEffect(() => {
+    fetch('/api/po-settings').then((r) => r.json()).then((j) => setMixedAllowed(j.mixedLocationsAllowed ?? true)).catch(() => setMixedAllowed(true));
+  }, []);
+
+  async function saveMixed(value) {
+    setMixedSaving(true); setMixedError(null);
+    const prev = mixedAllowed;
+    setMixedAllowed(value);
+    try {
+      const res = await fetch('/api/po-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mixedLocationsAllowed: value }) });
+      if (!res.ok) throw new Error('Could not save.');
+    } catch (err) { setMixedAllowed(prev); setMixedError(err.message); }
+    finally { setMixedSaving(false); }
+  }
 
   async function handleSave() {
     if (!poNumberLocked && (!nextPoNumber || parseInt(nextPoNumber, 10) < 1)) {
@@ -346,6 +364,21 @@ function PurchaseOrdersTab({ poNextNumber: initialPoNextNumber }) {
             ⚠ Once saved, this value cannot be changed.
           </p>
         )}
+      </div>
+
+      <div className="border-t border-gray-100" />
+
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800 mb-1">Putaway</h3>
+        <label className="flex items-center gap-2 text-sm text-gray-800">
+          <input type="checkbox" checked={mixedAllowed ?? true} disabled={mixedAllowed === null || mixedSaving} onChange={(e) => saveMixed(e.target.checked)} />
+          Mixed Locations Allowed
+        </label>
+        <p className="text-xs text-gray-500 mt-1">
+          When unchecked, a Bin Location that already has inventory in it can't be used during putaway, and the same Bin Location can't be used for two different SKUs.
+          {mixedSaving ? ' Saving…' : ''}
+        </p>
+        {mixedError && <p className="text-xs text-red-600 mt-1">{mixedError}</p>}
       </div>
 
       {saveError && <p className="text-sm text-red-600">{saveError}</p>}

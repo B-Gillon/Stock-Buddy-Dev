@@ -21,12 +21,14 @@ export default async function ReceivePOPage({ params }) {
       supplier:suppliers!supplier_id (
         id,
         supplier_name,
-        supplier_number
+        supplier_number,
+        currency
       ),
       location:locations!ship_to_location_id (
         id,
         name,
-        shopify_location_id
+        shopify_location_id,
+        address1, address2, city, province, country, zip
       )
     `)
     .eq("po_number", slug)
@@ -91,6 +93,7 @@ export default async function ReceivePOPage({ params }) {
     shipped_qty: shipped[l.id] ?? 0,
     receivable_qty: Math.max(0, Math.min(l.order_qty_units - (l.received_qty_units ?? 0), (shipped[l.id] ?? 0) - (l.received_qty_units ?? 0))),
     unit_cost: l.unit_cost,
+    extended_cost: l.extended_cost,
     shopify_inventory_item_id: inventoryMap[l.variant_id] ?? null,
   }));
 
@@ -98,10 +101,20 @@ export default async function ReceivePOPage({ params }) {
     id: po.id,
     po_number: po.po_number,
     status: po.status,
+    po_date: po.po_date,
     expected_date: po.expected_date,
+    expected_ship_date: po.expected_ship_date,
+    released_at: po.released_at,
+    currency_code: po.currency_code ?? po.supplier?.currency ?? "USD",
     supplier_name: po.supplier?.supplier_name ?? "",
     supplier_number: po.supplier?.supplier_number ?? "",
     location_name: po.location?.name ?? "",
+    location_address1: po.location?.address1 ?? "",
+    location_address2: po.location?.address2 ?? "",
+    location_city: po.location?.city ?? "",
+    location_province: po.location?.province ?? "",
+    location_country: po.location?.country ?? "",
+    location_zip: po.location?.zip ?? "",
   };
 
   return (

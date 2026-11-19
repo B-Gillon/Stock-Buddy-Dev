@@ -2,7 +2,7 @@
 // SERVER COMPONENT — no "use client"
 
 import { headers } from "next/headers";
-import CollapsibleCards from "./components/CollapsibleCards";
+import POInfoCards from "./components/POInfoCards";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantIdFromHeaders } from "@/lib/tenants";
@@ -155,41 +155,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
         />
 
         {view === "details" && (<>
-        <CollapsibleCards summary={`Supplier: ${flatPO.supplier_name || "—"} · Deliver to: ${flatPO.location_name || "—"}`}>
-        <div className="grid grid-cols-4 gap-4">
-          <Card title="PO Info">
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">PO Create Date</span><span className="font-medium text-gray-800">{fmtDate(flatPO.po_date)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Requested Ship Date</span><span className="font-medium text-gray-800">{fmtDate(flatPO.expected_date)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Expected Ship Date</span><span className="font-medium text-gray-800">{flatPO.expected_ship_date ? fmtDate(flatPO.expected_ship_date) : "—"}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Currency</span><span className="font-medium text-gray-800">{currencyCode}</span></div>
-              {flatPO.released_at && <div className="flex justify-between"><span className="text-gray-500">Released</span><span className="font-medium text-gray-800">{fmtDate(flatPO.released_at)}</span></div>}
-            </div>
-          </Card>
-          <Card title="Supplier">
-            <div className="text-sm">
-              <p className="font-medium text-gray-800">{flatPO.supplier_name || "—"}</p>
-              {flatPO.supplier_number && <p className="text-gray-400 text-xs">#{flatPO.supplier_number}</p>}
-            </div>
-          </Card>
-          <Card title="Ship To">
-            <div className="text-sm space-y-0.5">
-              <p className="font-medium text-gray-800">{flatPO.location_name || "—"}</p>
-              {flatPO.location_address1 && <p className="text-gray-500">{flatPO.location_address1}</p>}
-              {flatPO.location_address2 && <p className="text-gray-500">{flatPO.location_address2}</p>}
-              {(flatPO.location_city || flatPO.location_province || flatPO.location_zip) && <p className="text-gray-500">{[flatPO.location_city, flatPO.location_province, flatPO.location_zip].filter(Boolean).join(", ")}</p>}
-              {flatPO.location_country && <p className="text-gray-500">{flatPO.location_country}</p>}
-            </div>
-          </Card>
-          <Card title="Summary">
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Lines</span><span className="font-medium text-gray-800">{flatLines.length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Total Units</span><span className="font-medium text-gray-800">{totalUnits.toLocaleString()}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Total Cost</span><span className="font-medium text-gray-800">{formatCurrency(totalCost, currencyCode)}</span></div>
-            </div>
-          </Card>
-        </div>
-        </CollapsibleCards>
+        <POInfoCards po={flatPO} lineCount={flatLines.length} totalUnits={totalUnits} totalCost={totalCost} currencyCode={currencyCode} />
 
         {(flatPO.notes_internal || flatPO.notes_supplier) && (
           <div className="grid grid-cols-2 gap-4">
@@ -222,7 +188,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                 <th className="text-left px-3 py-2 font-medium">Ordered</th>
                 <th className="text-left px-3 py-2 font-medium">Shipped</th>
                 <th className="text-left px-3 py-2 font-medium">Received</th>
-                <th className="text-left px-3 py-2 font-medium">Ready for Putaway</th>
+                <th className="text-left px-3 py-2 font-medium">Put Away</th>
                 <th className="text-left px-3 py-2 font-medium">Open</th>
                 <th className="text-left px-3 py-2 font-medium">Unit Cost</th>
                 <th className="text-left px-3 py-2 font-medium">Extended Cost</th>
@@ -233,7 +199,6 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                 <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
               ) : flatLines.map((line) => {
                 const open = (line.order_qty_units ?? 0) - (line.received_qty_units ?? 0);
-                const readyPutaway = (line.received_qty_units ?? 0) - (line.putaway_qty_units ?? 0);
                 return (
                   <tr key={line.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-400">{line.line_no}</td>
@@ -242,12 +207,12 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                         {line.image_src ? <img src={line.image_src} alt={line.title} className="object-cover w-full h-full" /> : <svg className="w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
                       </div>
                     </td>
-                    <td className="px-3 py-2 text-gray-600">{line.sku || "—"}</td>
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{line.sku || "—"}</td>
                     <td className="px-3 py-2 text-gray-800 font-medium">{line.display_title || line.title || "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{line.order_qty_units?.toLocaleString() ?? "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{(line.shipped_qty_units ?? 0).toLocaleString()}</td>
                     <td className="px-3 py-2 text-gray-800">{(line.received_qty_units ?? 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-gray-800">{readyPutaway > 0 ? readyPutaway.toLocaleString() : "—"}</td>
+                    <td className="px-3 py-2 text-gray-800">{(line.putaway_qty_units ?? 0) > 0 ? line.putaway_qty_units.toLocaleString() : "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{open > 0 ? open.toLocaleString() : "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{formatCurrency(line.unit_cost, currencyCode)}</td>
                     <td className="px-3 py-2 text-gray-800">{formatCurrency(line.extended_cost, currencyCode)}</td>

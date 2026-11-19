@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/shared/components/ui/Button";
 import Badge from "@/shared/components/ui/Badge";
-import Card from "@/shared/components/ui/Card";
+import POInfoCards from "./POInfoCards";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 
-const inputCls = "block rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100";
-const BIN_W = "w-28", QTY_W = "w-20";
+const inputCls = "block rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-left text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100";
+const BIN_W = "w-[6.5rem]", QTY_W = "w-[4rem]";
 const blank = () => ({ bin: "", qty: "" });
 
 export default function ClientPutawayPage({ po, lines, slug }) {
@@ -26,6 +26,16 @@ export default function ClientPutawayPage({ po, lines, slug }) {
   };
   const addLocation = (lineId) => setSets((prev) => ({ ...prev, [lineId]: [...prev[lineId], blank()] }));
   const removeLocation = (lineId, i) => setSets((prev) => ({ ...prev, [lineId]: prev[lineId].filter((_, j) => j !== i) }));
+
+  // Tab goes Bin Location -> its Putaway -> the next Bin Location (Shift+Tab goes back the same way)
+  const focusId = (id) => { const el = document.getElementById(id); if (el) { el.focus(); return true; } return false; };
+  const onKey = (lineId, i, kind) => (e) => {
+    if (e.key !== "Tab") return;
+    const id = kind === "bin" ? (e.shiftKey ? `bin-${lineId}-${i - 1}-qty` : `qty-${lineId}-${i}`)
+      : (e.shiftKey ? `bin-${lineId}-${i}` : `bin-${lineId}-${i + 1}`);
+    const target = kind === "bin" && e.shiftKey ? `qty-${lineId}-${i - 1}` : kind === "qty" && !e.shiftKey ? `bin-${lineId}-${i + 1}` : id;
+    if (document.getElementById(target)) { e.preventDefault(); focusId(target); }
+  };
 
   const entered = (l) => sets[l.id].reduce((t, s) => t + (parseInt(s.qty, 10) || 0), 0);
   const overLine = (l) => entered(l) > l.ready_qty;
@@ -60,17 +70,15 @@ export default function ClientPutawayPage({ po, lines, slug }) {
       <div className="space-y-4">
         <PageHeader backHref={`/purchase-orders/${slug}`} badge={<Badge status={po.status} />} />
 
-        <div className="grid grid-cols-4 gap-4">
-          <Card title="Supplier"><p className="text-sm font-medium text-gray-800">{po.supplier_name || "—"}</p></Card>
-          <Card title="Ship To"><p className="text-sm font-medium text-gray-800">{po.location_name || "—"}</p></Card>
-          <Card title="Expected"><p className="text-sm font-medium text-gray-800">{po.expected_date ? new Date(po.expected_date).toLocaleDateString() : "—"}</p></Card>
-          <Card title="Summary">
-            <div className="space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Lines</span><span className="font-medium text-gray-800">{lines.length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Units ready for putaway</span><span className="font-medium text-gray-800">{lines.reduce((t, l) => t + l.ready_qty, 0).toLocaleString()}</span></div>
-            </div>
-          </Card>
-        </div>
+        <POInfoCards
+          po={po}
+          lineCount={lines.length}
+          totalUnits={lines.reduce((t, l) => t + (l.order_qty_units ?? 0), 0)}
+          totalCost={lines.reduce((t, l) => t + (parseFloat(l.extended_cost) || 0), 0)}
+          currencyCode={po.currency_code ?? "USD"}
+          defaultCollapsed
+          storageKey="po_action_cards_collapsed"
+        />
 
         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full whitespace-nowrap text-sm">
@@ -95,7 +103,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
                 return (
                   <tr key={line.id} className="border-b border-gray-50 align-top last:border-0 hover:bg-gray-50/50">
                     <td className="px-4 py-3 text-gray-400">{line.line_no ?? idx + 1}</td>
-                    <td className="px-4 py-3 text-gray-600">{line.sku}</td>
+                    <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{line.sku}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{line.display_title}</td>
                     <td className="px-4 py-3 text-gray-700">{line.order_qty_units}</td>
                     <td className="px-4 py-3 text-gray-700">{line.received_qty_units}</td>
@@ -104,7 +112,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
                     <td className="px-2 py-3">
                       <div className="space-y-2">
                         {sets[line.id].map((s, i) => (
-                          <input key={i} type="text" inputMode="numeric" maxLength={10} value={s.bin} disabled={!canPut}
+                          <input key={i} id={`bin-${line.id}-${i}`} onKeyDown={onKey(line.id, i, "bin")} type="text" inputMode="numeric" maxLength={10} value={s.bin} disabled={!canPut}
                             onChange={(e) => setField(line.id, i, "bin", e.target.value)} className={`${inputCls} ${BIN_W}`} aria-label="Bin Location" />
                         ))}
                       </div>
@@ -113,7 +121,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
                       <div className="space-y-2">
                         {sets[line.id].map((s, i) => (
                           <div key={i} className="flex items-center gap-1">
-                            <input type="text" inputMode="numeric" maxLength={5} value={s.qty} disabled={!canPut}
+                            <input id={`qty-${line.id}-${i}`} onKeyDown={onKey(line.id, i, "qty")} type="text" inputMode="numeric" maxLength={5} value={s.qty} disabled={!canPut}
                               onChange={(e) => setField(line.id, i, "qty", e.target.value)}
                               className={`${inputCls} ${QTY_W} ${over ? "border-amber-400 bg-amber-50 text-amber-800" : ""}`} aria-label="Putaway" />
                             {i > 0 && (
@@ -127,7 +135,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
                       {over && <p className="mt-1 text-xs text-amber-700">More than the {line.ready_qty} ready.</p>}
                     </td>
                     <td className="px-4 py-3">
-                      {canPut && <Button variant="secondary" onClick={() => addLocation(line.id)}>Add Location</Button>}
+                      {canPut && <Button variant="secondary" onClick={() => addLocation(line.id)}><span aria-label="Add Location" title="Add Location" className="px-0.5 font-bold">+</span></Button>}
                     </td>
                   </tr>
                 );
