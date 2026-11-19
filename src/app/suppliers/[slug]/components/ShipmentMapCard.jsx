@@ -3,7 +3,7 @@
 // /src/app/suppliers/[slug]/components/ShipmentMapCard.jsx
 // Suppliers -> Shipping tab: maps the columns of this supplier's shipment file to Stock Buddy's fields.
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { Fragment, useState, useEffect, useMemo, useRef } from "react";
 import Button from "@/shared/components/ui/Button";
 import { useToast } from "@/shared/components/ui/Toast";
 import { MAP_GROUPS, MAP_FIELDS, DELIMITERS, parseDelimited, autoMatch } from "@/lib/shipmentMapFields";
@@ -43,15 +43,10 @@ export default function ShipmentMapCard({ supplierId }) {
   const width = rows.reduce((m, r) => Math.max(m, r.length), 0);
   const headers = useMemo(() => Array.from({ length: width }, (_, i) => (cfg?.hasHeader ? (rows[0]?.[i] ?? "").trim() : "") || `Column ${i + 1}`), [rows, width, cfg?.hasHeader]);
   const dataRows = cfg?.hasHeader ? rows.slice(1) : rows;
-  const sample = (i) => dataRows.find((r) => (r[i] ?? "").trim() !== "")?.[i]?.trim() ?? "";
 
   if (!cfg) return null;
   const dirty = JSON.stringify(cfg) !== JSON.stringify(saved);
   const setMap = (id, patch) => setCfg((c) => ({ ...c, map: { ...c.map, [id]: { ...c.map[id], ...patch } } }));
-
-  // Which field each file column feeds (for highlighting the preview)
-  const fieldByCol = {};
-  for (const f of MAP_FIELDS) { const m = cfg.map[f.id]; if (m?.col != null) fieldByCol[m.col] = f.label; }
 
   const has = (id) => cfg.map[id]?.col != null || !!cfg.map[id]?.fixed;
   const missing = MAP_FIELDS.filter((f) => f.required && !has(f.id)).map((f) => f.label);
@@ -120,46 +115,13 @@ export default function ShipmentMapCard({ supplierId }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-        {/* Mapping table */}
-        <div className="space-y-4">
-          {MAP_GROUPS.map((g) => (
-            <div key={g.id}>
-              <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">{g.label}</h4>
-              <div className="overflow-hidden rounded-lg border border-gray-200">
-                {g.fields.map((f, i) => {
-                  const m = cfg.map[f.id];
-                  const mapped = m.col != null;
-                  return (
-                    <div key={f.id} className={`flex items-center gap-3 px-3 py-2 ${i < g.fields.length - 1 ? "border-b border-gray-100" : ""} ${mapped ? "bg-blue-50/40" : ""}`}>
-                      <div className="w-44 shrink-0">
-                        <span className="text-sm text-gray-800">{f.label}</span>
-                        {f.required && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Req</span>}
-                        {f.identifier && <span className="ml-1.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">1+ req</span>}
-                      </div>
-                      <select className={selectCls} value={m.col ?? ""} disabled={headers.length === 0}
-                        onChange={(e) => setMap(f.id, { col: e.target.value === "" ? null : Number(e.target.value) })}>
-                        <option value="">{headers.length === 0 ? "Upload a sample file" : "— not in the file —"}</option>
-                        {headers.map((h, ci) => <option key={ci} value={ci}>{h}{sample(ci) ? `  (e.g. ${sample(ci).slice(0, 18)})` : ""}</option>)}
-                      </select>
-                      {FIXED_OK.has(f.id) && !mapped && (
-                        <input type="text" className="w-28 shrink-0 rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
-                          placeholder="or fixed value" value={m.fixed ?? ""} onChange={(e) => setMap(f.id, { fixed: e.target.value })} />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Sample preview */}
-        <div className="min-w-0">
+      <div className="space-y-5 p-4">
+        {/* Sample file: header and first 3 rows */}
+        <div>
           <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500">Sample file</h4>
           {width === 0 ? (
-            <div className="rounded-lg border border-dashed border-gray-300 px-4 py-10 text-center text-sm text-gray-400">
-              Upload a sample shipment file (CSV) to see its columns here and pick them in the list.
+            <div className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400">
+              Upload a sample shipment file (CSV) to see its columns here and pick them in the list below.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -167,27 +129,64 @@ export default function ShipmentMapCard({ supplierId }) {
                 <thead>
                   <tr>
                     {headers.map((h, i) => (
-                      <th key={i} className={`whitespace-nowrap border-b border-gray-200 px-2 py-1.5 text-left font-semibold ${fieldByCol[i] ? "bg-blue-50 text-blue-800" : "bg-gray-50 text-gray-500"}`}>
-                        {h}
-                        <div className={`font-normal ${fieldByCol[i] ? "text-blue-600" : "text-gray-300"}`}>{fieldByCol[i] ? `→ ${fieldByCol[i]}` : "not used"}</div>
-                      </th>
+                      <th key={i} className="whitespace-nowrap border-b border-gray-200 bg-gray-50 px-3 py-1.5 text-left font-semibold text-gray-600">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {dataRows.slice(0, 6).map((r, ri) => (
+                  {dataRows.slice(0, 3).map((r, ri) => (
                     <tr key={ri} className="border-b border-gray-50 last:border-0">
-                      {headers.map((_, i) => (
-                        <td key={i} className={`whitespace-nowrap px-2 py-1 ${fieldByCol[i] ? "bg-blue-50/40 text-gray-800" : "text-gray-400"}`}>{r[i] ?? ""}</td>
-                      ))}
+                      {headers.map((_, i) => <td key={i} className="whitespace-nowrap px-3 py-1 text-gray-700">{r[i] ?? ""}</td>)}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          {width > 0 && <p className="mt-1.5 text-xs text-gray-400">Showing the first {Math.min(6, dataRows.length)} data rows. Only the first few lines of the sample are kept.</p>}
         </div>
+
+        {/* Mapping: Stock Buddy fields (left) -> fields in the file (right). Nothing here wraps. */}
+        <table className="border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr>
+              <th className="whitespace-nowrap border-b border-gray-300 pb-1.5 pr-14 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Stock Buddy Fields</th>
+              <th className="whitespace-nowrap border-b border-gray-300 pb-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Fields in File</th>
+            </tr>
+          </thead>
+          <tbody>
+            {MAP_GROUPS.map((g) => (
+              <Fragment key={g.id}>
+                <tr><td colSpan={2} className="whitespace-nowrap pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">{g.label}</td></tr>
+                {g.fields.map((f) => {
+                  const m = cfg.map[f.id];
+                  const mapped = m.col != null;
+                  return (
+                    <tr key={f.id}>
+                      <td className="whitespace-nowrap border-b border-gray-100 py-1.5 pr-14 text-gray-800">
+                        {f.label}
+                        {f.required && <span className="ml-2 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Req</span>}
+                        {f.identifier && <span className="ml-2 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">1+ req</span>}
+                      </td>
+                      <td className="whitespace-nowrap border-b border-gray-100 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <select className={`${selectCls} w-80`} value={m.col ?? ""} disabled={headers.length === 0}
+                            onChange={(e) => setMap(f.id, { col: e.target.value === "" ? null : Number(e.target.value) })}>
+                            <option value="">{headers.length === 0 ? "Upload a sample file" : "— not in the file —"}</option>
+                            {headers.map((h, ci) => <option key={ci} value={ci}>{h}</option>)}
+                          </select>
+                          {FIXED_OK.has(f.id) && !mapped && (
+                            <input type="text" className="w-32 rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
+                              placeholder="or fixed value" value={m.fixed ?? ""} onChange={(e) => setMap(f.id, { fixed: e.target.value })} />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
