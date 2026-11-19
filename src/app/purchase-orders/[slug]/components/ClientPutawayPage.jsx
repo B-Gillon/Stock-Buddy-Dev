@@ -8,7 +8,7 @@ import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 
-const inputCls = "rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100";
+const inputCls = "block rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100";
 const BIN_W = "w-28", QTY_W = "w-20";
 const blank = () => ({ bin: "", qty: "" });
 
@@ -72,7 +72,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
           </Card>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
           <table className="w-full whitespace-nowrap text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
