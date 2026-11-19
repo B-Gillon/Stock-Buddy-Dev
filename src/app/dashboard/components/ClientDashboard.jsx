@@ -46,16 +46,17 @@ function LowStockCard({ lowStock, onClick }) {
           <thead>
             <tr className="border-b border-gray-100 text-xs text-gray-400">
               <th className="text-left py-1 font-medium">Variant</th>
-              <th className="text-left py-1 font-medium">SKU</th>
-              <th className="text-left py-1 font-medium">Qty</th>
+              <th className="text-left py-1 pr-2 font-medium">SKU</th>
+              <th className="text-left py-1 pr-3 font-medium">Available</th>
+              <th className="text-left py-1 font-medium">Incoming</th>
             </tr>
           </thead>
           <tbody>
             {lowStock.map((v) => (
               <tr key={v.variant_id} className="border-b border-gray-50 last:border-0" style={{height:"22px"}}>
                 <td className="py-1 pr-3 text-gray-800 truncate max-w-[180px]">{v.title}</td>
-                <td className="py-1 pr-3 text-gray-500 text-xs">{v.sku}</td>
-                <td className="py-1">
+                <td className="py-1 pr-2 text-gray-500 text-xs whitespace-nowrap">{v.sku}</td>
+                <td className="py-1 pr-3">
                   <span className={`font-medium text-xs ${
                     v.available <= 0 ? "text-red-600" :
                     v.available <= 5 ? "text-amber-600" :
@@ -64,6 +65,7 @@ function LowStockCard({ lowStock, onClick }) {
                     {v.available}
                   </span>
                 </td>
+                <td className="py-1 text-xs font-medium text-gray-800">{v.incoming > 0 ? v.incoming.toLocaleString() : "—"}</td>
               </tr>
             ))}
           </tbody>

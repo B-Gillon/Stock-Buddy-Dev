@@ -199,7 +199,7 @@ export default async function DashboardPage() {
 
   return (
     <ClientDashboard
-      lowStock={lowStock}
+      lowStock={lowStock.map((v) => ({ ...v, incoming: incomingByVariant[v.variant_id]?.incoming ?? 0 }))}
       overduePOs={overdueFlat}
       poReport={report}
       totalIncoming={totalIncoming}
