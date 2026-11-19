@@ -169,9 +169,9 @@ export default function ShipmentMapCard({ supplierId }) {
                       </td>
                       <td className="whitespace-nowrap border-b border-gray-100 py-1.5">
                         <div className="flex items-center gap-2">
-                          <select className={`${selectCls} w-80`} value={m.col ?? ""} disabled={headers.length === 0}
+                          <select className={`${selectCls} w-40`} value={m.col ?? ""} disabled={headers.length === 0}
                             onChange={(e) => setMap(f.id, { col: e.target.value === "" ? null : Number(e.target.value) })}>
-                            <option value="">{headers.length === 0 ? "Upload a sample file" : "— not in the file —"}</option>
+                            <option value=""></option>
                             {headers.map((h, ci) => <option key={ci} value={ci}>{h}</option>)}
                           </select>
                           {FIXED_OK.has(f.id) && !mapped && (
