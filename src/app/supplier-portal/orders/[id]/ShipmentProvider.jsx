@@ -41,15 +41,15 @@ function Field({ label, required, children, wide }) {
   );
 }
 
-export function CartonFields({ cfg, f, set, autoSscc }) {
+export function CartonFields({ cfg, f, set, autoSscc, enforce }) {
   const v = (id) => cfg[id].visible; const r = (id) => cfg[id].required;
   const text = (key) => <input className={input} value={f[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {v('supplier_carton_id') && (
         <Field label="SSCC Case Number" required={r('supplier_carton_id')}>
-          <input className={input} inputMode="numeric" maxLength={20} placeholder="20 digits" value={f.supplier_carton_id ?? ''}
-            onChange={(e) => set({ supplier_carton_id: e.target.value.replace(/\D/g, '').slice(0, 20) })} />
+          <input className={input} inputMode={enforce ? 'numeric' : undefined} maxLength={enforce ? 20 : 40} placeholder={enforce ? '20 digits' : undefined} value={f.supplier_carton_id ?? ''}
+            onChange={(e) => set({ supplier_carton_id: enforce ? e.target.value.replace(/\D/g, '').slice(0, 20) : e.target.value.slice(0, 40) })} />
         </Field>
       )}
       {v('sscc') && <Field label="SSCC" required={r('sscc')}><input className={input} inputMode="numeric" placeholder={autoSscc ? 'Assigned when saved' : '18 digits (or 20 with 00)'} disabled={!!autoSscc} value={f.sscc ?? ''} onChange={(e) => set({ sscc: e.target.value })} /></Field>}
@@ -156,9 +156,9 @@ export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
 const labelUrl = (sscc, c) => `/supplier-portal/labels?sscc=${sscc}${c?.f?.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c?.f?.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`;
 // Case label for a carton still being built: prints the 20-digit SSCC Case Number (or the generated SSCC)
 export const BTN_BLUE = 'inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700';
-const hasCaseNo = (c) => /^\d{20}$/.test(c?.f?.supplier_carton_id ?? '');
+const hasCaseNo = (c) => /^[\x20-\x7E]{1,40}$/.test((c?.f?.supplier_carton_id ?? '').trim());
 const caseLabelUrl = (c, n, poId) => hasCaseNo(c)
-  ? `/supplier-portal/labels?code=${c.f.supplier_carton_id}&po=${poId}&n=${n}${c.f.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c.f.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`
+  ? `/supplier-portal/labels?code=${encodeURIComponent(c.f.supplier_carton_id.trim())}&po=${poId}&n=${n}${c.f.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c.f.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`
   : (c?.f?.sscc ? labelUrl(c.f.sscc, c) : null);
 const SSCC_PLACEHOLDER = '000000000000000000';
 
@@ -344,7 +344,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
         {error ? <p className="border-b border-red-100 bg-red-50 px-4 py-2 text-sm text-red-700">{error}</p> : null}
         {creating && (
           <div className="border-b border-gray-200 p-4">
-            <CartonFields autoSscc={labels?.enabled} cfg={config.carton} f={cur.f} set={(patch) => setCur((c) => ({ ...c, f: { ...c.f, ...patch } }))} />
+            <CartonFields autoSscc={labels?.enabled} enforce={config.enforceValidSscc} cfg={config.carton} f={cur.f} set={(patch) => setCur((c) => ({ ...c, f: { ...c.f, ...patch } }))} />
           </div>
         )}
         <table className="w-full text-sm">
@@ -446,7 +446,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
             <div className="border-t border-gray-100 px-4 py-3">
               {editing ? (
                 <div className="space-y-4">
-                  <CartonFields autoSscc={labels?.enabled} cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
+                  <CartonFields autoSscc={labels?.enabled} enforce={config.enforceValidSscc} cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
                   <ItemQtyTable lines={lines} carton={c} idCols={idCols} leftFor={(l) => leftFor(l, c)}
                     onQty={(lineId, v) => patchSaved(i, { q: { ...c.q, [lineId]: v } })} />
                 </div>

@@ -20,7 +20,8 @@ function lotBarcode(lot, exp) {
   catch { return null; }
 }
 // A label's code is the 20-digit SSCC Case Number the supplier typed, or the generated 18-digit SSCC
-const codeOf = (c) => (/^\d{20}$/.test(String(c.supplier_carton_id ?? '')) ? c.supplier_carton_id : c.sscc);
+const PRINTABLE = /^[\x20-\x7E]{1,40}$/;
+const codeOf = (c) => (PRINTABLE.test(String(c.supplier_carton_id ?? '').trim()) ? String(c.supplier_carton_id).trim() : c.sscc);
 // Standard GS1-128 only for a valid SSCC (18 digits, or "00" + 18); anything else prints as plain Code 128
 const asSscc = (code) => (isValidSscc(code) && (code.length === 18 || code.startsWith('00')) ? (code.length === 18 ? code : code.slice(2)) : null);
 const barcode = (code) => {
@@ -52,9 +53,9 @@ export default async function LabelsPage({ searchParams }) {
     labels = [{ code: codeOf(c), cartonNo: c.carton_no, lot: c.lot_number, exp: c.expiration_date, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }];
   } else if (codeParam) {
     // Carton not saved yet: print straight from what the supplier typed
-    if (!/^\d{20}$/.test(String(codeParam)) || !poParam) notFound();
+    if (!PRINTABLE.test(String(codeParam).trim()) || !poParam) notFound();
     const exp = /^\d{4}-\d{2}-\d{2}$/.test(String(expParam ?? '')) ? expParam : null;
-    labels = [{ code: String(codeParam), cartonNo: Math.max(1, parseInt(nParam, 10) || 1), lot: String(lotParam ?? '').slice(0, 40) || null, exp, total: null, poId: String(poParam), shipmentNumber: null }];
+    labels = [{ code: String(codeParam).trim(), cartonNo: Math.max(1, parseInt(nParam, 10) || 1), lot: String(lotParam ?? '').slice(0, 40) || null, exp, total: null, poId: String(poParam), shipmentNumber: null }];
   } else if (ssccParam) {
     const { data: r } = await supabase.from('supplier_ssccs').select('sscc, po_id, carton_no, shipment_id')
       .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).eq('sscc', String(ssccParam)).is('voided_at', null).maybeSingle();

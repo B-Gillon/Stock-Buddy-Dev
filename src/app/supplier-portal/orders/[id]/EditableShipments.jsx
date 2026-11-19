@@ -82,7 +82,7 @@ export default function EditableShipments({ shipments, lines, config, lineColumn
                   </div>
                   {editing && draft && (
                     <div className="space-y-4 border-t border-gray-100 px-3 py-3">
-                      <CartonFields cfg={cartonCfg} f={draft.f} set={(patch) => setDraft((d) => ({ ...d, f: { ...d.f, ...patch } }))} autoSscc={labels?.enabled} />
+                      <CartonFields enforce={config.enforceValidSscc} cfg={cartonCfg} f={draft.f} set={(patch) => setDraft((d) => ({ ...d, f: { ...d.f, ...patch } }))} autoSscc={labels?.enabled} />
                       <ItemQtyTable lines={lines} carton={draft} idCols={idCols}
                         leftFor={(l) => Math.max(0, l.ordered - l.shipped) + savedQty(c, l.id)}
                         onQty={(lineId, v) => setDraft((d) => ({ ...d, q: { ...d.q, [lineId]: v } }))} />

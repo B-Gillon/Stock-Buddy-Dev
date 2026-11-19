@@ -75,13 +75,11 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
     const raw = scanText.trim();
     if (!raw) return;
     setScanText("");
-    const digits = raw.replace(/\D/g, "");
-    const sscc = digits.length === 20 && digits.startsWith("00") ? digits.slice(2) : digits;
-    if (scanned.some((c) => c.sscc === sscc)) { setScanMsg({ ok: false, text: "That carton is already scanned." }); scanRef.current?.focus(); return; }
     try {
       const res = await fetch(`/api/purchase-orders/${po.id}/scan?sscc=${encodeURIComponent(raw)}`);
       const j = await res.json();
       if (j.result !== "ok") { setScanMsg({ ok: false, text: j.message ?? "Could not read that label." }); }
+      else if (scanned.some((c) => c.id === j.carton.id)) { setScanMsg({ ok: false, text: "That carton is already scanned." }); }
       else {
         setScanned((cs) => [...cs, { id: j.carton.id, sscc: j.sscc, cartonNo: j.carton.cartonNo, shipmentNumber: j.carton.shipmentNumber, lines: j.carton.lines }]);
         setQtyInputs((prev) => {

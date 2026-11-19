@@ -15,20 +15,24 @@ export async function GET(request, { params }) {
   try {
     const tenantId = await getTenantId(request);
     const { id: poId } = await params;
-    const rawDigits = String(new URL(request.url).searchParams.get('sscc') ?? '').replace(/\D/g, '');
-    const sscc = normalizeScan(rawDigits);
-    if (sscc.length !== 18 && rawDigits.length !== 20) return NextResponse.json({ result: 'invalid', message: 'That isn’t an 18-digit SSCC or a 20-digit case number.' });
+    const raw = String(new URL(request.url).searchParams.get('sscc') ?? '').trim().slice(0, 60);
+    const digits = raw.replace(/\D/g, '');
+    const sscc = normalizeScan(digits);
+    if (!raw) return NextResponse.json({ result: 'invalid', message: 'Nothing was scanned.' });
 
-    // Generated SSCC (18 digits), or the 20-digit SSCC Case Number the supplier typed in
-    const { data: cartons } = await supabase.from('shipment_cartons')
-      .select('id, carton_no, received_at, shipment:shipments!shipment_id ( po_id, shipment_number )')
-      .eq('tenant_id', tenantId)
-      .or(`sscc.eq.${sscc},supplier_carton_id.eq.${rawDigits}`);
+    // Generated SSCC (18 digits, or "00" + 18 as a scanner reads it) or the SSCC Case Number the supplier typed in (any text)
+    const cols = 'id, carton_no, received_at, shipment:shipments!shipment_id ( po_id, shipment_number )';
+    const idCandidates = [...new Set([raw, digits, `(00)${sscc}`].filter(Boolean))];
+    const [{ data: bySscc }, { data: byId }] = await Promise.all([
+      sscc.length === 18 ? supabase.from('shipment_cartons').select(cols).eq('tenant_id', tenantId).eq('sscc', sscc) : { data: [] },
+      supabase.from('shipment_cartons').select(cols).eq('tenant_id', tenantId).in('supplier_carton_id', idCandidates),
+    ]);
+    const cartons = [...(bySscc ?? []), ...(byId ?? [])].filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i);
     if (!cartons?.length) {
       const { data: old } = await supabase.from('supplier_ssccs').select('id').eq('tenant_id', tenantId).eq('sscc', sscc).not('voided_at', 'is', null).maybeSingle();
       if (old) return NextResponse.json({ result: 'voided', message: 'That label was replaced when the carton was edited. Scan the new label.' });
     }
-    if (!cartons?.length) return NextResponse.json({ result: 'not_found', message: `No carton with SSCC ${sscc} was found.` });
+    if (!cartons?.length) return NextResponse.json({ result: 'not_found', message: `No carton matching ${raw} was found.` });
 
     const mine = cartons.filter((c) => (Array.isArray(c.shipment) ? c.shipment[0] : c.shipment)?.po_id === poId);
     if (!mine.length) return NextResponse.json({ result: 'other_po', message: 'That carton belongs to a different purchase order.' });

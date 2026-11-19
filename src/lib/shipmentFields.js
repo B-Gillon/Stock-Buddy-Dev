@@ -95,7 +95,7 @@ function checkField(def, cfg, get, label, errors) {
       if (blank(v)) { need(!req, 'required.'); return; }
       if (def.kind === 'date') need(isDate(String(v)), 'not a valid date.');
       if (def.kind === 'int') need(/^\d+$/.test(String(v).trim()), 'enter a whole number.');
-      if (def.id === 'supplier_carton_id') need(/^\d{20}$/.test(String(v).trim()), 'enter exactly 20 digits.');
+      if (def.id === 'supplier_carton_id') need(/^[\x20-\x7E]{1,40}$/.test(String(v).trim()), 'up to 40 letters, numbers or symbols.');
       if (def.kind === 'sscc') need(isValidSscc(v), 'enter a valid 18-digit SSCC (its last digit is a check digit). A 20-digit value starting with 00 is also accepted.');
       need(String(v).length <= (def.kind === 'notes' ? 1000 : 100), 'too long.');
     }
@@ -152,8 +152,9 @@ export function validateShipment(config, shipment, cartons) {
     }
     // Supplier set to "Enforce Valid SSCC#s": the 20 digits must be "00" + a real SSCC (valid check digit)
     const cn = String(c.supplier_carton_id ?? '').trim();
-    if (config.enforceValidSscc && config.carton.supplier_carton_id.visible && /^\d{20}$/.test(cn) && !(cn.startsWith('00') && isValidSscc(cn))) {
-      errors.push(`${n}, SSCC Case Number: not a valid SSCC. It must start with 00 and end with a correct GS1 check digit.`);
+    if (config.enforceValidSscc && config.carton.supplier_carton_id.visible && cn) {
+      if (!/^\d{20}$/.test(cn)) errors.push(`${n}, SSCC Case Number: enter exactly 20 digits.`);
+      else if (!(cn.startsWith('00') && isValidSscc(cn))) errors.push(`${n}, SSCC Case Number: not a valid SSCC. It must start with 00 and end with a correct GS1 check digit.`);
     }
   });
   return errors;
