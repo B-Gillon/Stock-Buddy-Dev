@@ -55,13 +55,13 @@ export default function EditableShipments({ shipments, lines, config, lineColumn
       <h2 className="border-b border-gray-200 px-4 py-3 text-sm font-semibold text-gray-800">Shipments</h2>
       {shipments.map((sh) => (
         <div key={sh.id} className="border-b border-gray-100 last:border-0">
-          <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center justify-between py-2.5 pl-4 pr-[29px]">
             <p className="text-sm font-medium text-gray-800">
               {sh.shipment_number}
               <span className="ml-3 text-xs font-normal text-gray-500">Ship date {fmt(sh.ship_date)} · {sh.cartons.length} carton{sh.cartons.length === 1 ? '' : 's'}</span>
             </p>
             {sh.cartons.some((c) => c.sscc || c.supplier_carton_id) && (
-              <a className={BTN_BLUE} href={`/supplier-portal/labels?shipment=${sh.id}`} target="_blank" rel="noopener noreferrer">Print Case Labels</a>
+              <a className={BTN_BLUE} href={`/supplier-portal/labels?shipment=${sh.id}`} target="_blank" rel="noopener noreferrer">Print All Case Labels</a>
             )}
           </div>
           <div className="px-4 pb-3 space-y-2">
