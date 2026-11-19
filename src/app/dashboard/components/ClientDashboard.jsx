@@ -341,16 +341,16 @@ export default function ClientDashboard({
         lastSyncedAt: lastSynced,
       }}
     >
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-[3fr_2fr] gap-4">
         <style>{'.dashboard-table tbody tr { height: 22px !important; } .dashboard-table tbody td { padding-top: 2px !important; padding-bottom: 2px !important; }'}</style>
-        <OverduePOsCard
-          overduePOs={overduePOs}
-          onClick={() => router.push("/purchase-orders?status=overdue")}
-        />
-        <POReportCard poReport={poReport} onNavigate={(href) => router.push(href)} />
         <LowStockCard
           lowStock={lowStock}
           onClick={() => router.push("/inventory")}
+        />
+        <POReportCard poReport={poReport} onNavigate={(href) => router.push(href)} />
+        <OverduePOsCard
+          overduePOs={overduePOs}
+          onClick={() => router.push("/purchase-orders?status=overdue")}
         />
         {/* "Getting Started" card is hidden (not removed): <GettingStartedCard onNavigate={(href) => router.push(href)} /> */}
         <IncomingInventoryCard
