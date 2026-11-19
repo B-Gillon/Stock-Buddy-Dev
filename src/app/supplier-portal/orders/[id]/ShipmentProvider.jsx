@@ -151,7 +151,7 @@ export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
 const labelUrl = (sscc, c) => `/supplier-portal/labels?sscc=${sscc}${c?.f?.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c?.f?.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`;
 const SSCC_PLACEHOLDER = '000000000000000000';
 
-export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels }) {
+export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels, lastCartonNo = 0 }) {
   const router = useRouter();
   const { creating, setCreating } = useContext(Ctx);
   const [saved, setSaved] = useState([]);          // cartons already saved, in order
@@ -162,6 +162,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   const [error, setError] = useState('');
   const [cols, setCols] = useState(lineColumns);
   const [colsOpen, setColsOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);       // Create Shipment list: only unshipped lines by default
   const idCols = LINE_COLUMN_DEFS.filter((c) => cols[c.id] && ['sku','supplier_sku','barcode'].includes(c.id));
   const visible = LINE_COLUMN_DEFS.filter((c) => cols[c.id]).map((c) => c.id);
   const order = creating ? visible.flatMap((id) => (id === 'unit_cost' ? ['ship_qty', 'carton_qty', id] : [id])) : visible;
@@ -188,7 +189,9 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   // What a given carton can still take: remaining, minus what every OTHER carton already holds
   const leftFor = (l, own) => remainingBase(l) - ((thisShipment[l.id] ?? 0) - qtyIn(own, l.id));
 
-  const curNo = saved.length + 1;
+  // Carton numbers run across the whole PO, so the next carton continues after the ones already created
+  const curNo = lastCartonNo + saved.length + 1;
+  const shownLines = creating && !showAll ? lines.filter((l) => remainingBase(l) > 0) : lines;
   const totalUnits = lines.reduce((t, l) => t + (l.ordered ?? 0), 0);
   const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
   const cartonCount = saved.length + (hasQty(cur) ? 1 : 0);
@@ -237,7 +240,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     setEditIdx((e) => (e == null ? null : e === i ? null : e > i ? e - 1 : e));
   }
   function doneEditing(i) {
-    const errs = cartonErrors(saved[i], i + 1);
+    const errs = cartonErrors(saved[i], lastCartonNo + i + 1);
     if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
     setError(''); setEditIdx(null);
   }
@@ -300,9 +303,17 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
           <h2 className="text-sm font-semibold text-gray-800">
-            {creating ? `Create Shipment · Carton ${curNo}` : (<>Line Items<span className="ml-2 text-xs font-normal text-gray-400">({lines.length})</span></>)}
+            {creating ? 'Create Shipment' : 'Line Items'}
           </h2>
           <div className="flex items-center gap-2">
+            {creating && (
+              <div className="flex overflow-hidden rounded border border-gray-300 text-xs" role="group" aria-label="Which line items to show">
+                {[[false, 'Unshipped'], [true, 'All lines']].map(([v, label]) => (
+                  <button key={label} type="button" onClick={() => setShowAll(v)}
+                    className={`px-3 py-1 transition ${showAll === v ? 'bg-gray-200 font-semibold text-gray-900' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>{label}</button>
+                ))}
+              </div>
+            )}
             <div className="relative">
               <button type="button" onClick={() => setColsOpen((o) => !o)}
                 className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">Columns</button>
@@ -343,9 +354,9 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
             </tr>
           </thead>
           <tbody>
-            {lines.length === 0 ? (
-              <tr><td colSpan={order.length} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
-            ) : lines.map((l) => {
+            {shownLines.length === 0 ? (
+              <tr><td colSpan={order.length} className="px-3 py-8 text-center text-gray-400">{lines.length === 0 ? 'No line items on this purchase order.' : 'Every line item is already shipped.'}</td></tr>
+            ) : shownLines.map((l) => {
               const left = leftFor(l, cur);
               const cell = (id) => {
                 switch (id) {
@@ -411,7 +422,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
           <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between px-4 py-3">
               <p className="text-sm font-semibold text-gray-900">
-                Carton {i + 1}
+                Carton {lastCartonNo + i + 1}
                 <span className="ml-3 text-xs font-normal text-gray-500">{units} unit{units === 1 ? '' : 's'}{bits.length ? ` · ${bits.join(' · ')}` : ''}</span>
               </p>
               <div className="flex items-center gap-3 text-sm">

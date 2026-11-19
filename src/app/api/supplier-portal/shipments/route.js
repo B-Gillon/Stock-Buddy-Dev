@@ -39,7 +39,7 @@ export async function POST(request) {
   }
 
   // Field rules from the retailer's settings
-  const config = await loadShipmentConfig(tenantId);
+  const config = await loadShipmentConfig(tenantId, supplierId);
   const sh = body.shipment ?? {};
   const cartonsIn = Array.isArray(body.cartons) ? body.cartons : [];
   const errors = validateShipment(config, sh, cartonsIn);
@@ -102,11 +102,16 @@ export async function POST(request) {
   }
   const rollback = () => supabase.from('shipments').delete().eq('id', created.id);
 
+  // Carton numbers run across the whole PO: the next carton is one past the highest already created
+  const { data: prior } = await supabase.from('shipment_cartons').select('carton_no, shipments!inner(po_id)')
+    .eq('tenant_id', tenantId).eq('shipments.po_id', po.id).order('carton_no', { ascending: false }).limit(1);
+  const cartonBase = prior?.[0]?.carton_no ?? 0;
+
   const cartonRows = cartonsIn.map((c, i) => {
     const hasW = vc.weight.visible && numOrNull(c.weight) != null;
     const hasD = vc.dimensions.visible && numOrNull(c.length) != null;
     return {
-      tenant_id: tenantId, shipment_id: created.id, carton_no: i + 1,
+      tenant_id: tenantId, shipment_id: created.id, carton_no: cartonBase + i + 1,
       supplier_carton_id: vc.supplier_carton_id.visible ? clean(c.supplier_carton_id) : null,
       sscc: (vc.sscc.visible || labels.enabled) && clean(c.sscc) ? normalizeSscc(c.sscc) : null,
       tracking_number: vc.carton_tracking.visible ? clean(c.tracking_number) : null,
@@ -127,7 +132,7 @@ export async function POST(request) {
   cartonsIn.forEach((c, i) => {
     for (const r of c.lines ?? []) {
       const q = Number(r.qty) || 0;
-      if (q > 0) lineRows.push({ tenant_id: tenantId, shipment_id: created.id, carton_id: idByNo.get(i + 1), po_line_id: r.lineId, shipped_qty: q });
+      if (q > 0) lineRows.push({ tenant_id: tenantId, shipment_id: created.id, carton_id: idByNo.get(cartonBase + i + 1), po_line_id: r.lineId, shipped_qty: q });
     }
   });
   const { error: lErr } = await supabase.from('shipment_lines').insert(lineRows);

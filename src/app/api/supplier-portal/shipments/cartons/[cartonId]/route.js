@@ -39,7 +39,7 @@ export async function PATCH(request, { params }) {
   if (po.status === 'cancelled') return bad('This purchase order was cancelled.');
 
   const labels = await loadLabelSettings(tenantId, supplierId);
-  const config = await loadShipmentConfig(tenantId);
+  const config = await loadShipmentConfig(tenantId, supplierId);
   const c = body.carton ?? {};
   const forCheck = { ...c, sscc: labels.enabled ? (carton.sscc || '000000000000000000') : c.sscc };
   const errs = validateShipment(config, { ship_date: '2000-01-01' }, [forCheck]).filter((e) => e.startsWith('Carton 1'));

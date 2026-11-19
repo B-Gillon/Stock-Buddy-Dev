@@ -1,10 +1,14 @@
 // /src/lib/shipmentSettings.js — the retailer's shipment field settings (server only)
 import { supabase } from '@/lib/supabaseClient';
-import { normalizeConfig } from '@/lib/shipmentFields';
+import { normalizeConfig, applySupplierOverrides } from '@/lib/shipmentFields';
 
-export async function loadShipmentConfig(tenantId) {
+// With a supplierId, that supplier's visibility overrides (Suppliers -> Shipping tab) are applied.
+export async function loadShipmentConfig(tenantId, supplierId = null) {
   const { data } = await supabase.from('shipment_field_settings').select('config').eq('tenant_id', tenantId).maybeSingle();
-  return normalizeConfig(data?.config);
+  const config = normalizeConfig(data?.config);
+  if (!supplierId) return config;
+  const { data: sup } = await supabase.from('suppliers').select('shipping_field_overrides').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle();
+  return applySupplierOverrides(config, sup?.shipping_field_overrides);
 }
 
 export async function saveShipmentConfig(tenantId, raw) {

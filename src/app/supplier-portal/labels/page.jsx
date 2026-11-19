@@ -32,7 +32,8 @@ export default async function LabelsPage({ searchParams }) {
     if (!sh) notFound();
     const { data: cartons } = await supabase.from('shipment_cartons').select('carton_no, sscc, lot_number, expiration_date')
       .eq('shipment_id', sh.id).order('carton_no');
-    labels = (cartons ?? []).filter((c) => c.sscc).map((c) => ({ sscc: c.sscc, cartonNo: c.carton_no, lot: c.lot_number, exp: c.expiration_date, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
+    const firstNo = Math.min(...(cartons ?? []).map((c) => c.carton_no));
+    labels = (cartons ?? []).filter((c) => c.sscc).map((c) => ({ sscc: c.sscc, cartonNo: c.carton_no - firstNo + 1, lot: c.lot_number, exp: c.expiration_date, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
   } else if (ssccParam) {
     const { data: r } = await supabase.from('supplier_ssccs').select('sscc, po_id, carton_no, shipment_id')
       .eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).eq('sscc', String(ssccParam)).is('voided_at', null).maybeSingle();
@@ -43,7 +44,12 @@ export default async function LabelsPage({ searchParams }) {
     const { data: saved } = r.shipment_id ? await supabase.from('shipment_cartons').select('lot_number, expiration_date').eq('tenant_id', s.tenantId).eq('sscc', r.sscc).maybeSingle() : { data: null };
     const lot = saved ? saved.lot_number : String(lotParam ?? '').slice(0, 40) || null;
     const exp = saved ? saved.expiration_date : /^\d{4}-\d{2}-\d{2}$/.test(String(expParam ?? '')) ? expParam : null;
-    labels = [{ lot, exp, sscc: r.sscc, cartonNo: r.carton_no, total: sh?.total_cartons ?? null, poId: r.po_id, shipmentNumber: sh?.shipment_number ?? null }];
+    let shownNo = r.carton_no;
+    if (r.shipment_id) {
+      const { data: all } = await supabase.from('shipment_cartons').select('carton_no').eq('shipment_id', r.shipment_id);
+      if (all?.length) shownNo = r.carton_no - Math.min(...all.map((c) => c.carton_no)) + 1; // N of Y counts within the shipment
+    }
+    labels = [{ lot, exp, sscc: r.sscc, cartonNo: shownNo, total: sh?.total_cartons ?? null, poId: r.po_id, shipmentNumber: sh?.shipment_number ?? null }];
   }
   if (!labels.length) notFound();
 

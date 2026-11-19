@@ -10,6 +10,7 @@ import { useToast } from "@/shared/components/ui/Toast";
 import SupplierDeliverySettings from "./SupplierDeliverySettings";
 import AcknowledgementSettings from "./AcknowledgementSettings";
 import CartonLabelSettings from "./CartonLabelSettings";
+import ShippingTab from "./ShippingTab";
 
 // ─── Product column definitions ───────────────────────────────────────────────
 
@@ -888,7 +889,7 @@ function RecipientCard({ record, onUpdate, onRemove }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const DETAIL_TABS = ['General Info', 'Product Data', 'CSV Overrides', 'Transmission'];
+const DETAIL_TABS = ['General Info', 'Product Data', 'CSV Overrides', 'Transmission', 'Shipping'];
 
 export default function ClientSupplierDetailPage({ supplier, products, shopDomain = "" }) {
   const router = useRouter();
@@ -963,6 +964,7 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
       {activeTab === 'CSV Overrides' && (
         <CsvOverridesTab supplierId={supplier.id} />
       )}
+      {activeTab === 'Shipping' && <ShippingTab supplierId={supplier.id} />}
       {activeTab === 'Transmission' && (
         <TransmissionTab supplierId={supplier.id} />
       )}

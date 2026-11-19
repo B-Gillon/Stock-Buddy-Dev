@@ -152,3 +152,25 @@ export function validateShipment(config, shipment, cartons) {
   });
   return errors;
 }
+
+
+// Fields a retailer can switch on/off per supplier (Suppliers -> Shipping tab). Overrides win over the global settings.
+export const SUPPLIER_CONTROLLED_FIELDS = [
+  { section: 'shipment', id: 'tracking_number',     label: 'PRO/Tracking#' },
+  { section: 'shipment', id: 'supplier_reference',  label: 'Supplier Shipment Reference' },
+  { section: 'shipment', id: 'packing_slip_number', label: 'Packing Slip Number' },
+  { section: 'carton',   id: 'supplier_carton_id',  label: 'SSCC Case Number' },
+  { section: 'carton',   id: 'carton_tracking',     label: 'Carton Tracking Number' },
+];
+
+/** Applies one supplier's visibility overrides ({ fieldId: boolean }) on top of the global config. */
+export function applySupplierOverrides(config, overrides) {
+  if (!overrides || typeof overrides !== 'object') return config;
+  const out = { carton: { ...config.carton }, shipment: { ...config.shipment } };
+  for (const f of SUPPLIER_CONTROLLED_FIELDS) {
+    if (typeof overrides[f.id] !== 'boolean') continue;
+    const cur = out[f.section][f.id];
+    out[f.section][f.id] = { visible: overrides[f.id], required: overrides[f.id] ? cur.required : false };
+  }
+  return out;
+}

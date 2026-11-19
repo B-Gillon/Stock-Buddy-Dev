@@ -42,7 +42,7 @@ export default async function OrderPage({ params, searchParams }) {
     .from('purchase_order_lines')
     .select('id, line_no, sku, title, order_qty_units, received_qty_units, unit_cost, extended_cost, supplier_variant_id, variant:variants!variant_id ( display_title, image_src, barcode )')
     .eq('purchase_order_id', po.id).order('line_no', { ascending: true });
-  const shipConfig = await loadShipmentConfig(s.tenantId);
+  const shipConfig = await loadShipmentConfig(s.tenantId, s.supplierId);
   const labelSettings = await loadLabelSettings(s.tenantId, s.supplierId);
   const { data: shipRows } = await supabase.from('shipments')
     .select('id, shipment_number, ship_date, total_cartons, shipment_cartons ( id, carton_no, supplier_carton_id, sscc, tracking_number, weight, weight_unit, length, width, height, dim_unit, pallet_id, lot_number, expiration_date, received_at )')
@@ -138,6 +138,7 @@ export default async function OrderPage({ params, searchParams }) {
           {po.status === 'pending_acknowledgement' ? <AckForm poId={po.id} requestedShipDate={po.expected_ship_date || po.expected_date || ''} /> : null}
 
           <LinesTable
+            lastCartonNo={Math.max(0, ...(shipRows ?? []).flatMap((sh) => (sh.shipment_cartons ?? []).map((c) => c.carton_no)))}
             poId={po.id}
             lines={lines}
             currency={cur}
