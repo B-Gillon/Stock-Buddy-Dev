@@ -8,8 +8,7 @@ import Button from "@/shared/components/ui/Button";
 import { useToast } from "@/shared/components/ui/Toast";
 import { MAP_GROUPS, MAP_FIELDS, DELIMITERS, parseDelimited, autoMatch } from "@/lib/shipmentMapFields";
 
-const selectCls = "w-full rounded border border-gray-200 bg-white px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300";
-const FIXED_OK = new Set(["weight_unit", "dim_unit", "tracking_number", "supplier_reference", "packing_slip_number", "carton_tracking"]);
+const selectCls = "w-full rounded border border-gray-300 bg-gray-100 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300";
 const emptyMap = () => Object.fromEntries(MAP_FIELDS.map((f) => [f.id, { col: null, fixed: null }]));
 const delimChar = (id) => (DELIMITERS.find((d) => d.id === id) ?? DELIMITERS[0]).char;
 
@@ -159,7 +158,6 @@ export default function ShipmentMapCard({ supplierId }) {
                 <tr><td colSpan={2} className="whitespace-nowrap pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">{g.label}</td></tr>
                 {g.fields.map((f) => {
                   const m = cfg.map[f.id];
-                  const mapped = m.col != null;
                   return (
                     <tr key={f.id}>
                       <td className="whitespace-nowrap border-b border-gray-100 py-1.5 pr-14 text-gray-800">
@@ -174,10 +172,6 @@ export default function ShipmentMapCard({ supplierId }) {
                             <option value=""></option>
                             {headers.map((h, ci) => <option key={ci} value={ci}>{h}</option>)}
                           </select>
-                          {FIXED_OK.has(f.id) && !mapped && (
-                            <input type="text" className="w-32 rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none"
-                              placeholder="or fixed value" value={m.fixed ?? ""} onChange={(e) => setMap(f.id, { fixed: e.target.value })} />
-                          )}
                         </div>
                       </td>
                     </tr>
