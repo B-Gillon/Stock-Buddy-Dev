@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useToast } from "@/shared/components/ui/Toast";
 import Button from "@/shared/components/ui/Button";
 import SftpShipmentsCard from "./SftpShipmentsCard";
+import ShipmentMapCard from "./ShipmentMapCard";
 
 export default function ShippingTab({ supplierId }) {
   const { showToast } = useToast();
@@ -60,9 +61,12 @@ export default function ShippingTab({ supplierId }) {
     </div>
   );
   return (
-    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-      {controls}
-      <SftpShipmentsCard supplierId={supplierId} />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+        {controls}
+        <SftpShipmentsCard supplierId={supplierId} />
+      </div>
+      <ShipmentMapCard supplierId={supplierId} />
     </div>
   );
 }
