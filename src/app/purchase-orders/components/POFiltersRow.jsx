@@ -8,15 +8,19 @@ const STATUS_OPTIONS = [
   { value: 'draft',                   label: 'Draft' },
   { value: 'pending_acknowledgement', label: 'Pending Acknowledgement' },
   { value: 'waiting_to_ship',         label: 'Waiting to Ship' },
-  { value: 'partially_shipped',       label: 'Partially Shipped' },
   { value: 'shipped',                 label: 'Shipped' },
-  { value: 'partially_received',      label: 'Partially Received' },
   { value: 'received',                label: 'Received' },
   { value: 'overdue',                 label: 'Overdue' },
-  { value: 'ship_this_week',          label: 'Due to Ship This Week' },
   { value: 'in_transit',              label: 'In Transit' },
-  { value: 'ship_later',              label: 'Due to Ship After This Week' },
   { value: 'cancelled',               label: 'Cancelled' },
+];
+
+// Not in the dropdown, but the dashboard report links to them: shown only while active
+const LINK_ONLY_OPTIONS = [
+  { value: 'partially_shipped', label: 'Partially Shipped' },
+  { value: 'partially_received', label: 'Partially Received' },
+  { value: 'ship_this_week', label: 'Due to Ship This Week' },
+  { value: 'ship_later', label: 'Due to Ship After This Week' },
 ];
 
 export default function POFiltersRow({ suppliers, locations, currentFilters }) {
@@ -86,7 +90,7 @@ export default function POFiltersRow({ suppliers, locations, currentFilters }) {
         onChange={(e) => { setStatus(e.target.value); applyFilters({ status: e.target.value }); }}
         className="px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
       >
-        {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        {[...STATUS_OPTIONS, ...LINK_ONLY_OPTIONS.filter((o) => o.value === status)].map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
 
       {/* Supplier */}

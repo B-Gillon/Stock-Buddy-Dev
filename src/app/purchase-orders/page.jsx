@@ -52,6 +52,10 @@ export default async function Page({ searchParams }) {
     query = query
       .in('status', NOT_FULLY_SHIPPED_STATUSES)
       .or(`expected_date.is.null,expected_date.gte.${today}`);
+  } else if (status === 'shipped') {
+    query = query.in('status', ['shipped', 'partially_shipped']);
+  } else if (status === 'received') {
+    query = query.in('status', ['received', 'partially_received']);
   } else if (status) {
     query = query.eq('status', status);
   } else {
