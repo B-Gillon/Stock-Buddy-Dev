@@ -113,7 +113,9 @@ export async function PATCH(request, { params }) {
     await supabase.from('purchase_orders').update({ status: fully ? 'shipped' : 'partially_shipped' }).eq('id', po.id).in('status', ['shipped', 'partially_shipped']);
   }
 
-  await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: userLabel(user),
+  const { data: poNow } = await supabase.from('purchase_orders').select('status').eq('id', po.id).single();
+  const poStatusNow = poNow?.status;
+  await logPOActivity({ poId: po.id, tenantId, action: poStatusNow === 'shipped' ? 'shipped' : 'partially_shipped', userName: userLabel(user),
     comments: `Shipment ${shipment.shipment_number} carton ${carton.carton_no} edited${ssccChanged ? ' (new SSCC issued)' : ''}` });
   return NextResponse.json({ ok: true, sscc, ssccChanged });
 }

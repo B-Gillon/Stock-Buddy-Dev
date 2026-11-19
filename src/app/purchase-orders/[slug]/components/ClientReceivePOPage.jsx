@@ -109,7 +109,10 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
 
   const handleQtyChange = (lineId, value) => {
     if (value === "" || /^\d+$/.test(value)) {
-      setQtyInputs((prev) => ({ ...prev, [lineId]: value }));
+      // Can't enter more than what is shipped and not yet received
+      const max = lines.find((l) => l.id === lineId)?.receivable_qty ?? 0;
+      const capped = value !== "" && parseInt(value, 10) > max ? (max > 0 ? String(max) : "") : value;
+      setQtyInputs((prev) => ({ ...prev, [lineId]: capped }));
     }
   };
 
@@ -236,7 +239,9 @@ export default function ClientReceivePOPage({ po, lines, slug }) {
                           value={qtyInputs[line.id]}
                           onChange={(e) => handleQtyChange(line.id, e.target.value)}
                           placeholder=""
-                          className={`w-20 rounded-lg border px-3 py-1.5 text-left text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          disabled={line.receivable_qty <= 0}
+                          title={line.receivable_qty <= 0 ? "Nothing shipped and not yet received on this line" : `Up to ${line.receivable_qty}`}
+                          className={`w-20 disabled:cursor-not-allowed disabled:bg-gray-100 rounded-lg border px-3 py-1.5 text-left text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                             isOverReceiving
                               ? "border-amber-400 bg-amber-50 text-amber-800"
                               : "border-gray-200 bg-white text-gray-900"

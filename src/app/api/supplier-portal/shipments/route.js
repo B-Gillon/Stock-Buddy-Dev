@@ -143,7 +143,7 @@ export async function POST(request) {
   await markRetrieved({ poId: po.id, tenantId, supplierId, by: userLabel(user), method: 'shipment' });
 
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
-  await logPOActivity({ poId: po.id, tenantId, action: 'shipped', userName: userLabel(user),
+  await logPOActivity({ poId: po.id, tenantId, action: fullyShipped ? 'shipped' : 'partially_shipped', userName: userLabel(user),
     comments: `Shipment ${number}` });
   return NextResponse.json({ ok: true, shipmentNumber: number, shipmentId: created.id });
 }
