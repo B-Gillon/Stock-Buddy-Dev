@@ -6,6 +6,7 @@ import { SENT_STATUSES } from '@/lib/poStatus';
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppLayout from "@/shared/components/layout/AppLayout";
+import ConfirmModal from "@/shared/components/modals/ConfirmModal";
 import Button from "@/shared/components/ui/Button";
 import Badge from "@/shared/components/ui/Badge";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
@@ -247,13 +248,13 @@ export default function PurchaseOrderCreatePage({
     isDirtyRef.current = isDirty;
   }, [isDirty]);
 
-  // One prompt at a time, so a re-fired click can't stack a second popup
-  const confirmingRef = useRef(false);
+  // In-app "leave without saving?" box. pendingLeave = { href } (link click) or { back: true } (Cancel button)
+  const [pendingLeave, setPendingLeave] = useState(null);
   function confirmLeave() {
-    if (confirmingRef.current) return false;
-    confirmingRef.current = true;
-    try { return window.confirm("Are you sure you want to exit the process without saving?"); }
-    finally { setTimeout(() => { confirmingRef.current = false; }, 300); }
+    const target = pendingLeave;
+    setPendingLeave(null);
+    isDirtyRef.current = false; // confirmed: no second prompt from the unload/click guards
+    if (target?.href) router.push(target.href); else router.back();
   }
 
   useEffect(() => {
@@ -267,10 +268,7 @@ export default function PurchaseOrderCreatePage({
       const href = anchor.getAttribute('href');
       if (!href || href.startsWith('#')) return;
       e.preventDefault();
-      if (confirmLeave()) {
-        isDirtyRef.current = false; // already confirmed: don't ask again when the navigation re-fires
-        router.push(href);
-      }
+      setPendingLeave({ href });
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('click', handleClick, true);
@@ -312,8 +310,7 @@ export default function PurchaseOrderCreatePage({
   }, []);
 
   function handleCancel() {
-    if (isDirtyRef.current && !confirmLeave()) return;
-    isDirtyRef.current = false; // confirmed: no second prompt from the unload/click guards
+    if (isDirtyRef.current) { setPendingLeave({ back: true }); return; }
     router.back();
   }
 
@@ -432,6 +429,12 @@ export default function PurchaseOrderCreatePage({
 
   return (
     <AppLayout title={editMode ? "Edit Purchase Order" : "New Purchase Order"} showActionBar={false} bareLayout={true}>
+      <ConfirmModal
+        open={!!pendingLeave}
+        message="Are you sure you want to exit the process without saving?"
+        onConfirm={confirmLeave}
+        onCancel={() => setPendingLeave(null)}
+      />
 
       <div className="space-y-4">
 
