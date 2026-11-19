@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { validateShipment } from '@/lib/shipmentFields';
 import { LINE_COLUMN_DEFS } from '@/lib/supplierColumns';
-import { CartonFields, ItemQtyTable, BTN_BLUE } from './ShipmentProvider';
+import { CartonFields, ItemQtyTable, BTN_BLUE, useLastShipmentId } from './ShipmentProvider';
 
 const btn = 'inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50';
 const fmt = (v) => { if (!v) return '—'; const [y, m, d] = String(v).slice(0, 10).split('-'); return `${m}/${d}/${y}`; };
@@ -20,7 +20,10 @@ const toDraft = (c, cartonLines) => ({
   q: Object.fromEntries(cartonLines.map((l) => [l.po_line_id, String(l.shipped_qty)])),
 });
 
-export default function EditableShipments({ shipments, lines, config, lineColumns, labels }) {
+export default function EditableShipments({ shipments: allShipments, lines, config, lineColumns, labels }) {
+  // Right after Save Shipment, show only the shipment just created (a page reload lists them all again)
+  const lastId = useLastShipmentId();
+  const shipments = lastId && allShipments.some((s) => s.id === lastId) ? allShipments.filter((s) => s.id === lastId) : allShipments;
   const cartonCfg = config.carton;
   const router = useRouter();
   const [editId, setEditId] = useState(null);

@@ -14,7 +14,12 @@ const Ctx = createContext(null);
 
 export function ShipmentProvider({ children }) {
   const [creating, setCreating] = useState(false);
-  return <Ctx.Provider value={{ creating, setCreating }}>{children}</Ctx.Provider>;
+  const [lastShipmentId, setLastShipmentId] = useState(null); // after Save Shipment, the Shipments card shows only this one
+  return <Ctx.Provider value={{ creating, setCreating, lastShipmentId, setLastShipmentId }}>{children}</Ctx.Provider>;
+}
+
+export function useLastShipmentId() {
+  return useContext(Ctx).lastShipmentId;
 }
 
 export function HideWhileCreating({ children }) {
@@ -164,7 +169,7 @@ const SSCC_PLACEHOLDER = '000000000000000000';
 
 export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels }) {
   const router = useRouter();
-  const { creating, setCreating } = useContext(Ctx);
+  const { creating, setCreating, setLastShipmentId } = useContext(Ctx);
   const [saved, setSaved] = useState([]);          // cartons already saved, in order
   const [cur, setCur] = useState(blankCarton());   // the carton being filled in
   const [editIdx, setEditIdx] = useState(null);    // a saved carton open for editing
@@ -287,6 +292,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) { w?.close(); setError(data.error || 'Something went wrong.'); setBusy(false); return; }
       if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc, cartons[cartons.length - 1]);
+      setLastShipmentId(data.shipmentId);
       cancel(); setBusy(false); router.refresh();
     } catch (e) { w?.close(); setError(e?.message || 'Something went wrong.'); setBusy(false); }
   }
