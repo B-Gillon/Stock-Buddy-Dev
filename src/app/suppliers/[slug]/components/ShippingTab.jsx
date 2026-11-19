@@ -38,11 +38,11 @@ export default function ShippingTab({ supplierId }) {
   if (!fields) return null;
   const controls = (
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-800">Manual Shipping Controls</h3>
+      <h3 className="text-sm font-semibold text-gray-800">Shipping Controls</h3>
       <p className="mt-0.5 text-xs text-gray-500">
         Choose which of these fields this supplier sees when they create a shipment. Unchecked fields are hidden from the supplier and are not required.
       </p>
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-0.5">
         {fields.map((f) => (
           <label key={f.id} className="flex items-center gap-2 text-sm text-gray-800">
             <input type="checkbox" checked={f.visible} onChange={() => toggle(f.id)} />
@@ -50,15 +50,10 @@ export default function ShippingTab({ supplierId }) {
           </label>
         ))}
       </div>
-      <div className="mt-5 border-t border-gray-100 pt-4">
-        <label className="flex items-center gap-2 text-sm text-gray-800">
-          <input type="checkbox" checked={enforce} onChange={() => { setEnforce((v) => !v); setDirty(true); }} />
-          Enforce Valid SSCC#s
-        </label>
-        <p className="mt-1 text-xs text-gray-500">
-          When checked, an SSCC Case Number must start with 00 and have a correct GS1 check digit. Labels for valid numbers print as standard GS1-128 SSCC barcodes; anything else prints as a plain Code 128 barcode.
-        </p>
-      </div>
+      <label className="mt-0.5 flex items-center gap-2 text-sm text-gray-800">
+        <input type="checkbox" checked={enforce} onChange={() => { setEnforce((v) => !v); setDirty(true); }} />
+        Enforce Valid SSCC#s
+      </label>
       <div className="mt-4">
         <Button onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
       </div>

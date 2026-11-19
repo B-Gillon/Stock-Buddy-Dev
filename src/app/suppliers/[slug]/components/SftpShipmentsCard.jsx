@@ -96,7 +96,7 @@ export default function SftpShipmentsCard({ supplierId }) {
   return (
     <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="flex items-start justify-between px-4 pt-3 pb-1">
-        <h3 className="text-sm font-semibold text-gray-800">SFTP Shipments</h3>
+        <h3 className="text-sm font-semibold text-gray-800">SFTP Configuration</h3>
         <div className="ml-4 flex shrink-0 items-center gap-3">
           <label className={`flex items-center gap-2 text-xs font-medium text-gray-600 ${edit ? "" : "opacity-60"}`}>
             <input type="checkbox" checked={form.sftp_enabled} disabled={!edit}
