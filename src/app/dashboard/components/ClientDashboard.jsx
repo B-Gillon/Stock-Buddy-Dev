@@ -240,8 +240,8 @@ function ReportDonut({ poReport, onNavigate, rows = REPORT_ROWS }) {
 }
 
 // onNavigate is optional (no clicking when omitted); hide lists row keys to leave out (e.g. the supplier dashboard has no drafts)
-export function POReportCard({ poReport, onNavigate, hide = [] }) {
-  const rows = REPORT_ROWS.filter((r) => !hide.includes(r.key));
+export function POReportCard({ poReport, onNavigate, hide = [], labels = {} }) {
+  const rows = REPORT_ROWS.filter((r) => !hide.includes(r.key)).map((r) => (labels[r.key] ? { ...r, label: labels[r.key] } : r));
   return (
     <DashCard title="Purchase Order Report">
       <div className="flex items-center gap-5">

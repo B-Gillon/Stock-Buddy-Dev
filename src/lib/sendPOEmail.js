@@ -98,7 +98,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   const hasEmailTarget = !!hasRecipients;
 
   if (!hasEmailTarget && !sftpReady) {
-    return { success: false, error: 'No email recipients or SFTP delivery are set up for this supplier (Transmission tab)' };
+    return { success: false, error: 'No email recipients or SFTP delivery are set up for this supplier (Print/Export tab)' };
   }
 
   // ── For cancellation emails, send a plain text notice (no attachments) ─────
@@ -272,7 +272,7 @@ export async function sendPOEmail(poId, { isResend = false, isCancellation = fal
   const subject  = isResend
     ? `Purchase Order ${po.po_number} (Revised)`
     : `Purchase Order ${po.po_number}`;
-  // ── Acknowledgement (set per supplier on the Transmission tab) ─────────────
+  // ── Acknowledgement (set per supplier on the Print/Export tab) ─────────────
   // Only applies to emailed POs; SFTP-only suppliers have no one to send a link to.
   let ack = null;
   if (transmission.ack_required && hasRecipients) {

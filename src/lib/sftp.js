@@ -33,7 +33,7 @@ const remotePath = (dir, name) => (dir === '/' ? `/${name}` : dir ? `${dir}/${na
 function friendlyError(err, pinned, detail = {}) {
   const msg = String(err?.message ?? err);
   if (pinned && /host denied|verification failed|handshake failed/i.test(msg)) {
-    return "The SFTP server's host key has changed since it was first trusted. If that is expected, use 'Reset host key' in the supplier's Transmission settings.";
+    return "The SFTP server's host key has changed since it was first trusted. If that is expected, use 'Reset host key' in the supplier's Print/Export settings.";
   }
   if (/authentication|all configured authentication methods failed/i.test(msg)) {
     const extra = [];
@@ -92,7 +92,7 @@ async function withSftp(settings, fn) {
   try {
     if (!pinned && seen && settings.supplier_id) {
       await supabase
-        .from('supplier_transmission_settings')
+        .from(settings.fingerprint_table || 'supplier_transmission_settings')
         .update({ sftp_host_fingerprint: seen })
         .eq('supplier_id', settings.supplier_id);
     }
@@ -121,6 +121,17 @@ export async function testSftpConnection(settings) {
         message: kind === 'd' ? 'Found' : kind ? 'Exists but is not a folder' : 'Folder not found',
       });
     }
+    return { ok: checks.every((c) => c.ok), fingerprint, checks };
+  });
+}
+
+/** Tests the SFTP Shipments settings: logs in and checks that the shipment folder exists. */
+export async function testSftpShipments(settings) {
+  return withSftp({ ...settings, fingerprint_table: 'supplier_shipment_sftp_settings' }, async (client, fingerprint) => {
+    const dir = cleanRemoteDir(settings.sftp_folder) || '.';
+    const kind = await client.exists(dir);
+    const checks = [{ label: 'Shipment folder', path: dir, ok: kind === 'd',
+      message: kind === 'd' ? 'Found' : kind ? 'Exists but is not a folder' : 'Folder not found' }];
     return { ok: checks.every((c) => c.ok), fingerprint, checks };
   });
 }

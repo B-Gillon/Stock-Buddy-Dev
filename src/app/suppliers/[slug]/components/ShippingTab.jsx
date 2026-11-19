@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/shared/components/ui/Toast";
 import Button from "@/shared/components/ui/Button";
+import SftpShipmentsCard from "./SftpShipmentsCard";
 
 export default function ShippingTab({ supplierId }) {
   const { showToast } = useToast();
@@ -35,8 +36,8 @@ export default function ShippingTab({ supplierId }) {
   }
 
   if (!fields) return null;
-  return (
-    <div className="max-w-2xl rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+  const controls = (
+    <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-800">Manual Shipping Controls</h3>
       <p className="mt-0.5 text-xs text-gray-500">
         Choose which of these fields this supplier sees when they create a shipment. Unchecked fields are hidden from the supplier and are not required.
@@ -61,6 +62,12 @@ export default function ShippingTab({ supplierId }) {
       <div className="mt-4">
         <Button onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
       </div>
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      {controls}
+      <SftpShipmentsCard supplierId={supplierId} />
     </div>
   );
 }

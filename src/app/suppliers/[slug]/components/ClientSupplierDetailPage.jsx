@@ -641,7 +641,7 @@ function CsvOverridesTab({ supplierId }) {
   );
 }
 
-// ─── Tab: Transmission ────────────────────────────────────────────────────────
+// ─── Tab: Print/Export (formerly Transmission) ────────────────────────────────────────────────────────
 
 const newRecord = () => ({
   _key:       crypto.randomUUID(),
@@ -889,7 +889,8 @@ function RecipientCard({ record, onUpdate, onRemove }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const DETAIL_TABS = ['General Info', 'Product Data', 'CSV Overrides', 'Transmission', 'Shipping'];
+const DETAIL_TABS = ['General Info', 'Product Data', 'Print/Export', 'Shipping'];
+const TAB_ALIASES = { Transmission: 'Print/Export', 'CSV Overrides': 'Print/Export' }; // old names, for saved links
 
 export default function ClientSupplierDetailPage({ supplier, products, shopDomain = "" }) {
   const router = useRouter();
@@ -898,7 +899,7 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const tab = params.get("tab");
+      const tab = TAB_ALIASES[params.get("tab")] ?? params.get("tab");
       return DETAIL_TABS.includes(tab) ? tab : "General Info";
     }
     return "General Info";
@@ -961,12 +962,12 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
           shopDomain={shopDomain}
         />
       )}
-      {activeTab === 'CSV Overrides' && (
-        <CsvOverridesTab supplierId={supplier.id} />
-      )}
       {activeTab === 'Shipping' && <ShippingTab supplierId={supplier.id} />}
-      {activeTab === 'Transmission' && (
-        <TransmissionTab supplierId={supplier.id} />
+      {activeTab === 'Print/Export' && (
+        <div className="space-y-4">
+          <TransmissionTab supplierId={supplier.id} />
+          <CsvOverridesTab supplierId={supplier.id} />
+        </div>
       )}
 
       <Toast message={toast} />
