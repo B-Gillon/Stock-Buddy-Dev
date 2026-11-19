@@ -7,8 +7,8 @@ export async function loadShipmentConfig(tenantId, supplierId = null) {
   const { data } = await supabase.from('shipment_field_settings').select('config').eq('tenant_id', tenantId).maybeSingle();
   const config = normalizeConfig(data?.config);
   if (!supplierId) return config;
-  const { data: sup } = await supabase.from('suppliers').select('shipping_field_overrides').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle();
-  return applySupplierOverrides(config, sup?.shipping_field_overrides);
+  const { data: sup } = await supabase.from('suppliers').select('shipping_field_overrides, enforce_valid_sscc').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle();
+  return applySupplierOverrides(config, sup?.shipping_field_overrides, sup?.enforce_valid_sscc);
 }
 
 export async function saveShipmentConfig(tenantId, raw) {

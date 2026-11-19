@@ -7,11 +7,12 @@ import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { SUPPLIER_CONTROLLED_FIELDS } from '@/lib/shipmentFields';
 
 async function state(tenantId, id) {
-  const { data } = await supabase.from('suppliers').select('shipping_field_overrides').eq('id', id).eq('tenant_id', tenantId).maybeSingle();
+  const { data } = await supabase.from('suppliers').select('shipping_field_overrides, enforce_valid_sscc').eq('id', id).eq('tenant_id', tenantId).maybeSingle();
   if (!data) return null;
   const global = await loadShipmentConfig(tenantId); // retailer-wide settings
   const overrides = data.shipping_field_overrides ?? {};
   return {
+    enforceValidSscc: !!data.enforce_valid_sscc,
     fields: SUPPLIER_CONTROLLED_FIELDS.map((f) => ({
       id: f.id, label: f.label,
       visible: typeof overrides[f.id] === 'boolean' ? overrides[f.id] : !!global[f.section][f.id].visible,
@@ -47,7 +48,7 @@ export async function POST(request, { params }) {
       const want = body?.visible?.[f.id];
       if (typeof want === 'boolean' && want !== !!global[f.section][f.id].visible) overrides[f.id] = want;
     }
-    const { data, error } = await supabase.from('suppliers').update({ shipping_field_overrides: overrides })
+    const { data, error } = await supabase.from('suppliers').update({ shipping_field_overrides: overrides, enforce_valid_sscc: !!body?.enforceValidSscc })
       .eq('id', id).eq('tenant_id', tenantId).select('id').maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });

@@ -4,7 +4,7 @@ import bwipjs from 'bwip-js';
 import { supabase } from '@/lib/supabaseClient';
 import { requireSupplier } from '@/lib/supplierPortal';
 import PrintNow from './PrintNow';
-import { LOT_RE } from '@/lib/shipmentFields';
+import { LOT_RE, isValidSscc } from '@/lib/shipmentFields';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Carton Labels – Stock Buddy', robots: { index: false, follow: false } };
@@ -21,12 +21,15 @@ function lotBarcode(lot, exp) {
 }
 // A label's code is the 20-digit SSCC Case Number the supplier typed, or the generated 18-digit SSCC
 const codeOf = (c) => (/^\d{20}$/.test(String(c.supplier_carton_id ?? '')) ? c.supplier_carton_id : c.sscc);
+// Standard GS1-128 only for a valid SSCC (18 digits, or "00" + 18); anything else prints as plain Code 128
+const asSscc = (code) => (isValidSscc(code) && (code.length === 18 || code.startsWith('00')) ? (code.length === 18 ? code : code.slice(2)) : null);
 const barcode = (code) => {
-  if (code.length === 18) return bwipjs.toSVG({ bcid: 'gs1-128', text: `(00)${code}`, scale: 3, height: 22, includetext: false });
-  if (code.startsWith('00')) return bwipjs.toSVG({ bcid: 'gs1-128', text: `(00)${code.slice(2)}`, scale: 3, height: 22, includetext: false });
-  return bwipjs.toSVG({ bcid: 'code128', text: code, scale: 3, height: 22, includetext: false });
+  const s = asSscc(code);
+  return s
+    ? bwipjs.toSVG({ bcid: 'gs1-128', text: `(00)${s}`, scale: 3, height: 22, includetext: false })
+    : bwipjs.toSVG({ bcid: 'code128', text: code, scale: 3, height: 22, includetext: false });
 };
-const codeText = (code) => (code.length === 18 ? `(00) ${fmt(code)}` : code.startsWith('00') ? `(00) ${fmt(code.slice(2))}` : code);
+const codeText = (code) => { const s = asSscc(code); return s ? `(00) ${fmt(s)}` : code; };
 
 export default async function LabelsPage({ searchParams }) {
   const s = await requireSupplier();
@@ -129,7 +132,7 @@ export default async function LabelsPage({ searchParams }) {
                   </div>
                 )}
                 <div className={`bar${lb ? ' small' : ''}`} style={lb ? { marginTop: 6 } : undefined}>
-            <h4 style={{ textAlign: 'left' }}>{l.code.length === 18 ? 'SSCC' : 'SSCC Case Number'}</h4>
+            <h4 style={{ textAlign: 'left' }}>{asSscc(l.code) ? 'SSCC' : 'SSCC Case Number'}</h4>
             <div dangerouslySetInnerHTML={{ __html: barcode(l.code) }} />
             <div className="num">{codeText(l.code)}</div>
                 </div>

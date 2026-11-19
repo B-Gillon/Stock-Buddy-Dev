@@ -7,12 +7,13 @@ import Button from "@/shared/components/ui/Button";
 export default function ShippingTab({ supplierId }) {
   const { showToast } = useToast();
   const [fields, setFields] = useState(null);
+  const [enforce, setEnforce] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     let live = true;
-    fetch(`/api/suppliers/${supplierId}/shipping-fields`).then((r) => r.json()).then((j) => { if (live && j.fields) setFields(j.fields); }).catch(() => {});
+    fetch(`/api/suppliers/${supplierId}/shipping-fields`).then((r) => r.json()).then((j) => { if (live && j.fields) { setFields(j.fields); setEnforce(!!j.enforceValidSscc); } }).catch(() => {});
     return () => { live = false; };
   }, [supplierId]);
 
@@ -25,10 +26,10 @@ export default function ShippingTab({ supplierId }) {
     setSaving(true);
     try {
       const visible = Object.fromEntries(fields.map((f) => [f.id, f.visible]));
-      const res = await fetch(`/api/suppliers/${supplierId}/shipping-fields`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ visible }) });
+      const res = await fetch(`/api/suppliers/${supplierId}/shipping-fields`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ visible, enforceValidSscc: enforce }) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "Save failed");
-      setFields(j.fields); setDirty(false);
+      setFields(j.fields); setEnforce(!!j.enforceValidSscc); setDirty(false);
       showToast("Shipping settings saved.", "success");
     } catch (err) { showToast(err.message, "error"); } finally { setSaving(false); }
   }
@@ -47,6 +48,15 @@ export default function ShippingTab({ supplierId }) {
             {f.label}
           </label>
         ))}
+      </div>
+      <div className="mt-5 border-t border-gray-100 pt-4">
+        <label className="flex items-center gap-2 text-sm text-gray-800">
+          <input type="checkbox" checked={enforce} onChange={() => { setEnforce((v) => !v); setDirty(true); }} />
+          Enforce Valid SSCC#s
+        </label>
+        <p className="mt-1 text-xs text-gray-500">
+          When checked, an SSCC Case Number must start with 00 and have a correct GS1 check digit. Labels for valid numbers print as standard GS1-128 SSCC barcodes; anything else prints as a plain Code 128 barcode.
+        </p>
       </div>
       <div className="mt-4">
         <Button onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>

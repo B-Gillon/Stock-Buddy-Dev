@@ -150,6 +150,11 @@ export function validateShipment(config, shipment, cartons) {
       const g = cget[def.id]();
       checkField(def, config.carton[def.id], (k) => g[k], `${n}, ${def.label.replace(/ \(with unit\)/, '').replace(/:.*/, '')}`, errors);
     }
+    // Supplier set to "Enforce Valid SSCC#s": the 20 digits must be "00" + a real SSCC (valid check digit)
+    const cn = String(c.supplier_carton_id ?? '').trim();
+    if (config.enforceValidSscc && config.carton.supplier_carton_id.visible && /^\d{20}$/.test(cn) && !(cn.startsWith('00') && isValidSscc(cn))) {
+      errors.push(`${n}, SSCC Case Number: not a valid SSCC. It must start with 00 and end with a correct GS1 check digit.`);
+    }
   });
   return errors;
 }
@@ -165,9 +170,9 @@ export const SUPPLIER_CONTROLLED_FIELDS = [
 ];
 
 /** Applies one supplier's visibility overrides ({ fieldId: boolean }) on top of the global config. */
-export function applySupplierOverrides(config, overrides) {
-  if (!overrides || typeof overrides !== 'object') return config;
-  const out = { carton: { ...config.carton }, shipment: { ...config.shipment } };
+export function applySupplierOverrides(config, overrides, enforceValidSscc = false) {
+  const out = { carton: { ...config.carton }, shipment: { ...config.shipment }, enforceValidSscc: !!enforceValidSscc };
+  if (!overrides || typeof overrides !== 'object') return out;
   for (const f of SUPPLIER_CONTROLLED_FIELDS) {
     if (typeof overrides[f.id] !== 'boolean') continue;
     const cur = out[f.section][f.id];
