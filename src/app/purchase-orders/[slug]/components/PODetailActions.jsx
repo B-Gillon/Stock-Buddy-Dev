@@ -88,7 +88,7 @@ function CancelConfirmModal({ isOpen, onClose, onConfirm, po, isCancelling }) {
   );
 }
 
-export default function PODetailActions({ po, slug, view = "details" }) {
+export default function PODetailActions({ po, slug, view = "details", hasReceivable = true, hasPutaway = false }) {
   const router = useRouter();
   const { toast, showToast } = useToast();
   const [showReleaseModal, setShowReleaseModal] = useState(false);
@@ -146,7 +146,8 @@ export default function PODetailActions({ po, slug, view = "details" }) {
   };
 
   const canRelease = po.status === "draft";
-  const canReceive = RECEIVABLE_STATUSES.includes(po.status);
+  const canReceive = RECEIVABLE_STATUSES.includes(po.status) && hasReceivable;
+  const canPutaway = hasPutaway && po.status !== "cancelled";
   const canResend  = RESENDABLE_STATUSES.includes(po.status);
   const canEdit    = po.status !== "cancelled";
   const canCancel  = OPEN_STATUSES.includes(po.status);
@@ -177,6 +178,7 @@ export default function PODetailActions({ po, slug, view = "details" }) {
         {canResend  && <Button variant="secondary" onClick={handleResend} disabled={isResending}>{isResending ? "Sending…" : "Resend PO"}</Button>}
         {canRelease && <Button onClick={() => setShowReleaseModal(true)}>Release PO</Button>}
         {canReceive && <Button onClick={() => router.push(`/purchase-orders/${slug}/receive`)}>Receive Items</Button>}
+        {canPutaway && <Button onClick={() => router.push(`/purchase-orders/${slug}/putaway`)}>Putaway</Button>}
       </div>
     </>
   );

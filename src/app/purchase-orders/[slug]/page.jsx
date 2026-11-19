@@ -84,12 +84,17 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
     variant_id:         l.variant_id,
     order_qty_units:    l.order_qty_units,
     received_qty_units: l.received_qty_units ?? 0,
+    putaway_qty_units:  l.putaway_qty_units ?? 0,
     shipped_qty_units:  shippedMap[l.id] ?? 0,
     order_qty_cases:    l.order_qty_cases,
     case_pack_qty:      l.case_pack_qty,
     unit_cost:          l.unit_cost,
     extended_cost:      l.extended_cost,
   }));
+
+  // Button visibility: something shipped but not received / received but not put away
+  const hasReceivable = flatLines.some((l) => (l.shipped_qty_units ?? 0) > (l.received_qty_units ?? 0));
+  const hasPutaway    = flatLines.some((l) => (l.received_qty_units ?? 0) > (l.putaway_qty_units ?? 0));
 
   const flatPO = {
     id:                 po.id,
@@ -146,7 +151,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
         <PageHeader
           backHref="/purchase-orders"
           badge={<Badge status={flatPO.status} />}
-          actions={<PODetailActions po={flatPO} slug={slug} view={view} />}
+          actions={<PODetailActions po={flatPO} slug={slug} view={view} hasReceivable={hasReceivable} hasPutaway={hasPutaway} />}
         />
 
         {view === "details" && (<>
@@ -217,6 +222,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                 <th className="text-left px-3 py-2 font-medium">Ordered</th>
                 <th className="text-left px-3 py-2 font-medium">Shipped</th>
                 <th className="text-left px-3 py-2 font-medium">Received</th>
+                <th className="text-left px-3 py-2 font-medium">Ready for Putaway</th>
                 <th className="text-left px-3 py-2 font-medium">Open</th>
                 <th className="text-left px-3 py-2 font-medium">Unit Cost</th>
                 <th className="text-left px-3 py-2 font-medium">Extended Cost</th>
@@ -224,9 +230,10 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
             </thead>
             <tbody>
               {flatLines.length === 0 ? (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
+                <tr><td colSpan={11} className="px-3 py-8 text-center text-gray-400">No line items on this purchase order.</td></tr>
               ) : flatLines.map((line) => {
                 const open = (line.order_qty_units ?? 0) - (line.received_qty_units ?? 0);
+                const readyPutaway = (line.received_qty_units ?? 0) - (line.putaway_qty_units ?? 0);
                 return (
                   <tr key={line.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-2 text-gray-400">{line.line_no}</td>
@@ -240,6 +247,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                     <td className="px-3 py-2 text-gray-800">{line.order_qty_units?.toLocaleString() ?? "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{(line.shipped_qty_units ?? 0).toLocaleString()}</td>
                     <td className="px-3 py-2 text-gray-800">{(line.received_qty_units ?? 0).toLocaleString()}</td>
+                    <td className="px-3 py-2 text-gray-800">{readyPutaway > 0 ? readyPutaway.toLocaleString() : "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{open > 0 ? open.toLocaleString() : "—"}</td>
                     <td className="px-3 py-2 text-gray-800">{formatCurrency(line.unit_cost, currencyCode)}</td>
                     <td className="px-3 py-2 text-gray-800">{formatCurrency(line.extended_cost, currencyCode)}</td>
@@ -253,7 +261,7 @@ export default async function PurchaseOrderDetailPage({ params, searchParams }) 
                   <td className="px-3 py-2" colSpan={3}></td>
                   <td className="px-3 py-2 text-xs text-gray-500 font-medium">Totals</td>
                   <td className="px-3 py-2 font-semibold">{totalUnits.toLocaleString()}</td>
-                  <td className="px-3 py-2" colSpan={4}></td>
+                  <td className="px-3 py-2" colSpan={5}></td>
                   <td className="px-3 py-2 font-semibold">{formatCurrency(totalCost, currencyCode)}</td>
                 </tr>
               </tfoot>
