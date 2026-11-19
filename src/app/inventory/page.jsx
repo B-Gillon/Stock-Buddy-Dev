@@ -1,4 +1,5 @@
-import { RECEIVABLE_STATUSES } from '@/lib/poStatus';
+import { SENT_STATUSES } from '@/lib/poStatus';
+import { shippedByLine } from '@/lib/shipments';
 // /src/app/inventory/page.jsx
 // SERVER COMPONENT — no "use client"
 
@@ -60,7 +61,7 @@ export default async function InventoryPage({ searchParams }) {
   if (total_value === "no_value")      query = query.eq("total_value", 0);
   if (inventory_policy)                query = query.ilike("inventory_policy", inventory_policy);
 
-  const validSortKeys = ["display_title", "vendor_name", "sku", "status", "available_total", "incoming_total", "total_value"];
+  const validSortKeys = ["display_title", "vendor_name", "sku", "status", "available_total", "incoming_total", "on_order_total", "in_transit_total", "received_total", "total_value"];
   const safeSortKey   = validSortKeys.includes(sortKey) ? sortKey : "display_title";
   query = query.order(safeSortKey, { ascending: sortDir !== "desc" });
 
@@ -96,39 +97,48 @@ export default async function InventoryPage({ searchParams }) {
         location_id:   level.location_id,
         location_name: level.locations?.name ?? "Unknown",
         available:     level.available ?? 0,
-        incoming:      0, // will be filled in from PO data below
+        on_order: 0, in_transit: 0, received: 0, // filled in from PO data below
         total_value:   cost != null ? (level.available ?? 0) * cost : null,
       });
     }
 
-    // Fetch incoming per variant per location from active PO lines
-    // (released or partially_received POs only, incoming_remaining > 0)
+    // On Order / In Transit / Received (not yet put away) per variant per location, from sent POs
     const { data: poLines } = await supabase
       .from("purchase_order_lines")
       .select(`
+        id,
         variant_id,
-        incoming_remaining,
+        order_qty_units,
+        received_qty_units,
+        putaway_qty_units,
         purchase_orders!inner ( ship_to_location_id, status )
       `)
       .eq("tenant_id", tenantId)
       .in("variant_id", variantIds)
-      .in("purchase_orders.status", RECEIVABLE_STATUSES)
-      .gt("incoming_remaining", 0);
+      .in("purchase_orders.status", [...SENT_STATUSES, "partially_received", "received"]);
 
-    // Build a map of variant_id + location_id → total incoming_remaining
-    const incomingMap = new Map(); // key: `${variant_id}:${location_id}`
+    const shippedMap = await shippedByLine((poLines ?? []).map((l) => l.id));
+    const incomingMap = new Map(); // key: `${variant_id}:${location_id}` -> { onOrder, inTransit, received }
     for (const line of poLines ?? []) {
       const locationId = line.purchase_orders?.ship_to_location_id;
       if (!locationId) continue;
+      const ordered = line.order_qty_units ?? 0, received = line.received_qty_units ?? 0, put = line.putaway_qty_units ?? 0;
+      const shipped = Math.max(shippedMap[line.id] ?? 0, received);
       const key = `${line.variant_id}:${locationId}`;
-      incomingMap.set(key, (incomingMap.get(key) ?? 0) + (line.incoming_remaining ?? 0));
+      const t = incomingMap.get(key) ?? { onOrder: 0, inTransit: 0, received: 0 };
+      t.onOrder   += Math.max(0, ordered - shipped);
+      t.inTransit += Math.max(0, shipped - received);
+      t.received  += Math.max(0, received - put);
+      incomingMap.set(key, t);
     }
 
     // Merge incoming into location_rows
     for (const vid of Object.keys(locationRowsByVariant)) {
       locationRowsByVariant[vid] = locationRowsByVariant[vid].map((locRow) => ({
         ...locRow,
-        incoming: incomingMap.get(`${vid}:${locRow.location_id}`) ?? 0,
+        on_order:   incomingMap.get(`${vid}:${locRow.location_id}`)?.onOrder   ?? 0,
+        in_transit: incomingMap.get(`${vid}:${locRow.location_id}`)?.inTransit ?? 0,
+        received:   incomingMap.get(`${vid}:${locRow.location_id}`)?.received  ?? 0,
       }));
     }
   }
@@ -146,6 +156,9 @@ export default async function InventoryPage({ searchParams }) {
     inventory_policy: row.inventory_policy ?? null,
     available_total:  row.available_total  ?? 0,
     incoming_total:   row.incoming_total   ?? 0,
+    on_order_total:   row.on_order_total   ?? 0,
+    in_transit_total: row.in_transit_total ?? 0,
+    received_total:   row.received_total   ?? 0,
     total_value:      row.total_value      ?? null,
     unit_cost:        row.unit_cost        ?? null,
     location_rows:    locationRowsByVariant[row.variant_id] ?? [],

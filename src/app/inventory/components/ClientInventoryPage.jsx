@@ -17,12 +17,15 @@ const ALL_COLUMNS = [
   { key: "status",          label: "Status",        sortable: true,  hideable: true  },
   { key: "location",        label: "Location",      sortable: false, hideable: true  },
   { key: "available_total", label: "Available",     sortable: true,  hideable: true  },
-  { key: "incoming_total",  label: "Incoming",      sortable: true,  hideable: true  },
+  { key: "on_order_total",  label: "On Order",      sortable: true,  hideable: true  },
+  { key: "in_transit_total", label: "In Transit",   sortable: true,  hideable: true  },
+  { key: "received_total",  label: "Received",      sortable: true,  hideable: true  },
   { key: "total_value",     label: "Total Value",   sortable: true,  hideable: true  },
 ];
 
-const STORAGE_KEY = "inventory_column_visibility";
-const DEFAULT_VISIBILITY = Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, true]));
+const STORAGE_KEY = "inventory_column_visibility_v2";
+// Vendor and Barcode start hidden
+const DEFAULT_VISIBILITY = { ...Object.fromEntries(ALL_COLUMNS.map((c) => [c.key, true])), vendor_name: false, barcode: false };
 
 function loadVisibility() {
   if (typeof window === "undefined") return DEFAULT_VISIBILITY;
@@ -242,7 +245,7 @@ export default function ClientInventoryPage({
 
   function exportCSV() {
     if (!inventory.length) { alert("No inventory to export."); return; }
-    const cols = ["display_title", "vendor_name", "sku", "barcode", "status", "available_total", "incoming_total", "total_value"];
+    const cols = ["display_title", "vendor_name", "sku", "barcode", "status", "available_total", "on_order_total", "in_transit_total", "received_total", "total_value"];
     const csvRows = inventory.map((row) =>
       cols.map((key) => {
         const val = row[key];
@@ -294,7 +297,6 @@ export default function ClientInventoryPage({
 
     // Incoming comes from Stock Buddy PO data (inventory_summary.incoming_total),
     // not from inventory_levels.incoming which reflects Shopify's value (always 0).
-    const displayIncoming = row.incoming_total ?? 0;
 
     switch (col.key) {
       case "display_title":   return <span className="font-medium text-gray-900">{row.display_title}</span>;
@@ -304,7 +306,9 @@ export default function ClientInventoryPage({
       case "status":          return <StatusPill status={row.status} />;
       case "location":        return <span className="text-gray-400 text-xs">—</span>;
       case "available_total": return <span className="tabular-nums text-gray-700">{displayAvailable.toLocaleString()}</span>;
-      case "incoming_total":  return <span className="tabular-nums text-gray-700">{displayIncoming.toLocaleString()}</span>;
+      case "on_order_total":   return <span className="tabular-nums text-gray-700">{(row.on_order_total ?? 0).toLocaleString()}</span>;
+      case "in_transit_total": return <span className="tabular-nums text-gray-700">{(row.in_transit_total ?? 0).toLocaleString()}</span>;
+      case "received_total":   return <span className="tabular-nums text-gray-700">{(row.received_total ?? 0).toLocaleString()}</span>;
       case "total_value":     return <span className="tabular-nums text-gray-700">{formatCurrency(displayValue)}</span>;
       default:                return null;
     }
@@ -314,7 +318,9 @@ export default function ClientInventoryPage({
     switch (col.key) {
       case "location":        return <span className="text-xs text-gray-600 font-medium">{loc.location_name}</span>;
       case "available_total": return <span className="tabular-nums text-xs text-gray-600">{loc.available.toLocaleString()}</span>;
-      case "incoming_total":  return <span className="tabular-nums text-xs text-gray-600">{loc.incoming.toLocaleString()}</span>;
+      case "on_order_total":   return <span className="tabular-nums text-xs text-gray-600">{(loc.on_order ?? 0).toLocaleString()}</span>;
+      case "in_transit_total": return <span className="tabular-nums text-xs text-gray-600">{(loc.in_transit ?? 0).toLocaleString()}</span>;
+      case "received_total":   return <span className="tabular-nums text-xs text-gray-600">{(loc.received ?? 0).toLocaleString()}</span>;
       case "total_value":     return <span className="tabular-nums text-xs text-gray-600">{formatCurrency(loc.total_value)}</span>;
       default:                return null;
     }
