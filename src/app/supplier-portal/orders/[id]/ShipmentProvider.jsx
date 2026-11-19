@@ -46,7 +46,12 @@ export function CartonFields({ cfg, f, set, autoSscc }) {
   const text = (key) => <input className={input} value={f[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      {v('supplier_carton_id') && <Field label="SSCC Case Number" required={r('supplier_carton_id')}>{text('supplier_carton_id')}</Field>}
+      {v('supplier_carton_id') && (
+        <Field label="SSCC Case Number" required={r('supplier_carton_id')}>
+          <input className={input} inputMode="numeric" maxLength={20} placeholder="20 digits" value={f.supplier_carton_id ?? ''}
+            onChange={(e) => set({ supplier_carton_id: e.target.value.replace(/\D/g, '').slice(0, 20) })} />
+        </Field>
+      )}
       {v('sscc') && <Field label="SSCC" required={r('sscc')}><input className={input} inputMode="numeric" placeholder={autoSscc ? 'Assigned when saved' : '18 digits (or 20 with 00)'} disabled={!!autoSscc} value={f.sscc ?? ''} onChange={(e) => set({ sscc: e.target.value })} /></Field>}
       {v('carton_tracking') && <Field label="Carton Tracking Number" required={r('carton_tracking')}>{text('tracking_number')}</Field>}
       {v('weight') && (
@@ -149,9 +154,15 @@ export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
 }
 
 const labelUrl = (sscc, c) => `/supplier-portal/labels?sscc=${sscc}${c?.f?.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c?.f?.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`;
+// Case label for a carton still being built: prints the 20-digit SSCC Case Number (or the generated SSCC)
+export const BTN_BLUE = 'inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700';
+const hasCaseNo = (c) => /^\d{20}$/.test(c?.f?.supplier_carton_id ?? '');
+const caseLabelUrl = (c, n, poId) => hasCaseNo(c)
+  ? `/supplier-portal/labels?code=${c.f.supplier_carton_id}&po=${poId}&n=${n}${c.f.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c.f.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`
+  : (c?.f?.sscc ? labelUrl(c.f.sscc, c) : null);
 const SSCC_PLACEHOLDER = '000000000000000000';
 
-export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels, lastCartonNo = 0 }) {
+export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels }) {
   const router = useRouter();
   const { creating, setCreating } = useContext(Ctx);
   const [saved, setSaved] = useState([]);          // cartons already saved, in order
@@ -189,8 +200,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   // What a given carton can still take: remaining, minus what every OTHER carton already holds
   const leftFor = (l, own) => remainingBase(l) - ((thisShipment[l.id] ?? 0) - qtyIn(own, l.id));
 
-  // Carton numbers run across the whole PO, so the next carton continues after the ones already created
-  const curNo = lastCartonNo + saved.length + 1;
+  const curNo = saved.length + 1; // each shipment numbers its cartons from 1
   const shownLines = creating && !showAll ? lines.filter((l) => remainingBase(l) > 0) : lines;
   const totalUnits = lines.reduce((t, l) => t + (l.ordered ?? 0), 0);
   const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
@@ -240,7 +250,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     setEditIdx((e) => (e == null ? null : e === i ? null : e > i ? e - 1 : e));
   }
   function doneEditing(i) {
-    const errs = cartonErrors(saved[i], lastCartonNo + i + 1);
+    const errs = cartonErrors(saved[i], i + 1);
     if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
     setError(''); setEditIdx(null);
   }
@@ -422,15 +432,15 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
           <div key={i} className="bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between px-4 py-3">
               <p className="text-sm font-semibold text-gray-900">
-                Carton {lastCartonNo + i + 1}
+                Carton {i + 1}
                 <span className="ml-3 text-xs font-normal text-gray-500">{units} unit{units === 1 ? '' : 's'}{bits.length ? ` · ${bits.join(' · ')}` : ''}</span>
               </p>
               <div className="flex items-center gap-3 text-sm">
                 {editing
                   ? <button type="button" className="text-blue-700 hover:underline" onClick={() => doneEditing(i)}>Done</button>
                   : <button type="button" className="text-blue-700 hover:underline" onClick={() => { setEditIdx(i); setError(''); }}>Edit</button>}
-                {c.f.sscc && <a className="text-blue-700 hover:underline" href={labelUrl(c.f.sscc, c)} target="_blank" rel="noopener noreferrer">Print label</a>}
                 <button type="button" className="text-red-600 hover:underline" onClick={() => removeSaved(i)}>Remove</button>
+                {caseLabelUrl(c, i + 1, poId) && <a className={BTN_BLUE} href={caseLabelUrl(c, i + 1, poId)} target="_blank" rel="noopener noreferrer">Print Case Label</a>}
               </div>
             </div>
             <div className="border-t border-gray-100 px-4 py-3">

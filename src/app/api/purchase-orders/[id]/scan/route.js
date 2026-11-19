@@ -15,12 +15,15 @@ export async function GET(request, { params }) {
   try {
     const tenantId = await getTenantId(request);
     const { id: poId } = await params;
-    const sscc = normalizeScan(new URL(request.url).searchParams.get('sscc'));
-    if (sscc.length !== 18) return NextResponse.json({ result: 'invalid', message: 'That isn’t an 18-digit SSCC.' });
+    const rawDigits = String(new URL(request.url).searchParams.get('sscc') ?? '').replace(/\D/g, '');
+    const sscc = normalizeScan(rawDigits);
+    if (sscc.length !== 18 && rawDigits.length !== 20) return NextResponse.json({ result: 'invalid', message: 'That isn’t an 18-digit SSCC or a 20-digit case number.' });
 
+    // Generated SSCC (18 digits), or the 20-digit SSCC Case Number the supplier typed in
     const { data: cartons } = await supabase.from('shipment_cartons')
       .select('id, carton_no, received_at, shipment:shipments!shipment_id ( po_id, shipment_number )')
-      .eq('tenant_id', tenantId).eq('sscc', sscc);
+      .eq('tenant_id', tenantId)
+      .or(`sscc.eq.${sscc},supplier_carton_id.eq.${rawDigits}`);
     if (!cartons?.length) {
       const { data: old } = await supabase.from('supplier_ssccs').select('id').eq('tenant_id', tenantId).eq('sscc', sscc).not('voided_at', 'is', null).maybeSingle();
       if (old) return NextResponse.json({ result: 'voided', message: 'That label was replaced when the carton was edited. Scan the new label.' });

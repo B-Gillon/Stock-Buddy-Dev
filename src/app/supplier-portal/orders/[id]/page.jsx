@@ -138,7 +138,6 @@ export default async function OrderPage({ params, searchParams }) {
           {po.status === 'pending_acknowledgement' ? <AckForm poId={po.id} requestedShipDate={po.expected_ship_date || po.expected_date || ''} /> : null}
 
           <LinesTable
-            lastCartonNo={Math.max(0, ...(shipRows ?? []).flatMap((sh) => (sh.shipment_cartons ?? []).map((c) => c.carton_no)))}
             poId={po.id}
             lines={lines}
             currency={cur}

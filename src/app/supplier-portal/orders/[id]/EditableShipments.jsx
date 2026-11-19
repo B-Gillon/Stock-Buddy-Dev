@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { validateShipment } from '@/lib/shipmentFields';
 import { LINE_COLUMN_DEFS } from '@/lib/supplierColumns';
-import { CartonFields, ItemQtyTable } from './ShipmentProvider';
+import { CartonFields, ItemQtyTable, BTN_BLUE } from './ShipmentProvider';
 
 const btn = 'inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50';
 const fmt = (v) => { if (!v) return '—'; const [y, m, d] = String(v).slice(0, 10).split('-'); return `${m}/${d}/${y}`; };
@@ -60,8 +60,8 @@ export default function EditableShipments({ shipments, lines, config, lineColumn
               {sh.shipment_number}
               <span className="ml-3 text-xs font-normal text-gray-500">Ship date {fmt(sh.ship_date)} · {sh.cartons.length} carton{sh.cartons.length === 1 ? '' : 's'}</span>
             </p>
-            {sh.cartons.some((c) => c.sscc) && (
-              <a className={btn} href={`/supplier-portal/labels?shipment=${sh.id}`} target="_blank" rel="noopener noreferrer">Print all labels</a>
+            {sh.cartons.some((c) => c.sscc || c.supplier_carton_id) && (
+              <a className={BTN_BLUE} href={`/supplier-portal/labels?shipment=${sh.id}`} target="_blank" rel="noopener noreferrer">Print Case Labels</a>
             )}
           </div>
           <div className="px-4 pb-3 space-y-2">
@@ -76,8 +76,8 @@ export default function EditableShipments({ shipments, lines, config, lineColumn
                       <span className="ml-3 text-xs text-gray-500">{units} unit{units === 1 ? '' : 's'}{c.sscc ? ` · SSCC ${c.sscc}` : ''}{c.received_at ? ' · Received' : ''}</span>
                     </span>
                     <span className="flex items-center gap-3 text-xs">
-                      {c.sscc && !c.received_at && <a className="text-blue-700 hover:underline" href={`/supplier-portal/labels?sscc=${c.sscc}`} target="_blank" rel="noopener noreferrer">Print label</a>}
                       {!c.received_at && !editing && <button type="button" className="text-blue-700 hover:underline" onClick={() => start(c)}>Edit</button>}
+                      {(c.sscc || c.supplier_carton_id) && !c.received_at && <a className={BTN_BLUE} href={`/supplier-portal/labels?carton=${c.id}`} target="_blank" rel="noopener noreferrer">Print Case Label</a>}
                     </span>
                   </div>
                   {editing && draft && (
