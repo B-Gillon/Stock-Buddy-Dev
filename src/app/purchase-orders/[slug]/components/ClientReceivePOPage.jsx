@@ -18,7 +18,7 @@ function ConfirmReceiveModal({ isOpen, onClose, onConfirm, receipts, lines, isSu
         <div className="border-b border-gray-100 px-6 py-4">
           <h2 className="text-base font-semibold text-gray-900">Confirm Receipt</h2>
           <p className="mt-1 text-sm text-gray-500">
-            The following quantities will be marked as received and synced to Shopify.
+            The following quantities will be marked as received and held as Ready for Putaway. They are added to Shopify available after putaway.
           </p>
         </div>
         <div className="max-h-72 overflow-y-auto px-6 py-4">

@@ -48,13 +48,15 @@ function LowStockCard({ lowStock, onClick }) {
               <th className="text-left py-1 font-medium">Variant</th>
               <th className="text-left py-1 pr-2 font-medium">SKU</th>
               <th className="text-left py-1 pr-3 font-medium">Available</th>
-              <th className="text-left py-1 font-medium">Incoming</th>
+              <th className="text-left py-1 pr-3 font-medium">On Order</th>
+              <th className="text-left py-1 pr-3 font-medium">In Transit</th>
+              <th className="text-left py-1 font-medium">Received</th>
             </tr>
           </thead>
           <tbody>
             {lowStock.map((v) => (
               <tr key={v.variant_id} className="border-b border-gray-50 last:border-0" style={{height:"22px"}}>
-                <td className="py-1 pr-3 text-gray-800 truncate max-w-[180px]">{v.title}</td>
+                <td className="py-1 pr-3 text-gray-800 whitespace-nowrap">{v.title}</td>
                 <td className="py-1 pr-2 text-gray-500 text-xs whitespace-nowrap">{v.sku}</td>
                 <td className="py-1 pr-3">
                   <span className={`font-medium text-xs ${
@@ -65,7 +67,9 @@ function LowStockCard({ lowStock, onClick }) {
                     {v.available}
                   </span>
                 </td>
-                <td className="py-1 text-xs font-medium text-gray-800">{v.incoming > 0 ? v.incoming.toLocaleString() : "—"}</td>
+                <td className="py-1 pr-3 text-xs font-medium text-gray-800">{v.onOrder > 0 ? v.onOrder.toLocaleString() : "—"}</td>
+                <td className="py-1 pr-3 text-xs font-medium text-gray-800">{v.inTransit > 0 ? v.inTransit.toLocaleString() : "—"}</td>
+                <td className="py-1 text-xs font-medium text-gray-800">{v.received > 0 ? v.received.toLocaleString() : "—"}</td>
               </tr>
             ))}
           </tbody>

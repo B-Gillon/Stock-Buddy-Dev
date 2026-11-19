@@ -1,4 +1,5 @@
-import { OPEN_STATUSES, NOT_FULLY_SHIPPED_STATUSES } from '@/lib/poStatus';
+import { OPEN_STATUSES, NOT_FULLY_SHIPPED_STATUSES, SENT_STATUSES } from '@/lib/poStatus';
+import { shippedByLine } from '@/lib/shipments';
 
 const DEFAULT_LOW_STOCK = 5; // used when a product has no low-stock threshold of its own
 // /src/app/dashboard/page.jsx
@@ -153,7 +154,7 @@ export default async function DashboardPage() {
       )
     `)
     .eq("tenant_id", tenantId)
-    .in("purchase_orders.status", OPEN_STATUSES);
+    .in("purchase_orders.status", OPEN_STATUSES.filter((st) => st !== "draft")); // drafts are not on order yet
 
   const incomingByVariant = {};
   let totalIncoming = 0;
@@ -189,6 +190,30 @@ export default async function DashboardPage() {
     .sort((a, b) => b.incoming - a.incoming)
     .slice(0, 3);
 
+  // ── Low stock pipeline: On Order / In Transit / Received (not yet put away) ──
+  // Sent POs only (no drafts, no cancelled). Per line: on order = ordered - shipped,
+  // in transit = shipped - received, received = received - put away.
+  const pipeline = {};
+  const lowIds = lowStock.map((v) => v.variant_id);
+  if (lowIds.length) {
+    const { data: pLines } = await supabase
+      .from("purchase_order_lines")
+      .select("id, variant_id, order_qty_units, received_qty_units, putaway_qty_units, purchase_orders!inner(status)")
+      .eq("tenant_id", tenantId)
+      .in("variant_id", lowIds)
+      .in("purchase_orders.status", [...SENT_STATUSES, "partially_received", "received"]);
+    const shippedMap = await shippedByLine((pLines ?? []).map((l) => l.id));
+    for (const l of pLines ?? []) {
+      const ordered = l.order_qty_units ?? 0, received = l.received_qty_units ?? 0, put = l.putaway_qty_units ?? 0;
+      const shipped = Math.max(shippedMap[l.id] ?? 0, received);
+      const t = (pipeline[l.variant_id] ??= { onOrder: 0, inTransit: 0, received: 0 });
+      t.onOrder += Math.max(0, ordered - shipped);
+      t.inTransit += Math.max(0, shipped - received);
+      t.received += Math.max(0, received - put);
+    }
+  }
+  const lowStockWithPipeline = lowStock.map((v) => ({ ...v, ...(pipeline[v.variant_id] ?? { onOrder: 0, inTransit: 0, received: 0 }) }));
+
   // ── Last sync timestamp ────────────────────────────────────────────────────
   const { data: syncStatus } = await supabase
     .from("sync_status")
@@ -199,7 +224,7 @@ export default async function DashboardPage() {
 
   return (
     <ClientDashboard
-      lowStock={lowStock.map((v) => ({ ...v, incoming: incomingByVariant[v.variant_id]?.incoming ?? 0 }))}
+      lowStock={lowStockWithPipeline}
       overduePOs={overdueFlat}
       poReport={report}
       totalIncoming={totalIncoming}

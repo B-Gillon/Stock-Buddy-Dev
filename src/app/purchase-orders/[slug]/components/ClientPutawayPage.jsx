@@ -56,8 +56,8 @@ export default function ClientPutawayPage({ po, lines, slug }) {
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error ?? "Unknown error");
-      showToast("Putaway submitted successfully.", "info");
-      setTimeout(() => router.push(`/purchase-orders/${slug}`), 1200);
+      if (data.warning) showToast(data.warning, "error"); else showToast("Putaway submitted successfully.", "info");
+      setTimeout(() => router.push(`/purchase-orders/${slug}`), data.warning ? 4000 : 1200);
     } catch (err) {
       showToast(err.message, "error");
       setIsSubmitting(false);

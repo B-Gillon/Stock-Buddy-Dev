@@ -61,13 +61,6 @@ export async function receiveInStockBuddy({ poId, lineId, qtyToReceive, tenantId
       };
     }
 
-    // Guard: if receiving_source is external, block Shopify push
-    const willPushToShopify = po.receiving_source === "stock_buddy";
-
-    const inventoryItem = line.variants?.inventory_items?.[0];
-    if (willPushToShopify && !inventoryItem?.shopify_inventory_item_id) {
-      return { success: false, error: `No inventory item found for line ${lineId}` };
-    }
 
     // ── Update internal state ─────────────────────────────────────────────────
     const newRemaining = line.incoming_remaining - qtyToReceive;
@@ -112,52 +105,18 @@ const { error: lineUpdateError } = await supabase
 
     if (poUpdateError) throw new Error(`PO status update failed: ${poUpdateError.message}`);
 
-    // ── Push to Shopify (if stock_buddy mode) ─────────────────────────────────
-    if (willPushToShopify) {
-      try {
-        const shopifyCreds = await resolveShopifyCredentials(tenantId);
-        const shopifyLocationId = await getShopifyLocationId(po.ship_to_location_id, tenantId);
-
-        await adjustShopifyAvailable(
-          shopifyCreds,
-          inventoryItem.shopify_inventory_item_id,
-          shopifyLocationId,
-          qtyToReceive // positive delta → increase available
-        );
-
-        await logShopifyIncoming({
-          tenantId,
-          poId,
-          lineId,
-          variantId: line.variant_id,
-          locationId: po.ship_to_location_id,
-          incomingQty: -qtyToReceive, // negative = reduction of incoming
-          action: "reverse",
-        });
-
-        // Stamp sync success
-        await supabase
-          .from("purchase_orders")
-          .update({ shopify_synced_at: new Date().toISOString(), shopify_sync_error: null })
-          .eq("id", poId)
-          .eq("tenant_id", tenantId);
-      } catch (shopifyErr) {
-        // DB is already updated — do NOT roll back
-        // Log the Shopify error but report partial success
-        await supabase
-          .from("purchase_orders")
-          .update({ shopify_sync_error: shopifyErr.message })
-          .eq("id", poId)
-          .eq("tenant_id", tenantId);
-
-        return {
-          success: true, // DB succeeded
-          newPOStatus,
-          shopifyError: shopifyErr.message,
-          warning: "Receiving recorded in Stock Buddy. Shopify sync failed — reconcile manually.",
-        };
-      }
-    }
+    // ── Shopify available is NOT touched here ─────────────────────────────────
+    // Received units wait as "Ready for Putaway"; Shopify's available goes up when they are put away
+    // (see /api/purchase-orders/[id]/putaway). Only the incoming ledger is reduced now.
+    await logShopifyIncoming({
+      tenantId,
+      poId,
+      lineId,
+      variantId: line.variant_id,
+      locationId: po.ship_to_location_id,
+      incomingQty: -qtyToReceive, // negative = reduction of incoming
+      action: "reverse",
+    });
 
     return { success: true, newPOStatus };
   } catch (err) {
