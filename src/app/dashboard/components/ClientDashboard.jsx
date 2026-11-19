@@ -197,29 +197,29 @@ const REPORT_ROWS = [
   { key: "drafts",   label: "Drafts",                      color: "#2563eb", tone: "text-gray-900",  href: "/purchase-orders?status=draft" },
 ];
 
-function ReportDonut({ poReport, onNavigate }) {
+function ReportDonut({ poReport, onNavigate, rows = REPORT_ROWS }) {
   const [hover, setHover] = useState(null); // { key, x, y }
-  const total = REPORT_ROWS.reduce((t, r) => t + poReport[r.key].count, 0);
+  const total = rows.reduce((t, r) => t + poReport[r.key].count, 0);
   const R = 46, C = 2 * Math.PI * R;
   let offset = 0;
   const move = (r) => (e) => {
     const box = e.currentTarget.ownerSVGElement.parentElement.getBoundingClientRect();
     setHover({ key: r.key, x: e.clientX - box.left, y: e.clientY - box.top });
   };
-  const hovered = hover && REPORT_ROWS.find((r) => r.key === hover.key);
+  const hovered = hover && rows.find((r) => r.key === hover.key);
   return (
     <div className="relative shrink-0" onMouseLeave={() => setHover(null)}>
       <svg viewBox="0 0 120 120" className="h-44 w-44" role="img" aria-label="Purchase orders by status">
         <circle cx="60" cy="60" r={R} fill="none" stroke="#f3f4f6" strokeWidth="16" />
-        {total > 0 && REPORT_ROWS.map((r) => {
+        {total > 0 && rows.map((r) => {
           const n = poReport[r.key].count;
           if (!n) return null;
           const len = (n / total) * C;
           const el = (
             <circle key={r.key} cx="60" cy="60" r={R} fill="none" stroke={r.color} strokeWidth="16"
               strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} transform="rotate(-90 60 60)"
-              style={{ cursor: "pointer", opacity: hover && hover.key !== r.key ? 0.55 : 1 }}
-              onMouseMove={move(r)} onMouseLeave={() => setHover(null)} onClick={() => onNavigate(r.href)} />
+              style={{ cursor: onNavigate ? "pointer" : "default", opacity: hover && hover.key !== r.key ? 0.55 : 1 }}
+              onMouseMove={move(r)} onMouseLeave={() => setHover(null)} onClick={() => onNavigate?.(r.href)} />
           );
           offset += len;
           return el;
@@ -239,17 +239,19 @@ function ReportDonut({ poReport, onNavigate }) {
   );
 }
 
-function POReportCard({ poReport, onNavigate }) {
+// onNavigate is optional (no clicking when omitted); hide lists row keys to leave out (e.g. the supplier dashboard has no drafts)
+export function POReportCard({ poReport, onNavigate, hide = [] }) {
+  const rows = REPORT_ROWS.filter((r) => !hide.includes(r.key));
   return (
     <DashCard title="Purchase Order Report">
       <div className="flex items-center gap-5">
-        <ReportDonut poReport={poReport} onNavigate={onNavigate} />
+        <ReportDonut poReport={poReport} onNavigate={onNavigate} rows={rows} />
         <ul className="min-w-0 flex-1 space-y-1.5 text-xs">
-          {REPORT_ROWS.map((r) => (
+          {rows.map((r) => (
             <li key={r.key} className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} />
-              <button type="button" onClick={() => onNavigate(r.href)}
-                className="min-w-0 flex-1 truncate text-left text-xs font-bold text-gray-900 hover:underline"
+              <button type="button" onClick={() => onNavigate?.(r.href)}
+                className={`min-w-0 flex-1 truncate text-left text-xs font-bold text-gray-900 ${onNavigate ? "hover:underline" : "cursor-default"}`}
                 style={{ padding: 0, margin: 0, font: "inherit", fontSize: "0.75rem", fontWeight: 700, lineHeight: "inherit" }}>
                 {r.label}
               </button>

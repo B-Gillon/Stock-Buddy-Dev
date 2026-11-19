@@ -6,6 +6,8 @@ import { NOT_FULLY_SHIPPED_STATUSES } from '@/lib/poStatus';
 import { businessHoursBetween } from '@/lib/businessDays';
 import PortalFrame from './components/PortalFrame';
 import ClickRow from './components/ClickRow';
+import { POReportCard } from '@/app/dashboard/components/ClientDashboard';
+import { buildPOReport } from '@/lib/poReport';
 
 const STATUS_LABEL = { pending_acknowledgement: 'Needs acknowledgement', waiting_to_ship: 'Waiting to ship', partially_shipped: 'Partially shipped' };
 // Lookup results can be in any status, including completed ones
@@ -22,49 +24,6 @@ function Card({ title, value, href, red }) {
     </div>
   );
   return href ? <Link href={href} className="block">{body}</Link> : body;
-}
-
-const DONUT_COLORS = { ready: '#2563eb', week: '#f59e0b', overdue: '#dc2626' };
-
-function Donut({ ready, week, overdue }) {
-  const total = ready + week + overdue;
-  const R = 70, C = 2 * Math.PI * R;
-  const parts = [
-    { key: 'ready', label: 'Ready to Ship', n: ready },
-    { key: 'week', label: 'Ship this Week', n: week },
-    { key: 'overdue', label: 'Overdue Shipments', n: overdue },
-  ];
-  let offset = 0;
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
-      <svg viewBox="0 0 200 200" className="h-44 w-44 shrink-0" role="img"
-        aria-label={`Shipping status: ${parts.map((p) => `${p.n} ${p.label}`).join(', ')}`}>
-        <g transform="rotate(-90 100 100)">
-          <circle cx="100" cy="100" r={R} fill="none" stroke="#e5e7eb" strokeWidth="28" />
-          {total > 0 && parts.filter((p) => p.n > 0).map((p) => {
-            const len = (p.n / total) * C;
-            const el = (
-              <circle key={p.key} cx="100" cy="100" r={R} fill="none" stroke={DONUT_COLORS[p.key]} strokeWidth="28"
-                strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} />
-            );
-            offset += len;
-            return el;
-          })}
-        </g>
-        <text x="100" y="98" textAnchor="middle" className="fill-gray-900" style={{ fontSize: 30, fontWeight: 600 }}>{total}</text>
-        <text x="100" y="120" textAnchor="middle" className="fill-gray-500" style={{ fontSize: 12 }}>open orders</text>
-      </svg>
-      <ul className="space-y-2 text-sm">
-        {parts.map((p) => (
-          <li key={p.key} className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-sm" style={{ background: DONUT_COLORS[p.key] }} />
-            <span className="text-gray-700">{p.label}</span>
-            <span className="ml-auto pl-4 font-semibold text-gray-900">{p.n}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 export default async function SupplierDashboard({ searchParams }) {
@@ -107,7 +66,7 @@ export default async function SupplierDashboard({ searchParams }) {
   const waitingToShip = list.length;
   const thisWeek = list.filter((p) => shipDate(p) && shipDate(p) >= today && shipDate(p) >= weekStart && shipDate(p) <= weekEnd).length;
   const overdue = list.filter((p) => shipDate(p) && shipDate(p) < today).length;
-  const ready = waitingToShip - thisWeek - overdue; // open orders shipping later or with no date
+  const poReport = await buildPOReport({ tenantId: s.tenantId, supplierId: s.supplierId, today }); // same report as the retailer's, for this supplier
   const notInvoiced = 0; // invoicing not built yet
 
   // Purchase Order Lookup: any of this supplier's sent POs (drafts excluded), whatever its status
@@ -124,7 +83,7 @@ export default async function SupplierDashboard({ searchParams }) {
 
   return (
     <PortalFrame supplierName={s.supplierName} email={s.email}>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         <div className="grid grid-cols-3 gap-3">
           <Card title="Not Printed" value={notPrinted} href="/supplier-portal/orders" red={notPrintedRed} />
           <Card title="Not Acknowledged" value={notAck} href="/supplier-portal/orders" red={notAckRed} />
@@ -133,38 +92,9 @@ export default async function SupplierDashboard({ searchParams }) {
           <Card title="Overdue" value={overdue} />
           <Card title="Not Invoiced" value={notInvoiced} href="/supplier-portal/invoicing" />
         </div>
-        <div className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Shipping Status</h2>
-          <Donut ready={ready} week={thisWeek} overdue={overdue} />
-        </div>
+        <POReportCard poReport={poReport} hide={["drafts"]} />
       </div>
-      <section id="po-lookup" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Purchase Order Lookup</h2>
-        <form method="get" action="/supplier-portal#po-lookup" className="flex items-center gap-2">
-          <input name="po" defaultValue={q} placeholder="Enter a PO number" autoComplete="off"
-            className="h-9 w-full max-w-sm rounded border border-gray-300 px-3 text-sm" />
-          <button type="submit" className="inline-flex h-9 items-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700">Search</button>
-          {q && <Link href="/supplier-portal" className="text-sm text-blue-700 hover:underline">Clear</Link>}
-        </form>
-        {found && (found.length === 0 ? <p className="mt-3 text-sm text-gray-400">No purchase orders found for “{q}”.</p> : (
-          <table className="mt-3 w-full text-sm">
-            <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-400">
-              <th className="py-1 font-medium">PO Number</th><th className="py-1 font-medium">Ship To</th>
-              <th className="py-1 font-medium">PO Date</th><th className="py-1 font-medium">Status</th>
-            </tr></thead>
-            <tbody>
-              {found.map((p) => (
-                <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}`} className="border-b border-gray-50 last:border-0">
-                  <td className="py-1.5"><Link className="text-blue-700 hover:underline" href={`/supplier-portal/orders/${p.id}`}>{p.po_number}</Link></td>
-                  <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
-                  <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>
-                  <td className="py-1.5 text-gray-700">{ALL_STATUS_LABEL[p.status] ?? p.status}</td>
-                </ClickRow>
-              ))}
-            </tbody>
-          </table>
-        ))}
-      </section>
+      <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Open purchase orders</h2>
         {list.length === 0 ? <p className="text-sm text-gray-400">No open purchase orders.</p> : (
@@ -188,6 +118,34 @@ export default async function SupplierDashboard({ searchParams }) {
           </table>
         )}
       </section>
+      <section id="po-lookup" className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Purchase Order Lookup</h2>
+        <form method="get" action="/supplier-portal#po-lookup" className="flex items-center gap-2">
+          <input name="po" defaultValue={q} placeholder="Enter a PO number" autoComplete="off"
+            className="h-9 w-48 rounded border border-gray-300 px-3 text-sm" />
+          <button type="submit" className="inline-flex h-9 items-center rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700">Search</button>
+          {q && <Link href="/supplier-portal" className="text-sm text-blue-700 hover:underline">Clear</Link>}
+        </form>
+        {found && (found.length === 0 ? <p className="mt-3 text-sm text-gray-400">No purchase orders found for “{q}”.</p> : (
+          <table className="mt-3 w-full text-xs">
+            <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-400">
+              <th className="py-1 font-medium">PO Number</th><th className="py-1 font-medium">Ship To</th>
+              <th className="py-1 font-medium">PO Date</th><th className="py-1 font-medium">Status</th>
+            </tr></thead>
+            <tbody>
+              {found.map((p) => (
+                <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}`} className="border-b border-gray-50 last:border-0">
+                  <td className="py-1.5"><Link className="text-blue-700 hover:underline" href={`/supplier-portal/orders/${p.id}`}>{p.po_number}</Link></td>
+                  <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
+                  <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>
+                  <td className="py-1.5 text-gray-700">{ALL_STATUS_LABEL[p.status] ?? p.status}</td>
+                </ClickRow>
+              ))}
+            </tbody>
+          </table>
+        ))}
+      </section>
+      </div>
     </PortalFrame>
   );
 }
