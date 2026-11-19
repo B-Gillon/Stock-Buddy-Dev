@@ -165,10 +165,10 @@ function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, cu
             placeholder=""
             disabled={isEmpty}
             title={row.error ?? undefined}
-            className={`w-full px-2 py-1.5 text-xs border rounded focus:outline-none focus:ring-1 bg-transparent ${
+            className={`w-full px-2 py-1.5 text-xs border rounded focus:outline-none focus:ring-1 ${
               row.error ? "border-red-400 ring-red-400 bg-red-50"
-              : isEmpty ? "border-transparent cursor-default"
-                        : "border-transparent hover:border-gray-300 focus:border-gray-300 focus:ring-gray-300"
+              : isEmpty ? "border-gray-200 bg-gray-50 cursor-default"
+                        : "border-gray-300 bg-white hover:border-gray-400 focus:border-blue-500 focus:ring-blue-500"
             }`}
           />
           {row.error && (
@@ -212,7 +212,7 @@ function LineItemRow({ row, rowIndex, variants, supplierVariants, supplierId, cu
 // ---------------------------------------------------------------------------
 const LINE_ITEMS_COLUMNS = [
   { key: "_num",              label: "",                  width: "32px"  },
-  { key: "display_title",     label: "Product / Variant", width: "220px" },
+  { key: "display_title",     label: "Product / Variant Description", width: "260px" },
   { key: "sku",               label: "SKU",               width: "120px" },
   { key: "barcode",           label: "Barcode",           width: "160px" },
   { key: "order_qty",         label: "Quantity",          width: "80px"  },
@@ -247,6 +247,15 @@ export default function PurchaseOrderCreatePage({
     isDirtyRef.current = isDirty;
   }, [isDirty]);
 
+  // One prompt at a time, so a re-fired click can't stack a second popup
+  const confirmingRef = useRef(false);
+  function confirmLeave() {
+    if (confirmingRef.current) return false;
+    confirmingRef.current = true;
+    try { return window.confirm("Are you sure you want to exit the process without saving?"); }
+    finally { setTimeout(() => { confirmingRef.current = false; }, 300); }
+  }
+
   useEffect(() => {
     function handleBeforeUnload(e) {
       if (isDirtyRef.current) { e.preventDefault(); e.returnValue = ''; }
@@ -258,7 +267,8 @@ export default function PurchaseOrderCreatePage({
       const href = anchor.getAttribute('href');
       if (!href || href.startsWith('#')) return;
       e.preventDefault();
-      if (window.confirm("Please save your Purchase Order before leaving the page. Any unsaved changes will be lost.\n\nLeave without saving?")) {
+      if (confirmLeave()) {
+        isDirtyRef.current = false; // already confirmed: don't ask again when the navigation re-fires
         router.push(href);
       }
     }
@@ -302,7 +312,8 @@ export default function PurchaseOrderCreatePage({
   }, []);
 
   function handleCancel() {
-    if (isDirty && !window.confirm("Please save your Purchase Order before leaving the page. Any unsaved changes will be lost.\n\nLeave without saving?")) return;
+    if (isDirtyRef.current && !confirmLeave()) return;
+    isDirtyRef.current = false; // confirmed: no second prompt from the unload/click guards
     router.back();
   }
 
