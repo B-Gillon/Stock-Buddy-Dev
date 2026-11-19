@@ -8,7 +8,8 @@ import Card from "@/shared/components/ui/Card";
 import PageHeader from "@/shared/components/ui/PageHeader";
 import { Toast, useToast } from "@/shared/components/ui/Toast";
 
-const inputCls = "w-24 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100";
+const inputCls = "rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-left text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100";
+const BIN_W = "w-28", QTY_W = "w-20";
 const blank = () => ({ bin: "", qty: "" });
 
 export default function ClientPutawayPage({ po, lines, slug }) {
@@ -16,6 +17,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
   const { toast, showToast } = useToast();
   const [sets, setSets] = useState(() => Object.fromEntries(lines.map((l) => [l.id, [blank()]])));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attempted, setAttempted] = useState(false);
 
   const digits = (v) => v === "" || /^\d+$/.test(v);
   const setField = (lineId, i, field, value) => {
@@ -32,9 +34,11 @@ export default function ClientPutawayPage({ po, lines, slug }) {
   const payload = lines
     .map((l) => ({ lineId: l.id, locations: sets[l.id].filter((s) => s.bin !== "" && parseInt(s.qty, 10) > 0).map((s) => ({ bin: s.bin, qty: parseInt(s.qty, 10) })) }))
     .filter((l) => l.locations.length);
-  const canSubmit = payload.length > 0 && !anyOver && !incomplete && !isSubmitting;
+  const canSubmit = !anyOver && !isSubmitting;
 
   const handleSubmit = async () => {
+    setAttempted(true);
+    if (incomplete || payload.length === 0) return;
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/purchase-orders/${po.id}/putaway`, {
@@ -69,7 +73,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
         </div>
 
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <table className="w-full text-sm">
+          <table className="w-full whitespace-nowrap text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500">
                 <th className="px-4 py-3 text-left font-medium">#</th>
@@ -78,9 +82,9 @@ export default function ClientPutawayPage({ po, lines, slug }) {
                 <th className="px-4 py-3 text-left font-medium">Ordered</th>
                 <th className="px-4 py-3 text-left font-medium">Received</th>
                 <th className="px-4 py-3 text-left font-medium">Put Away</th>
-                <th className="px-4 py-3 text-left font-medium">Ready for Putaway</th>
-                <th className="px-4 py-3 text-left font-medium">Bin Location</th>
-                <th className="px-4 py-3 text-left font-medium">Putaway</th>
+                <th className="py-3 pl-4 pr-2 text-left font-medium">Ready for Putaway</th>
+                <th className="px-2 py-3 text-left font-medium">Bin Location</th>
+                <th className="px-2 py-3 text-left font-medium">Putaway</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -96,24 +100,26 @@ export default function ClientPutawayPage({ po, lines, slug }) {
                     <td className="px-4 py-3 text-gray-700">{line.order_qty_units}</td>
                     <td className="px-4 py-3 text-gray-700">{line.received_qty_units}</td>
                     <td className="px-4 py-3 text-gray-500">{line.putaway_qty_units}</td>
-                    <td className="px-4 py-3"><span className={canPut ? "font-medium text-gray-800" : "text-gray-400"}>{canPut ? line.ready_qty : "—"}</span></td>
-                    <td className="px-4 py-3">
+                    <td className="py-3 pl-4 pr-2"><span className={canPut ? "font-medium text-gray-800" : "text-gray-400"}>{canPut ? line.ready_qty : "—"}</span></td>
+                    <td className="px-2 py-3">
                       <div className="space-y-2">
                         {sets[line.id].map((s, i) => (
-                          <input key={i} type="text" inputMode="numeric" value={s.bin} disabled={!canPut}
-                            onChange={(e) => setField(line.id, i, "bin", e.target.value)} className={inputCls} aria-label="Bin Location" />
+                          <input key={i} type="text" inputMode="numeric" maxLength={10} value={s.bin} disabled={!canPut}
+                            onChange={(e) => setField(line.id, i, "bin", e.target.value)} className={`${inputCls} ${BIN_W}`} aria-label="Bin Location" />
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2 py-3">
                       <div className="space-y-2">
                         {sets[line.id].map((s, i) => (
                           <div key={i} className="flex items-center gap-1">
-                            <input type="text" inputMode="numeric" value={s.qty} disabled={!canPut}
+                            <input type="text" inputMode="numeric" maxLength={5} value={s.qty} disabled={!canPut}
                               onChange={(e) => setField(line.id, i, "qty", e.target.value)}
-                              className={`${inputCls} ${over ? "border-amber-400 bg-amber-50 text-amber-800" : ""}`} aria-label="Putaway" />
+                              className={`${inputCls} ${QTY_W} ${over ? "border-amber-400 bg-amber-50 text-amber-800" : ""}`} aria-label="Putaway" />
                             {i > 0 && (
-                              <button type="button" onClick={() => removeLocation(line.id, i)} className="text-gray-400 hover:text-red-600" aria-label="Remove location">×</button>
+                              <button type="button" onClick={() => removeLocation(line.id, i)} className="p-1 text-gray-400 hover:text-red-600" aria-label="Remove location" title="Remove location">
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.35 9m-4.78 0L9.26 9m9.97-3.21c.34.05.68.11 1.02.17m-1.02-.17L18.16 19.67a2.25 2.25 0 01-2.24 2.08H8.08a2.25 2.25 0 01-2.24-2.08L4.77 5.79m14.46 0a48.1 48.1 0 00-3.48-.4m-12 .57c.34-.06.68-.12 1.02-.17m0 0a48.11 48.11 0 013.48-.4m7.5 0v-.92c0-1.18-.91-2.16-2.09-2.2a51.96 51.96 0 00-3.32 0c-1.18.04-2.09 1.02-2.09 2.2v.92m7.5 0a48.67 48.67 0 00-7.5 0" /></svg>
+                              </button>
                             )}
                           </div>
                         ))}
@@ -130,7 +136,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
           </table>
         </div>
 
-        {incomplete && <p className="text-sm text-red-600">Each location needs both a Bin Location and a Putaway quantity.</p>}
+        {attempted && (incomplete || payload.length === 0) && <p className="text-sm text-red-600">Each location needs both a Bin Location and a Putaway quantity.</p>}
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}`)}>Cancel</Button>
