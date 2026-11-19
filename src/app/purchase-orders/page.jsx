@@ -43,6 +43,9 @@ export default async function Page({ searchParams }) {
     query = query
       .lt('expected_date', today)
       .not('status', 'in', '("draft","cancelled","received")');
+  } else if (status === 'in_transit') {
+    const today = new Date().toISOString().split('T')[0];
+    query = query.eq('status', 'shipped').or(`expected_date.is.null,expected_date.gte.${today}`);
   } else if (status === 'ship_this_week' || status === 'ship_later') {
     // same buckets as the dashboard report: not overdue, still something to ship
     const today = new Date().toISOString().split('T')[0];

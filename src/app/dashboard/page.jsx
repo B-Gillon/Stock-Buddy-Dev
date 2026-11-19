@@ -122,12 +122,13 @@ export default async function DashboardPage() {
 
   const report = {
     overdue: { count: 0, cost: 0 }, thisWeek: { count: 0, cost: 0 },
-    later: { count: 0, cost: 0 }, drafts: { count: 0, cost: 0 },
+    later: { count: 0, cost: 0 }, transit: { count: 0, cost: 0 }, drafts: { count: 0, cost: 0 },
   };
   const add = (k, po) => { report[k].count += 1; report[k].cost += costByPO[po.id] ?? 0; };
   for (const po of reportPOs ?? []) {
     if (po.status === "draft") { add("drafts", po); continue; }
     if (po.expected_date && po.expected_date < today) { add("overdue", po); continue; } // same rule as the Overdue card
+    if (po.status === "shipped") { add("transit", po); continue; } // shipped, not yet received
     if (!NOT_FULLY_SHIPPED_STATUSES.includes(po.status)) continue; // already shipped: nothing left to ship
     const ship = po.expected_ship_date || po.expected_date;
     if (ship && ship <= weekEnd) add("thisWeek", po); else add("later", po);

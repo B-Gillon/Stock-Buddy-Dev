@@ -183,10 +183,11 @@ function GettingStartedCard({ onNavigate }) {
 const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n ?? 0);
 
 const REPORT_ROWS = [
-  { key: "overdue",  label: "Overdue",                     color: "#dc2626", tone: "text-red-600",   href: "/purchase-orders?status=overdue" },
-  { key: "thisWeek", label: "Due to ship this week",       color: "#f59e0b", tone: "text-amber-600", href: "/purchase-orders?status=ship_this_week" },
-  { key: "later",    label: "Due to ship after this week", color: "#16a34a", tone: "text-green-700", href: "/purchase-orders?status=ship_later" },
-  { key: "drafts",   label: "Drafts",                      color: "#2563eb", tone: "text-blue-700",  href: "/purchase-orders?status=draft" },
+  { key: "overdue",  label: "Overdue",                     color: "#dc2626", tone: "text-gray-900",   href: "/purchase-orders?status=overdue" },
+  { key: "thisWeek", label: "Due to ship this week",       color: "#f59e0b", tone: "text-gray-900", href: "/purchase-orders?status=ship_this_week" },
+  { key: "later",    label: "Due to ship after this week", color: "#16a34a", tone: "text-gray-900", href: "/purchase-orders?status=ship_later" },
+  { key: "transit",  label: "In Transit",                  color: "#7c3aed", tone: "text-gray-900", href: "/purchase-orders?status=in_transit" },
+  { key: "drafts",   label: "Drafts",                      color: "#2563eb", tone: "text-gray-900",  href: "/purchase-orders?status=draft" },
 ];
 
 function ReportDonut({ poReport, onNavigate }) {
@@ -218,7 +219,7 @@ function ReportDonut({ poReport, onNavigate }) {
         })}
         <text x="60" y="60" textAnchor="middle" dominantBaseline="central" style={{ pointerEvents: "none" }}>
           <tspan className="fill-gray-800" style={{ fontSize: 24, fontWeight: 700 }}>{total}</tspan>
-          <tspan className="fill-gray-500" style={{ fontSize: 13, fontWeight: 700 }} dx="3">POs</tspan>
+          <tspan className="fill-gray-800" style={{ fontSize: 24, fontWeight: 700 }} dx="4">POs</tspan>
         </text>
       </svg>
       {hovered && (
@@ -241,11 +242,11 @@ function POReportCard({ poReport, onNavigate }) {
             <li key={r.key} className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} />
               <button type="button" onClick={() => onNavigate(r.href)}
-                className="min-w-0 flex-1 truncate text-left text-xs text-gray-700 hover:underline"
-                style={{ padding: 0, margin: 0, font: "inherit", fontSize: "0.75rem", lineHeight: "inherit" }}>
+                className="min-w-0 flex-1 truncate text-left text-xs font-bold text-gray-900 hover:underline"
+                style={{ padding: 0, margin: 0, font: "inherit", fontSize: "0.75rem", fontWeight: 700, lineHeight: "inherit" }}>
                 {r.label}
               </button>
-              <span className={`font-semibold ${poReport[r.key].count > 0 ? r.tone : "text-gray-300"}`}>{poReport[r.key].count}</span>
+              <span className="font-bold text-gray-900">{poReport[r.key].count}</span>
             </li>
           ))}
         </ul>
