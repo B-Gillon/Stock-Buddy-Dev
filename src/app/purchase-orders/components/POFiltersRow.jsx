@@ -19,6 +19,7 @@ const STATUS_OPTIONS = [
 const LINK_ONLY_OPTIONS = [
   { value: 'partially_shipped', label: 'Partially Shipped' },
   { value: 'partially_received', label: 'Partially Received' },
+  { value: 'not_put_away', label: 'Not Put Away' },
   { value: 'ship_this_week', label: 'Due to Ship This Week' },
   { value: 'ship_later', label: 'Due to Ship After This Week' },
 ];

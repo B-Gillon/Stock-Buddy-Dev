@@ -100,19 +100,21 @@ export default async function DashboardPage() {
     .from("purchase_orders")
     .select("id, status, expected_date, expected_ship_date")
     .eq("tenant_id", tenantId)
-    .in("status", OPEN_STATUSES)
+    .in("status", [...OPEN_STATUSES, "received"])
     .limit(5000);
 
   const costByPO = {};
+  const readyByPO = {}; // received but not yet put away (units)
   if ((reportPOs ?? []).length) {
     const { data: reportLines } = await supabase
       .from("purchase_order_lines")
-      .select("purchase_order_id, order_qty_units, unit_cost, purchase_orders!inner(status)")
+      .select("purchase_order_id, order_qty_units, unit_cost, received_qty_units, putaway_qty_units, purchase_orders!inner(status)")
       .eq("tenant_id", tenantId)
-      .in("purchase_orders.status", OPEN_STATUSES)
+      .in("purchase_orders.status", [...OPEN_STATUSES, "received"])
       .range(0, 19999);
     for (const l of reportLines ?? []) {
       costByPO[l.purchase_order_id] = (costByPO[l.purchase_order_id] ?? 0) + (l.order_qty_units ?? 0) * Number(l.unit_cost ?? 0);
+      readyByPO[l.purchase_order_id] = (readyByPO[l.purchase_order_id] ?? 0) + Math.max(0, (l.received_qty_units ?? 0) - (l.putaway_qty_units ?? 0));
     }
   }
 
@@ -122,12 +124,13 @@ export default async function DashboardPage() {
 
   const report = {
     overdue: { count: 0, cost: 0 }, thisWeek: { count: 0, cost: 0 },
-    later: { count: 0, cost: 0 }, transit: { count: 0, cost: 0 }, drafts: { count: 0, cost: 0 },
+    later: { count: 0, cost: 0 }, transit: { count: 0, cost: 0 }, putaway: { count: 0, cost: 0 }, drafts: { count: 0, cost: 0 },
   };
   const add = (k, po) => { report[k].count += 1; report[k].cost += costByPO[po.id] ?? 0; };
   for (const po of reportPOs ?? []) {
     if (po.status === "draft") { add("drafts", po); continue; }
-    if (po.expected_date && po.expected_date < today) { add("overdue", po); continue; } // same rule as the Overdue card
+    if (po.status !== "received" && po.expected_date && po.expected_date < today) { add("overdue", po); continue; } // same rule as the Overdue card
+    if ((readyByPO[po.id] ?? 0) > 0) { add("putaway", po); continue; } // received, not yet put away
     if (po.status === "shipped") { add("transit", po); continue; } // shipped, not yet received
     if (!NOT_FULLY_SHIPPED_STATUSES.includes(po.status)) continue; // already shipped: nothing left to ship
     const ship = po.expected_ship_date || po.expected_date;

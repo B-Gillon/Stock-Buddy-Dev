@@ -187,6 +187,7 @@ const REPORT_ROWS = [
   { key: "thisWeek", label: "Due to ship this week",       color: "#f59e0b", tone: "text-gray-900", href: "/purchase-orders?status=ship_this_week" },
   { key: "later",    label: "Due to ship after this week", color: "#16a34a", tone: "text-gray-900", href: "/purchase-orders?status=ship_later" },
   { key: "transit",  label: "In Transit",                  color: "#7c3aed", tone: "text-gray-900", href: "/purchase-orders?status=in_transit" },
+  { key: "putaway",  label: "Not Put Away",                color: "#0d9488", tone: "text-gray-900", href: "/purchase-orders?status=not_put_away" },
   { key: "drafts",   label: "Drafts",                      color: "#2563eb", tone: "text-gray-900",  href: "/purchase-orders?status=draft" },
 ];
 

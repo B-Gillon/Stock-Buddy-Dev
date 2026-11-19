@@ -52,6 +52,9 @@ export default async function Page({ searchParams }) {
     query = query
       .in('status', NOT_FULLY_SHIPPED_STATUSES)
       .or(`expected_date.is.null,expected_date.gte.${today}`);
+  } else if (status === 'not_put_away') {
+    // received (fully or partly) with something not yet put away; a late partly-received PO shows as Overdue instead
+    query = query.in('status', ['received', 'partially_received']);
   } else if (status === 'shipped') {
     query = query.in('status', ['shipped', 'partially_shipped']);
   } else if (status === 'received') {
@@ -69,6 +72,18 @@ export default async function Page({ searchParams }) {
   if (search)     query = query.or(`po_number.ilike.%${search}%`);
 
   let { data: posRaw } = await query;
+
+  if (status === 'not_put_away') {
+    const today = new Date().toISOString().split('T')[0];
+    const ids = (posRaw ?? []).map((p) => p.id);
+    const ready = new Set();
+    if (ids.length) {
+      const { data: pl } = await supabase.from('purchase_order_lines')
+        .select('purchase_order_id, received_qty_units, putaway_qty_units').eq('tenant_id', tenantId).in('purchase_order_id', ids);
+      for (const l of pl ?? []) if ((l.received_qty_units ?? 0) > (l.putaway_qty_units ?? 0)) ready.add(l.purchase_order_id);
+    }
+    posRaw = (posRaw ?? []).filter((po) => ready.has(po.id) && !(po.status !== 'received' && po.expected_date && po.expected_date < today));
+  }
 
   if (status === 'ship_this_week' || status === 'ship_later') {
     const today = new Date().toISOString().split('T')[0];
