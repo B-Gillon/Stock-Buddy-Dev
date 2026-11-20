@@ -19,7 +19,7 @@ export const MAP_GROUPS = [
     { id: 'packing_slip_number', label: 'Packing Slip Number', explain: 'Optional. Must be the same on every row of a shipment.', aliases: ['packingslip', 'packingslipnumber', 'packslip', 'packslipnumber'] },
   ] },
   { id: 'carton', label: 'Carton', fields: [
-    { id: 'supplier_carton_id', label: 'SSCC Case Number (Carton ID)', explain: 'Identifies one carton and prints on its case label. Must be unique, never used on any other carton. Rows sharing a number are items in the same carton. When "Enforce Valid SSCC#s" is on, it must be 20 digits, start with 00, and have a valid check digit. When mixed cases are blocked, a carton can hold only one item.', aliases: ['sscc', 'ssccasenumber', 'ssccartonid', 'ssccnumber', 'casenumber', 'cartonid', 'cartonnumber', 'caseid', 'sscc18'] },
+    { id: 'supplier_carton_id', label: 'SSCC Case Number (Carton ID)', explain: 'Identifies one carton and prints on its case label. Must be unique, never used on any other carton. Rows sharing a number are items in the same carton. When "Enforce Valid SSCC#s" is on, it must be 20 digits, start with 00, and have a valid check digit. When mixed cases are blocked, a carton can hold only one item.', aliases: ['sscc', 'sscccasenumber', 'ssccartonid', 'ssccnumber', 'casenumber', 'cartonid', 'cartonnumber', 'caseid', 'sscc18'] },
     { id: 'carton_tracking', label: 'Carton Tracking Number', explain: 'Optional. Parcel tracking number for the carton. Must be the same on every row of a carton.', aliases: ['cartontracking', 'cartontrackingnumber', 'parceltracking'] },
   ] },
   { id: 'item', label: 'Item', fields: [
