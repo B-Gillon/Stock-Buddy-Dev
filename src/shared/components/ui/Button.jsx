@@ -13,6 +13,8 @@
  *   type     — button type (default: "button")
  */
 
+import { useRouter } from "next/navigation";
+
 const variants = {
   primary:   "bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40",
   secondary: "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40",
@@ -35,6 +37,7 @@ export default function Button({
   title,
   active = false,
 }) {
+  const router = useRouter();
   const cls = [
     "inline-flex items-center justify-center rounded-lg font-medium transition",
     "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1",
@@ -45,7 +48,7 @@ export default function Button({
   ].join(" ");
 
   const handleClick = href
-    ? (e) => { e.preventDefault(); window.location.href = href; }
+    ? (e) => { e.preventDefault(); router.push(href); }
     : onClick;
 
   return (

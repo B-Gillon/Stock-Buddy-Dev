@@ -185,7 +185,7 @@ export default function ClientLocationVariantReviewPage({ knownVariantIds }) {
       }
       clearImportData();
       showToast("Import successful!");
-      setTimeout(() => { window.location.replace("/products"); }, 1200);
+      setTimeout(() => { router.replace("/products"); }, 1200);
     } catch (err) {
       setSubmitError(err.message);
       setSubmitting(false);
