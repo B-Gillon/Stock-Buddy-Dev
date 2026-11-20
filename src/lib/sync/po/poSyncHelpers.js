@@ -5,12 +5,13 @@
  */
 
 import { supabase } from "@/lib/supabaseClient";
+import { shopifyGraphQL } from "@/lib/sync/shopifyHelpers";
 
 // ─── Credential Resolution ────────────────────────────────────────────────────
 
 /**
  * Resolve Shopify credentials for a tenant.
- * Returns { storeDomain, accessToken, apiVersion }
+ * Returns { storeDomain, accessToken }
  */
 export async function resolveShopifyCredentials(tenantId) {
   const { data, error } = await supabase
@@ -25,28 +26,75 @@ export async function resolveShopifyCredentials(tenantId) {
   return {
     storeDomain: data.shop_domain,
     accessToken: data.access_token,
-    apiVersion: process.env.SHOPIFY_API_VERSION || "2024-01",
-  };
+      };
 }
 
-// ─── Shopify Inventory API ────────────────────────────────────────────────────
+// ─── Shopify Inventory API (Admin GraphQL) ────────────────────────────────────
+
+const toGid = (type, id) =>
+  String(id).startsWith("gid://") ? String(id) : `gid://shopify/${type}/${id}`;
+
+const gqlCreds = ({ storeDomain, accessToken }) => ({
+  shopDomain: storeDomain,
+  accessToken,
+});
+
+function throwOnUserErrors(label, userErrors) {
+  if (userErrors?.length) {
+    throw new Error(`Shopify ${label} failed: ${userErrors.map((e) => e.message).join("; ")}`);
+  }
+}
+
+const INVENTORY_LEVEL_QUERY = `
+  query InventoryLevel($itemId: ID!, $locationId: ID!) {
+    inventoryItem(id: $itemId) {
+      inventoryLevel(locationId: $locationId) {
+        quantities(names: ["available"]) { name quantity }
+      }
+    }
+  }
+`;
+
+const INVENTORY_ADJUST_MUTATION = `
+  mutation InventoryAdjust($input: InventoryAdjustQuantitiesInput!) {
+    inventoryAdjustQuantities(input: $input) {
+      inventoryAdjustmentGroup { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+const INVENTORY_SET_MUTATION = `
+  mutation InventorySet($input: InventorySetQuantitiesInput!) {
+    inventorySetQuantities(input: $input) {
+      inventoryAdjustmentGroup { id }
+      userErrors { field message }
+    }
+  }
+`;
 
 /**
  * Fetch current inventory level from Shopify for a given
- * inventory_item_id + location_id (Shopify IDs).
+ * inventory_item_id + location_id (numeric ids or GIDs).
+ * Returns { available } or null when the item has no level at the location.
  */
 export async function getShopifyInventoryLevel(
-  { storeDomain, accessToken, apiVersion },
+  creds,
   shopifyInventoryItemId,
   shopifyLocationId
 ) {
-  const url = `https://${storeDomain}/admin/api/${apiVersion}/inventory_levels.json?inventory_item_ids=${shopifyInventoryItemId}&location_ids=${shopifyLocationId}`;
-  const res = await fetch(url, {
-    headers: { "X-Shopify-Access-Token": accessToken },
-  });
-  if (!res.ok) throw new Error(`Shopify inventory_levels fetch failed: ${res.status}`);
-  const json = await res.json();
-  return json.inventory_levels?.[0] ?? null;
+  const data = await shopifyGraphQL(
+    INVENTORY_LEVEL_QUERY,
+    {
+      itemId: toGid("InventoryItem", shopifyInventoryItemId),
+      locationId: toGid("Location", shopifyLocationId),
+    },
+    gqlCreds(creds)
+  );
+  const level = data?.inventoryItem?.inventoryLevel;
+  if (!level) return null;
+  const available = level.quantities?.find((q) => q.name === "available")?.quantity ?? 0;
+  return { available };
 }
 
 /**
@@ -54,58 +102,61 @@ export async function getShopifyInventoryLevel(
  * Use positive delta to increase, negative to decrease.
  */
 export async function adjustShopifyAvailable(
-  { storeDomain, accessToken, apiVersion },
+  creds,
   shopifyInventoryItemId,
   shopifyLocationId,
   delta
 ) {
-  const url = `https://${storeDomain}/admin/api/${apiVersion}/inventory_levels/adjust.json`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "X-Shopify-Access-Token": accessToken,
-      "Content-Type": "application/json",
+  const data = await shopifyGraphQL(
+    INVENTORY_ADJUST_MUTATION,
+    {
+      input: {
+        reason: "received",
+        name: "available",
+        changes: [
+          {
+            delta,
+            inventoryItemId: toGid("InventoryItem", shopifyInventoryItemId),
+            locationId: toGid("Location", shopifyLocationId),
+          },
+        ],
+      },
     },
-    body: JSON.stringify({
-      location_id: shopifyLocationId,
-      inventory_item_id: shopifyInventoryItemId,
-      available_adjustment: delta,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Shopify adjust failed (${res.status}): ${body}`);
-  }
-  return await res.json();
+    gqlCreds(creds)
+  );
+  throwOnUserErrors("adjust", data?.inventoryAdjustQuantities?.userErrors);
+  return data.inventoryAdjustQuantities;
 }
 
 /**
  * Set Shopify available to an absolute value.
  */
 export async function setShopifyAvailable(
-  { storeDomain, accessToken, apiVersion },
+  creds,
   shopifyInventoryItemId,
   shopifyLocationId,
   available
 ) {
-  const url = `https://${storeDomain}/admin/api/${apiVersion}/inventory_levels/set.json`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "X-Shopify-Access-Token": accessToken,
-      "Content-Type": "application/json",
+  const data = await shopifyGraphQL(
+    INVENTORY_SET_MUTATION,
+    {
+      input: {
+        reason: "correction",
+        name: "available",
+        ignoreCompareQuantity: true,
+        quantities: [
+          {
+            inventoryItemId: toGid("InventoryItem", shopifyInventoryItemId),
+            locationId: toGid("Location", shopifyLocationId),
+            quantity: available,
+          },
+        ],
+      },
     },
-    body: JSON.stringify({
-      location_id: shopifyLocationId,
-      inventory_item_id: shopifyInventoryItemId,
-      available,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Shopify set failed (${res.status}): ${body}`);
-  }
-  return await res.json();
+    gqlCreds(creds)
+  );
+  throwOnUserErrors("set", data?.inventorySetQuantities?.userErrors);
+  return data.inventorySetQuantities;
 }
 
 // ─── DB Helpers ───────────────────────────────────────────────────────────────
