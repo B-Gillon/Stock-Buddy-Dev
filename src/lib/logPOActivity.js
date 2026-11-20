@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { readUserCookie } from '@/lib/shopify/userCookie';
 import { userLabel } from '@/lib/userLabel';
+import { logError } from '@/lib/logError';
 
 /**
  * Logs an activity entry for a purchase order.
@@ -43,7 +44,11 @@ export async function logPOActivity({ poId, tenantId, action, comments, request,
         user_id:    user?.id ?? null,
         created_at: new Date().toISOString(),
       });
-    if (error) console.error('[logPOActivity] insert error:', error);
+    if (error) {
+      console.error('[logPOActivity] insert error:', error);
+      // Show it on the Errors page too, so a History row that didn't save is never silent
+      await logError({ source: 'logPOActivity', error: new Error(`History row "${action}" was not saved: ${error.message}`), tenantId, context: { poId, action } });
+    }
   } catch (err) {
     console.error('[logPOActivity] unexpected error:', err);
   }
