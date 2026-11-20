@@ -172,7 +172,7 @@ export async function fetchShipFiles(settings) {
 }
 
 /**
- * Deletes ship files that were processed successfully, so they are not picked up again. A file is only
+ * Deletes ship files that were read and handled, so they are not picked up again. A file is only
  * deleted if it is still exactly the one that was read (same size and modified time); one the supplier
  * replaced in the meantime is left alone. Returns { [name]: null | 'reason it was not deleted' }.
  */
