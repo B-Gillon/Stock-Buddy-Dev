@@ -5,7 +5,6 @@
 import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { shippedByLine } from '@/lib/shipments';
-import { markRetrieved } from '@/lib/supplierPortal';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { validateShipment, normalizeSscc } from '@/lib/shipmentFields';
 import { loadLabelSettings, validSscc } from '@/lib/sscc';
@@ -126,7 +125,6 @@ export async function createShipment({ tenantId, supplierId, userName, poId, shi
   await supabase.from('purchase_orders')
     .update({ status: fullyShipped ? 'shipped' : 'partially_shipped' })
     .eq('id', po.id).in('status', ['waiting_to_ship', 'partially_shipped']);
-  await markRetrieved({ poId: po.id, tenantId, supplierId, by: userName, method: 'shipment', log: false }); // shipping is not a PDF/CSV retrieval, so no "Retrieved" history entry
 
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
   await logPOActivity({ poId: po.id, tenantId, action: fullyShipped ? 'shipped' : 'partially_shipped', userName,
