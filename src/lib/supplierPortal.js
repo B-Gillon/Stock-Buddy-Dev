@@ -26,12 +26,12 @@ export const money = (n, cur = 'USD') =>
   n == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: cur }).format(n);
 
 /** Marks a PO as retrieved by the supplier (first time only). */
-export async function markRetrieved({ poId, tenantId, supplierId, by, method }) {
+export async function markRetrieved({ poId, tenantId, supplierId, by, method, log = true }) {
   const { logPOActivity } = await import('@/lib/logPOActivity');
   const { data } = await supabase
     .from('purchase_orders')
     .update({ supplier_retrieved_at: new Date().toISOString(), supplier_retrieved_by: by })
     .eq('id', poId).eq('tenant_id', tenantId).eq('supplier_id', supplierId).is('supplier_retrieved_at', null)
     .select('id').maybeSingle();
-  if (data) await logPOActivity({ poId, tenantId, action: 'retrieved', userName: by, comments: `Retrieved by supplier (${method})` });
+  if (data && log) await logPOActivity({ poId, tenantId, action: 'retrieved', userName: by, comments: `Retrieved by supplier (${method})` });
 }

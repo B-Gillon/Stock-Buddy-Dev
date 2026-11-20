@@ -11,6 +11,7 @@ const ACTION_LABELS = {
   sftp_retrieved: "SFTP Retrieved",
   sftp_deleted:   "SFTP Deleted",
   sftp_failed:    "SFTP Failed",
+  ship_file_retrieved: "Ship File Retrieved",
   reminder_sent:  "Reminder Sent",
   retrieved:      "Retrieved",
   shipped:        "Shipped",
@@ -32,6 +33,7 @@ const ACTION_STYLES = {
   sftp_retrieved: "bg-green-50 text-green-700",
   sftp_deleted:   "bg-green-50 text-green-700",
   sftp_failed:    "bg-red-50 text-red-700",
+  ship_file_retrieved: "bg-green-50 text-green-700",
   reminder_sent:  "bg-amber-50 text-amber-700",
   retrieved:      "bg-green-50 text-green-700",
   shipped:        "bg-blue-50 text-blue-700",
@@ -48,11 +50,15 @@ const ACTION_STYLES = {
   error:        "bg-red-50 text-red-700",
 };
 
-// A file the supplier picked up from the SFTP site is shown as "PDF Retrieved" / "CSV Retrieved"
+// A PO file the supplier picked up (SFTP) or downloaded (portal) is shown as "PDF Export Retrieved" / "CSV Export Retrieved"
 function activityLabel(row) {
   if (row.action === "sftp_retrieved" || row.action === "sftp_deleted") {
     const m = /\.(pdf|csv)\b/i.exec(row.comments ?? "");
-    if (m) return `${m[1].toUpperCase()} Retrieved`;
+    if (m) return `${m[1].toUpperCase()} Export Retrieved`;
+  }
+  if (row.action === "retrieved") {
+    const m = /\((pdf|csv)\)/i.exec(row.comments ?? "");
+    if (m) return `${m[1].toUpperCase()} Export Retrieved`;
   }
   return ACTION_LABELS[row.action] ?? row.action;
 }
