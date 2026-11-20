@@ -4,7 +4,7 @@
 // Server-side only.
 import { supabase } from '@/lib/supabaseClient';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
-import { validateShipment } from '@/lib/shipmentFields';
+import { validateShipment, resolveToday } from '@/lib/shipmentFields';
 import { shippedByLine } from '@/lib/shipments';
 import { createShipment } from '@/lib/createShipment';
 import { MAP_FIELDS, DELIMITERS, parseDelimited, autoMatch } from '@/lib/shipmentMapFields';
@@ -38,7 +38,7 @@ const LABEL_TO_FIELD = {
  *  - rows: [{ n, v:{field:value}, e:{field:message} }]  (n = row number in the file)
  *  - payloads: what createShipment needs per shipment (server use only)
  */
-export async function buildImportPlan({ tenantId, supplierId, fileText }) {
+export async function buildImportPlan({ tenantId, supplierId, fileText, clientDate }) {
   const fatal = (message) => ({ ok: false, fatal: message, columns: [], rows: [], errors: [], groups: [], totals: { shipments: 0, cartons: 0, units: 0 }, payloads: [] });
 
   const { data: mapRow } = await supabase.from('supplier_shipment_maps').select('config')
@@ -208,7 +208,7 @@ export async function buildImportPlan({ tenantId, supplierId, fileText }) {
   const out = [], payloads = [];
   for (const g of groups.values()) {
     const first = g.rows[0].v;
-    const shipment = { ship_date: g.date, tracking_number: first.tracking_number, supplier_reference: first.supplier_reference, packing_slip_number: first.packing_slip_number };
+    const shipment = { today: resolveToday(clientDate), ship_date: g.date, tracking_number: first.tracking_number, supplier_reference: first.supplier_reference, packing_slip_number: first.packing_slip_number };
     const cartons = [...g.cartons.values()].map((c) => {
       const byLine = new Map();
       for (const r of c.rows) if (r.lineId && r.qty) byLine.set(r.lineId, (byLine.get(r.lineId) ?? 0) + r.qty);
@@ -250,10 +250,10 @@ export async function buildImportPlan({ tenantId, supplierId, fileText }) {
 }
 
 /** Creates every shipment in a clean plan, one after another. Stops at the first failure. */
-export async function commitImportPlan({ tenantId, supplierId, userName, plan }) {
+export async function commitImportPlan({ tenantId, supplierId, userName, plan, clientDate }) {
   const created = [];
   for (const p of plan.payloads) {
-    const r = await createShipment({ tenantId, supplierId, userName, poId: p.poId, shipment: p.shipment, cartons: p.cartons });
+    const r = await createShipment({ tenantId, supplierId, userName, poId: p.poId, shipment: p.shipment, cartons: p.cartons, clientDate });
     if (!r.ok) return { ok: false, created, error: r.error };
     created.push(r.shipmentNumber);
   }

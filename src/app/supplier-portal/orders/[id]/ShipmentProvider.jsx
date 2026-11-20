@@ -90,7 +90,7 @@ export function CartonFields({ cfg, f, set, autoSscc, enforce }) {
 function ShipmentDetails({ cfg, s, set }) {
   const v = (id) => cfg[id].visible; const r = (id) => cfg[id].required;
   const text = (key) => <input className={input} value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
-  const date = (key) => <input className={`${input} w-[7.5rem] px-1`} type="date" value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
+  const date = (key) => <input className={`${input} w-[7.5rem] px-1`} type="date" max={key === 'ship_date' ? today() : undefined} value={s[key] ?? ''} onChange={(e) => set({ [key]: e.target.value })} />;
   return (
     <div className="flex items-stretch gap-4">
       <div className="grid flex-1 content-start gap-x-3 gap-y-3 sm:grid-cols-4">
@@ -268,7 +268,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   async function save() {
     setError('');
     const all = hasQty(cur) ? [...saved, cur] : saved;
-    const { ...shipment } = ship;
+    const { ...shipment } = { ...ship, today: today() };
     const errs = validateShipment(config, shipment, all.map((c) => cartonPayload(withPh(c))));
     if (!hasQty(cur) && Object.values(cur.f).some((v) => v && !['lb', 'in'].includes(v))) {
       errs.push(`Carton ${curNo}: enter a quantity for at least one item, or clear its fields.`);
@@ -288,7 +288,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
         }
       }
       const body = { poId, shipment, cartons: cartons.map(cartonPayload) };
-      const res = await fetch('/api/supplier-portal/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch('/api/supplier-portal/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, clientDate: today() }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) { w?.close(); setError(data.error || 'Something went wrong.'); setBusy(false); return; }
       if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc, cartons[cartons.length - 1]);

@@ -22,7 +22,7 @@ export async function POST(request) {
 
   const result = await createShipment({
     tenantId: sup.tenant_id, supplierId, userName: userLabel(user),
-    poId: body.poId, shipment: body.shipment, cartons: body.cartons,
+    poId: body.poId, shipment: body.shipment, cartons: body.cartons, clientDate: body.clientDate,
   });
   if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
   return NextResponse.json({ ok: true, shipmentNumber: result.shipmentNumber, shipmentId: result.shipmentId });

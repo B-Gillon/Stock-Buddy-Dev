@@ -24,11 +24,11 @@ export async function POST(request) {
   if (!sup || !user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
-    const plan = await buildImportPlan({ tenantId: sup.tenant_id, supplierId, fileText: text });
+    const plan = await buildImportPlan({ tenantId: sup.tenant_id, supplierId, fileText: text, clientDate: body.clientDate });
     const { payloads, ...view } = plan;
     if (!body.commit) return NextResponse.json(view);
     if (!plan.ok) return NextResponse.json({ ...view, committed: false });
-    const result = await commitImportPlan({ tenantId: sup.tenant_id, supplierId, userName: userLabel(user), plan });
+    const result = await commitImportPlan({ tenantId: sup.tenant_id, supplierId, userName: userLabel(user), plan, clientDate: body.clientDate });
     return NextResponse.json({ ...view, committed: result.ok, created: result.created, commitError: result.error ?? null });
   } catch (err) {
     console.error('[shipment-import] failed:', err);

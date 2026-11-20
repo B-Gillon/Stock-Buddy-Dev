@@ -10,7 +10,7 @@ const btnGray = 'inline-flex items-center rounded-md border border-gray-300 bg-w
 
 async function callImport(fileText, commit) {
   const res = await fetch('/api/supplier-portal/shipment-import', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileText, commit }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileText, commit, clientDate: new Date().toLocaleDateString('en-CA') }),
   });
   return res.json();
 }

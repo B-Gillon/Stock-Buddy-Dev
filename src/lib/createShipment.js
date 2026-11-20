@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
-import { validateShipment, normalizeSscc } from '@/lib/shipmentFields';
+import { validateShipment, normalizeSscc, resolveToday } from '@/lib/shipmentFields';
 import { loadLabelSettings, validSscc } from '@/lib/sscc';
 
 const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
@@ -15,7 +15,7 @@ const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null
 /**
  * @returns {Promise<{ok:true, shipmentNumber:string, shipmentId:string} | {ok:false, error:string, status:number}>}
  */
-export async function createShipment({ tenantId, supplierId, userName, poId, shipment, cartons }) {
+export async function createShipment({ tenantId, supplierId, userName, poId, shipment, cartons, clientDate }) {
   const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status')
     .eq('id', poId).eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
   if (!po) return { ok: false, error: 'Purchase order not found.', status: 404 };
@@ -25,7 +25,7 @@ export async function createShipment({ tenantId, supplierId, userName, poId, shi
 
   // Field rules from the retailer's settings
   const config = await loadShipmentConfig(tenantId, supplierId);
-  const sh = shipment ?? {};
+  const sh = { ...(shipment ?? {}), today: resolveToday(clientDate) };
   const cartonsIn = Array.isArray(cartons) ? cartons : [];
   const errors = validateShipment(config, sh, cartonsIn);
   if (errors.length) return { ok: false, error: errors[0] + (errors.length > 1 ? ` (and ${errors.length - 1} more)` : ''), status: 400 };

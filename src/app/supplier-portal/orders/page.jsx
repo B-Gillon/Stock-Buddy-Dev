@@ -20,7 +20,11 @@ export default async function OrdersPage() {
     .in('status', ['pending_acknowledgement', 'waiting_to_ship', 'partially_shipped', 'shipped'])
     .is('supplier_retrieved_at', null)
     .order('po_date', { ascending: false }).limit(300);
-  const rows = data ?? [];
+  // Any shipping activity takes a PO off this list
+  const ids = (data ?? []).map((p) => p.id);
+  const { data: shp } = ids.length ? await supabase.from('shipments').select('po_id').in('po_id', ids) : { data: [] };
+  const hasShipment = new Set((shp ?? []).map((x) => x.po_id));
+  const rows = (data ?? []).filter((p) => !hasShipment.has(p.id));
 
   const Table = ({ items }) => (
     <table className="w-full text-sm">

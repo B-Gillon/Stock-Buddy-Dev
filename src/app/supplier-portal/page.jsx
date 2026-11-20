@@ -8,6 +8,7 @@ import PortalFrame from './components/PortalFrame';
 import ClickRow from './components/ClickRow';
 import { POReportCard } from '@/app/dashboard/components/ClientDashboard';
 import { buildPOReport } from '@/lib/poReport';
+import { shippedByLine } from '@/lib/shipments';
 
 const STATUS_LABEL = { pending_acknowledgement: 'Needs acknowledgement', waiting_to_ship: 'Waiting to ship', partially_shipped: 'Partially shipped' };
 // Lookup results can be in any status, including completed ones
@@ -39,7 +40,17 @@ export default async function SupplierDashboard({ searchParams }) {
     .order('po_date', { ascending: false }).limit(500);
 
   // Open = sent with something still to ship (not fully shipped, received or cancelled)
-  const list = pos ?? [];
+  const allPos = pos ?? [];
+  const poIds = allPos.map((p) => p.id);
+  const [{ data: lineData }, { data: shipData }] = poIds.length ? await Promise.all([
+    supabase.from('purchase_order_lines').select('id, purchase_order_id, order_qty_units').in('purchase_order_id', poIds),
+    supabase.from('shipments').select('po_id').in('po_id', poIds),
+  ]) : [{ data: [] }, { data: [] }];
+  const shippedQty = await shippedByLine((lineData ?? []).map((l) => l.id));
+  const unshippedByPo = new Map();
+  for (const l of lineData ?? []) unshippedByPo.set(l.purchase_order_id, (unshippedByPo.get(l.purchase_order_id) ?? 0) + Math.max(0, (l.order_qty_units ?? 0) - (shippedQty[l.id] ?? 0)));
+  const shippedPoIds = new Set((shipData ?? []).map((x) => x.po_id));
+  const list = allPos.filter((p) => (unshippedByPo.get(p.id) ?? 0) > 0);
   const shipDate = (p) => p.expected_ship_date || p.expected_date || null;
   const now = new Date();
   const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - ((now.getUTCDay() + 6) % 7)));
@@ -50,7 +61,7 @@ export default async function SupplierDashboard({ searchParams }) {
   const OVER = 24; // business hours (weekends and major holidays excluded)
 
   // Not Printed = not yet retrieved (downloaded, emailed, or picked up by the supplier's system), same as the New POs tab
-  const unretrieved = list.filter((p) => !p.supplier_retrieved_at);
+  const unretrieved = allPos.filter((p) => !p.supplier_retrieved_at && !shippedPoIds.has(p.id));
   const notPrinted = unretrieved.length;
   const notPrintedRed = unretrieved.some((p) => businessHoursBetween(p.released_at || p.po_date, nowMs) > OVER);
 

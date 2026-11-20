@@ -21,6 +21,17 @@ export function isValidSscc(v) {
   return (10 - (sum % 10)) % 10 === Number(d[17]);
 }
 
+/**
+ * "Today" for the future-date check, as the user's own calendar date. The browser sends its local date (clientDate);
+ * it is only trusted when it is within a day of the server's UTC date, otherwise the UTC date is used.
+ */
+export function resolveToday(clientDate) {
+  const utc = new Date().toISOString().slice(0, 10);
+  const c = String(clientDate ?? '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(c) && Math.abs(Date.parse(`${c}T00:00:00Z`) - Date.parse(`${utc}T00:00:00Z`)) <= 864e5) return c;
+  return utc;
+}
+
 export const WEIGHT_UNITS = ['lb', 'kg'];
 export const DIM_UNITS = ['in', 'cm'];
 
@@ -113,6 +124,7 @@ export function validateShipment(config, shipment, cartons) {
   const s = shipment ?? {};
   if (blank(s.ship_date)) errors.push('Ship Date: required.');
   else if (!isDate(String(s.ship_date))) errors.push('Ship Date: not a valid date.');
+  else if (s.today && String(s.ship_date) > s.today) errors.push('Ship Date: can’t be in the future. Create the shipment once it has actually shipped.');
 
   const sget = {
     ship_method: () => ({ value: s.ship_method }),
