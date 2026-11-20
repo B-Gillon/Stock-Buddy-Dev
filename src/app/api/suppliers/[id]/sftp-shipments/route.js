@@ -25,7 +25,7 @@ export async function GET(request, { params }) {
     return NextResponse.json({
       settings: {
         sftp_enabled: !!s.sftp_enabled, sftp_host: s.sftp_host ?? '', sftp_port: s.sftp_port ?? 22,
-        sftp_username: s.sftp_username ?? '', sftp_folder: s.sftp_folder ?? '',
+        sftp_username: s.sftp_username ?? '', sftp_folder: s.sftp_folder ?? '', sftp_pickup_prefix: s.sftp_pickup_prefix ?? '',
         has_password: s.has_password, has_private_key: s.has_private_key, host_fingerprint: s.sftp_host_fingerprint ?? null,
       },
     });
@@ -58,9 +58,14 @@ export async function POST(request, { params }) {
     let folder;
     try { folder = cleanRemoteDir(b.sftp_folder); } catch (e) { return NextResponse.json({ error: e.message }, { status: 422 }); }
 
+    const prefix = String(b.sftp_pickup_prefix ?? '').trim();
+    if (prefix.length > 100 || /[\/\\\0]/.test(prefix) || prefix.includes('..')) {
+      return NextResponse.json({ error: 'The pickup prefix must be a file-name start (no slashes), up to 100 characters.' }, { status: 422 });
+    }
+
     const row = {
       tenant_id: tenantId, supplier_id: id, sftp_enabled: !!b.sftp_enabled,
-      sftp_host: host || null, sftp_port: port, sftp_username: username || null, sftp_folder: folder,
+      sftp_host: host || null, sftp_port: port, sftp_username: username || null, sftp_folder: folder, sftp_pickup_prefix: prefix || null,
       updated_at: new Date().toISOString(),
     };
 
@@ -77,7 +82,7 @@ export async function POST(request, { params }) {
     if (row.sftp_enabled) {
       if (!username) return NextResponse.json({ error: 'SFTP username is required.' }, { status: 422 });
       if (!row.sftp_password_enc && !row.sftp_private_key_enc) return NextResponse.json({ error: 'Enter an SFTP password or private key.' }, { status: 422 });
-      if (!folder) return NextResponse.json({ error: 'Enter the SFTP folder for shipment files.' }, { status: 422 });
+      if (!folder) return NextResponse.json({ error: 'Enter the SFTP pickup folder.' }, { status: 422 });
     }
 
     const { error } = await supabase.from('supplier_shipment_sftp_settings').upsert(row, { onConflict: 'supplier_id' });

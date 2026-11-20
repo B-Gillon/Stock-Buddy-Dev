@@ -130,8 +130,15 @@ export async function testSftpShipments(settings) {
   return withSftp({ ...settings, fingerprint_table: 'supplier_shipment_sftp_settings' }, async (client, fingerprint) => {
     const dir = cleanRemoteDir(settings.sftp_folder) || '.';
     const kind = await client.exists(dir);
-    const checks = [{ label: 'Shipment folder', path: dir, ok: kind === 'd',
-      message: kind === 'd' ? 'Found' : kind ? 'Exists but is not a folder' : 'Folder not found' }];
+    let message = kind === 'd' ? 'Found' : kind ? 'Exists but is not a folder' : 'Folder not found';
+    if (kind === 'd') {
+      try {
+        const prefix = String(settings.sftp_pickup_prefix ?? '');
+        const files = (await client.list(dir)).filter((f) => f.type === '-' && f.name.startsWith(prefix));
+        message = `Found (${files.length} file${files.length === 1 ? '' : 's'} ${prefix ? `starting with "${prefix}"` : 'to pick up'})`;
+      } catch { /* listing is only informational */ }
+    }
+    const checks = [{ label: 'Pickup folder', path: dir, ok: kind === 'd', message }];
     return { ok: checks.every((c) => c.ok), fingerprint, checks };
   });
 }

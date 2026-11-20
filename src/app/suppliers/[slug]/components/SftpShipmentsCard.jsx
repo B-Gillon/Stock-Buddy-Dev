@@ -12,7 +12,7 @@ const inputCls =
   "w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-500";
 const labelCls = "block text-xs font-medium text-gray-500 mb-1";
 
-const EMPTY = { sftp_enabled: false, sftp_host: "", sftp_port: 22, sftp_username: "", sftp_folder: "" };
+const EMPTY = { sftp_enabled: false, sftp_host: "", sftp_port: 22, sftp_username: "", sftp_folder: "", sftp_pickup_prefix: "" };
 const FIELDS = Object.keys(EMPTY);
 
 export default function SftpShipmentsCard({ supplierId }) {
@@ -52,7 +52,7 @@ export default function SftpShipmentsCard({ supplierId }) {
   const folderMissing = form.sftp_enabled && !String(form.sftp_folder ?? "").trim();
 
   async function save(extra = {}) {
-    if (!extra.reset_host_key && folderMissing) { showToast("Enter the SFTP folder for shipment files.", "error"); return; }
+    if (!extra.reset_host_key && folderMissing) { showToast("Enter the SFTP pickup folder.", "error"); return; }
     setSaving(true);
     try {
       const body = extra.reset_host_key
@@ -140,9 +140,18 @@ export default function SftpShipmentsCard({ supplierId }) {
             </div>
 
             <div className="space-y-2.5 self-start rounded border border-gray-100 bg-gray-50 p-3">
-              <p className="text-xs font-medium text-gray-600">Shipment Folder</p>
-              <input type="text" className={folderMissing ? inputCls.replace("border-gray-200", "border-red-400") : inputCls}
-                value={form.sftp_folder} onChange={(e) => set("sftp_folder", e.target.value)} placeholder="/outbound/shipments" />
+              <p className="text-xs font-medium text-gray-600">Pickup</p>
+              <div>
+                <label className={labelCls}>Pickup Folder</label>
+                <input type="text" className={folderMissing ? inputCls.replace("border-gray-200", "border-red-400") : inputCls}
+                  value={form.sftp_folder} onChange={(e) => set("sftp_folder", e.target.value)} placeholder="/outbound/shipments" />
+              </div>
+              <div>
+                <label className={labelCls}>Pickup Prefix</label>
+                <input type="text" className={inputCls} value={form.sftp_pickup_prefix} maxLength={100}
+                  onChange={(e) => set("sftp_pickup_prefix", e.target.value)} placeholder="e.g. SHIP_" />
+                <p className="mt-1 text-xs text-gray-400">Only files whose names start with this are picked up.</p>
+              </div>
             </div>
 
             <div>

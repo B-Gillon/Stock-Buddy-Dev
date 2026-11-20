@@ -39,10 +39,15 @@ export default function ShippingTab({ supplierId }) {
   if (!fields) return null;
   const controls = (
     <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-gray-800">Shipping Controls</h3>
-      <p className="mt-0.5 text-xs text-gray-500">
-        Choose which of these fields this supplier sees when they create a shipment. Unchecked fields are hidden from the supplier and are not required.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Shipping Controls</h3>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Choose which of these fields this supplier sees when they create a shipment. Unchecked fields are hidden from the supplier and are not required.
+          </p>
+        </div>
+        <Button onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
+      </div>
       <div className="mt-3 space-y-0.5">
         {fields.map((f) => (
           <label key={f.id} className="flex items-center gap-2 text-sm text-gray-800">
@@ -55,9 +60,6 @@ export default function ShippingTab({ supplierId }) {
         <input type="checkbox" checked={enforce} onChange={() => { setEnforce((v) => !v); setDirty(true); }} />
         Enforce Valid SSCC#s
       </label>
-      <div className="mt-4">
-        <Button onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
-      </div>
     </div>
   );
   return (
