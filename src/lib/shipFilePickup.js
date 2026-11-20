@@ -3,10 +3,11 @@
 // same checks as the supplier's manual upload. All-or-nothing per file: a file with any problem creates
 // nothing. Files are never changed or deleted on the supplier's server; a file is skipped once it has been
 // handled (same name, size and modified time), and picked up again only if the supplier replaces it.
+// A file that shipped successfully is deleted from the SFTP site afterwards; a file with problems is left there.
 // Server-side only.
 import { supabase } from '@/lib/supabaseClient';
 import { getShipmentSftpSettings } from '@/lib/shipmentSftpSettings';
-import { fetchShipFiles, validateSftpHost } from '@/lib/sftp';
+import { fetchShipFiles, deleteShipFiles, validateSftpHost } from '@/lib/sftp';
 import { buildImportPlan, commitImportPlan } from '@/lib/shipmentImport';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { sendAlert } from '@/lib/alerts';
@@ -43,6 +44,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
   }
 
   const results = [];
+  const shippedFiles = [];
   for (const f of found) {
     const sig = { supplier_id: supplierId, file_name: f.name, file_size: f.size, file_mtime: f.mtime.toISOString() };
     const { data: seen } = await supabase.from('ship_file_pickups').select('id, status').match(sig).limit(1);
@@ -89,6 +91,19 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
         vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', skus: [...new Set((plan?.rows ?? []).map((r) => r.v.sku).filter(Boolean))].join(', '), problem: message } });
     }
     results.push({ name: f.name, status, message, shipments: created });
+    if (status === 'shipped') shippedFiles.push(f);
+  }
+
+  // Delete what shipped, so the next pickup doesn't see it again
+  if (shippedFiles.length) {
+    const deleted = await deleteShipFiles(s, shippedFiles);
+    for (const f of shippedFiles) {
+      const r = results.find((x) => x.name === f.name);
+      const note = deleted[f.name] == null ? 'File deleted from the SFTP site.' : `Could not delete the file from the SFTP site: ${deleted[f.name]}`;
+      r.message = `${r.message}\n${note}`;
+      await supabase.from('ship_file_pickups').update({ message: r.message })
+        .match({ supplier_id: supplierId, file_name: f.name, file_size: f.size, file_mtime: f.mtime.toISOString() });
+    }
   }
   return { ok: true, files: results };
 }

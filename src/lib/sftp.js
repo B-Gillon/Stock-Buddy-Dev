@@ -171,6 +171,36 @@ export async function fetchShipFiles(settings) {
   });
 }
 
+/**
+ * Deletes ship files that were processed successfully, so they are not picked up again. A file is only
+ * deleted if it is still exactly the one that was read (same size and modified time); one the supplier
+ * replaced in the meantime is left alone. Returns { [name]: null | 'reason it was not deleted' }.
+ */
+export async function deleteShipFiles(settings, files) {
+  const out = {};
+  if (!files.length) return out;
+  try {
+    await withSftp({ ...settings, fingerprint_table: 'supplier_shipment_sftp_settings' }, async (client) => {
+      const dir = cleanRemoteDir(settings.sftp_folder) || '.';
+      for (const f of files) {
+        try {
+          const path = remotePath(dir, f.name);
+          const st = await client.stat(path);
+          if (Number(st.size) !== f.size || Math.abs(new Date(st.modifyTime).getTime() - f.mtime.getTime()) > 2000) {
+            out[f.name] = 'the file was replaced after it was read, so it was left on the SFTP site';
+            continue;
+          }
+          await client.delete(path);
+          out[f.name] = null;
+        } catch (err) { out[f.name] = String(err?.message ?? err); }
+      }
+    });
+  } catch (err) {
+    for (const f of files) if (!(f.name in out)) out[f.name] = String(err?.message ?? err);
+  }
+  return out;
+}
+
 // ── Upload ────────────────────────────────────────────────────────────────────
 
 /** Picks a file name that is not already on the server: name.pdf, name_2.pdf, name_3.pdf ... */
