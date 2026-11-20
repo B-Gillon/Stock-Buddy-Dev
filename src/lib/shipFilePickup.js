@@ -1,10 +1,9 @@
 // /src/lib/shipFilePickup.js
 // Picks up a supplier's shipment files from their SFTP pickup folder and creates the shipments, using the
 // same checks as the supplier's manual upload. All-or-nothing per file: a file with any problem creates
-// nothing. Files are never changed or deleted on the supplier's server; a file is skipped once it has been
-// handled (same name, size and modified time), and picked up again only if the supplier replaces it.
-// Every file that was read is deleted from the SFTP site afterwards (shipped, failed, or already handled), so it is
-// not picked up again. A file that could not be read is left there.
+// nothing. Every file found is processed, and once it has been read it is deleted from the SFTP site, so it
+// is not picked up again. A file that could not be read is left there. A file that is somehow still there on
+// the next pickup is simply checked again: its carton IDs and lots are already used, so it can't ship twice.
 // Server-side only.
 import { supabase } from '@/lib/supabaseClient';
 import { getShipmentSftpSettings } from '@/lib/shipmentSftpSettings';
@@ -23,7 +22,7 @@ function problemSummary(plan) {
   return list.length ? list.join('\n') : 'The file has no shipments to create.';
 }
 
-/** @returns {Promise<{ok:boolean, error?:string, files:{name:string, status:'shipped'|'failed'|'skipped', message:string, shipments?:string[]}[]}>} */
+/** @returns {Promise<{ok:boolean, error?:string, files:{name:string, status:'shipped'|'failed', message:string, shipments?:string[]}[]}>} */
 export async function pickupShipFiles({ tenantId, supplierId, userName = 'System' }) {
   const { data: supplier } = await supabase.from('suppliers').select('id, supplier_name').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle();
   if (!supplier) return { ok: false, error: 'Supplier not found.', files: [] };
@@ -49,13 +48,6 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
   const readFiles = [];
   for (const f of found) {
     const sig = { supplier_id: supplierId, file_name: f.name, file_size: f.size, file_mtime: f.mtime.toISOString() };
-    const { data: seen } = await supabase.from('ship_file_pickups').select('id, status').match(sig).limit(1);
-    if (seen?.length) {
-      results.push({ name: f.name, status: 'skipped', message: `Already handled (${seen[0].status === 'shipped' ? 'shipped' : 'failed'}).` });
-      if (f.text !== undefined) readFiles.push(f);
-      continue;
-    }
-
     const record = (status, message, poNumbers, created) => supabase.from('ship_file_pickups').insert({
       tenant_id: tenantId, ...sig, status, message, po_numbers: poNumbers, shipments_created: created, picked_up_by: userName,
     });
@@ -110,10 +102,8 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
       const r = results.find((x) => x.name === f.name);
       const note = deleted[f.name] == null ? 'File deleted from the SFTP site.' : `Could not delete the file from the SFTP site: ${deleted[f.name]}`;
       r.message = `${r.message}\n${note}`;
-      if (r.status !== 'skipped') {
-        await supabase.from('ship_file_pickups').update({ message: r.message })
-          .match({ supplier_id: supplierId, file_name: f.name, file_size: f.size, file_mtime: f.mtime.toISOString() });
-      }
+      await supabase.from('ship_file_pickups').update({ message: r.message })
+        .match({ supplier_id: supplierId, file_name: f.name, file_size: f.size, file_mtime: f.mtime.toISOString() });
     }
   }
   return { ok: true, files: results };
