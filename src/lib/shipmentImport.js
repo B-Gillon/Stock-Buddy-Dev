@@ -39,7 +39,7 @@ const LABEL_TO_FIELD = {
  *  - rows: [{ n, v:{field:value}, e:{field:message} }]  (n = row number in the file)
  *  - payloads: what createShipment needs per shipment (server use only)
  */
-export async function buildImportPlan({ tenantId, supplierId, fileText, clientDate }) {
+export async function buildImportPlan({ tenantId, supplierId, fileText, clientDate, maxErrors = 300 }) {
   const fatal = (message) => ({ ok: false, fatal: message, columns: [], rows: [], errors: [], groups: [], totals: { shipments: 0, cartons: 0, units: 0 }, payloads: [] });
 
   const { data: mapRow } = await supabase.from('supplier_shipment_maps').select('config')
@@ -270,7 +270,7 @@ export async function buildImportPlan({ tenantId, supplierId, fileText, clientDa
 
   const totals = { shipments: out.length, cartons: out.reduce((t, g) => t + g.cartons.length, 0), units: out.reduce((t, g) => t + g.units, 0) };
   return {
-    ok: errors.length === 0 && out.length > 0, columns, errors: errors.slice(0, 300), errorCount: errors.length,
+    ok: errors.length === 0 && out.length > 0, columns, errors: errors.slice(0, maxErrors), errorCount: errors.length,
     rows: rows.slice(0, 500).map(({ n, v, e }) => ({ n, v, e })), rowCount: rows.length, groups: out, totals, payloads,
   };
 }

@@ -40,7 +40,7 @@ export default function ErrorsClient({ initialErrors }) {
                   <tr className="border-t border-gray-100 align-top">
                     <td className="whitespace-nowrap px-4 py-2 text-gray-600">{fmt(e.created_at)}</td>
                     <td className="px-4 py-2 text-gray-900">
-                      <button type="button" className="text-left hover:underline" onClick={() => setOpen(open === e.id ? null : e.id)}>{e.message}</button>
+                      <button type="button" className="whitespace-pre-line text-left hover:underline" onClick={() => setOpen(open === e.id ? null : e.id)}>{e.message}</button>
                     </td>
                     <td className="px-4 py-2 font-mono text-xs text-gray-600">{e.source}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-gray-600">{e.user_name ?? <span className="text-gray-400">—</span>}</td>

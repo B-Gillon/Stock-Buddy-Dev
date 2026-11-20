@@ -11,15 +11,15 @@ import { fetchShipFiles, deleteShipFiles, validateSftpHost } from '@/lib/sftp';
 import { buildImportPlan, commitImportPlan } from '@/lib/shipmentImport';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { sendAlert } from '@/lib/alerts';
+import { logError } from '@/lib/logError';
 
 const low = (s) => String(s ?? '').trim().toLowerCase();
 
-function problemSummary(plan, max = 8) {
+// Every problem, by row, so nothing is hidden behind "and N more"
+function problemSummary(plan) {
   if (plan.fatal) return plan.fatal;
-  const list = (plan.errors ?? []).slice(0, max).map((e) => `Row ${e.n}: ${e.message}`);
-  const total = plan.errorCount ?? (plan.errors ?? []).length;
-  if (!list.length) return 'The file has no shipments to create.';
-  return list.join('\n') + (total > list.length ? `\n…and ${total - list.length} more problem${total - list.length === 1 ? '' : 's'}.` : '');
+  const list = [...(plan.errors ?? [])].sort((a, b) => a.n - b.n).map((e) => `Row ${e.n}: ${e.message}`);
+  return list.length ? list.join('\n') : 'The file has no shipments to create.';
 }
 
 /** @returns {Promise<{ok:boolean, error?:string, files:{name:string, status:'shipped'|'failed'|'skipped', message:string, shipments?:string[]}[]}>} */
@@ -38,6 +38,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
   let found;
   try { found = await fetchShipFiles(s); }
   catch (err) {
+    await logError({ source: 'shipFilePickup/connect', error: new Error(`Could not check ${supplier.supplier_name}'s SFTP site for ship files: ${err.message}`), tenantId, context: { supplierId } });
     await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
       vars: { supplier_name: supplier.supplier_name, file_name: '(could not connect to the SFTP site)', po_numbers: 'n/a', skus: '', problem: err.message } });
     return { ok: false, error: err.message, files: [] };
@@ -58,7 +59,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
     if (f.error) message = f.error;
     else {
       try {
-        plan = await buildImportPlan({ tenantId, supplierId, fileText: f.text });
+        plan = await buildImportPlan({ tenantId, supplierId, fileText: f.text, maxErrors: Infinity });
         poNumbers = [...new Set([...(plan.rows ?? []).map((r) => r.v.po_number), ...(plan.groups ?? []).map((g) => g.poNumber)].filter(Boolean))];
         if (plan.ok) {
           const r = await commitImportPlan({ tenantId, supplierId, userName, plan, logActivity: false });
@@ -87,6 +88,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
 
     await record(status, message, poNumbers, created.length);
     if (status === 'failed') {
+      await logError({ source: 'shipFilePickup/file', error: new Error(`Ship file ${f.name} from ${supplier.supplier_name} could not be processed:\n${message}`), tenantId, context: { supplierId, file: f.name, pos: poNumbers } });
       await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
         vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', skus: [...new Set((plan?.rows ?? []).map((r) => r.v.sku).filter(Boolean))].join(', '), problem: message } });
     }
