@@ -1,33 +1,14 @@
 // /src/app/api/cron/sftp-status/route.js
-// Hourly sweep of SFTP files we delivered. Called by a scheduler with the CRON_SECRET.
+// Called by the database scheduler (see Settings -> Scheduler). Needs the scheduler's login.
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "node:crypto";
-import { refreshAllSftpStatus } from "@/lib/sftp";
-import { logError } from "@/lib/logError";
+import { cronAuthorized, runJob } from "@/lib/scheduledJobs";
 
 export const maxDuration = 60;
 
-function authorized(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false; // fail closed
-  const given = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  const a = Buffer.from(given);
-  const b = Buffer.from(expected);
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
 async function run(request) {
-  if (!authorized(request)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
-  try {
-    const summary = await refreshAllSftpStatus();
-    return NextResponse.json({ success: true, ...summary });
-  } catch (err) {
-    await logError({ source: "api/cron/sftp-status", error: err });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  }
+  if (!(await cronAuthorized(request))) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  const result = await runJob("sftp_status", request.headers.get("x-trigger") === "schedule" ? "schedule" : "external");
+  return NextResponse.json({ success: result.ok, ...result }, { status: result.ok ? 200 : 500 });
 }
 
 export const GET = run;

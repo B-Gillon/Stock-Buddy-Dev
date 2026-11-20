@@ -108,3 +108,20 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
   }
   return { ok: true, files: results };
 }
+
+/** Scheduled run: every supplier (all stores) that has SFTP Shipments turned on. */
+export async function pickupAllShipFiles() {
+  const { data: rows } = await supabase.from('supplier_shipment_sftp_settings').select('tenant_id, supplier_id').eq('sftp_enabled', true);
+  const sum = { suppliers: (rows ?? []).length, files: 0, shipped: 0, failed: 0, couldNotConnect: 0 };
+  for (const r of rows ?? []) {
+    try {
+      const res = await pickupShipFiles({ tenantId: r.tenant_id, supplierId: r.supplier_id });
+      if (!res.ok) { sum.couldNotConnect += 1; continue; }
+      for (const f of res.files) { sum.files += 1; if (f.status === 'shipped') sum.shipped += 1; else sum.failed += 1; }
+    } catch (err) {
+      sum.couldNotConnect += 1;
+      await logError({ source: 'shipFilePickup/scheduled', error: err, tenantId: r.tenant_id, context: { supplierId: r.supplier_id } });
+    }
+  }
+  return sum;
+}
