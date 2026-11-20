@@ -15,6 +15,7 @@ import { exchangeTokenForAccess, exchangeTokenForOnlineUser } from "@/lib/shopif
 import { setUserCookie } from "@/lib/shopify/userCookie";
 import { supabase } from "@/lib/supabaseClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { SHOPIFY_API_VERSION } from "@/lib/sync/shopifyHelpers";
 
 export async function POST(request) {
   // 1. Verify session token and extract shop domain
@@ -38,14 +39,30 @@ export async function POST(request) {
     //    previous one. If the stored token is still good, keep it instead of replacing it on every load.
     const { data: existing } = await supabase
       .from("tenants")
-      .select("access_token_expires_at, refresh_token, uninstalled_at")
+      .select("access_token, access_token_expires_at, refresh_token, uninstalled_at")
       .eq("shop_domain", shop)
       .maybeSingle();
-    const storedIsGood =
+    let storedIsGood = !!(
       existing?.refresh_token &&
       !existing.uninstalled_at &&
       existing.access_token_expires_at &&
-      new Date(existing.access_token_expires_at).getTime() - Date.now() > 10 * 60 * 1000;
+      new Date(existing.access_token_expires_at).getTime() - Date.now() > 10 * 60 * 1000
+    );
+    // An uninstall we were never told about leaves a token that looks fine but Shopify has revoked.
+    // Check it with one tiny call; only a clear "rejected" answer replaces it (a network hiccup does not).
+    if (storedIsGood) {
+      try {
+        const probe = await fetch(`https://${shop}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+          method: "POST",
+          headers: { "X-Shopify-Access-Token": existing.access_token, "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "{ shop { id } }" }),
+        });
+        if (probe.status === 401 || probe.status === 403) {
+          console.log("[TokenExchange] Stored token was rejected by Shopify (app reinstalled?); getting a new one.");
+          storedIsGood = false;
+        }
+      } catch { /* leave the stored token in place */ }
+    }
 
     if (!storedIsGood) {
       console.log("[TokenExchange] Exchanging token for shop:", shop);

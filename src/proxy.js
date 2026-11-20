@@ -87,6 +87,7 @@ export async function proxy(request) {
     pathname.startsWith("/api/auth/") ||
     pathname.startsWith("/api/acknowledge") ||
     pathname.startsWith("/api/shopify/set-shop-cookie") ||
+    pathname.startsWith("/api/webhooks/") ||
     pathname.startsWith("/admin");
 
   if (isPublicRoute) {
