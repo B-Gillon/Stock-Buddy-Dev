@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { getTenantId } from "@/lib/tenants";
 import { logError } from "@/lib/logError";
+import { getShopifyCredentials } from "@/lib/shopify/accessToken";
 import syncProducts        from "@/lib/sync/syncProducts";
 import syncVendors         from "@/lib/sync/syncVendors";
 import syncLocations       from "@/lib/sync/syncLocations";
@@ -15,24 +16,13 @@ export async function POST(request) {
   const results  = {};
   const errors   = [];
 
-  // Look up tenant credentials from the tenants table
-  const { data: tenant, error: tenantError } = await supabaseAdmin
-    .from("tenants")
-    .select("shop_domain, access_token")
-    .eq("id", tenantId)
-    .single();
-
-  if (tenantError || !tenant?.access_token) {
-    return NextResponse.json(
-      { success: false, error: "Tenant credentials not found." },
-      { status: 401 }
-    );
+  // Valid (auto-refreshed) Shopify credentials for this tenant
+  let credentials;
+  try {
+    credentials = await getShopifyCredentials(tenantId);
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 401 });
   }
-
-  const credentials = {
-    shopDomain:  tenant.shop_domain,
-    accessToken: tenant.access_token,
-  };
 
   try { await syncProducts(credentials, tenantId);        results.products        = "ok"; }
   catch (err) { console.error("syncProducts failed:", err);        errors.push(`products: ${err.message}`);        results.products        = "failed"; await logError({ source: "syncProducts",        error: err, tenantId }); }

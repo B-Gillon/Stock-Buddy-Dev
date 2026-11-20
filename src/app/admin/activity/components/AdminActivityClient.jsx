@@ -149,7 +149,7 @@ function AddTesterModal({ adminKey, onClose, onAdded }) {
 // ── Approve Modal ─────────────────────────────────────────────────────────────
 
 function ApproveModal({ tester, accessRequest, adminKey, onClose, onApproved }) {
-  const installUrl = `https://stock-buddy-dev.brandongillon.com/api/shopify/install?shop=${accessRequest?.store_url ?? ''}`;
+  const installUrl = process.env.NEXT_PUBLIC_SHOPIFY_INSTALL_URL ?? '';
   const firstName  = (accessRequest?.contact_name ?? tester.contact_name ?? '').split(' ')[0] || 'there';
 
   const approvalBody =
@@ -157,7 +157,7 @@ function ApproveModal({ tester, accessRequest, adminKey, onClose, onApproved }) 
 
 Great news — your request to join the Stock Buddy private beta has been approved!
 
-You can install Stock Buddy into your Shopify store using the button below. This link is specific to your store and will not work for any other Shopify account.
+You can install Stock Buddy into your Shopify store using the button below.
 
 Once installed, Stock Buddy will appear inside your Shopify Admin. If you run into any issues during setup, feel free to reply to this email and I'll help you get sorted.
 

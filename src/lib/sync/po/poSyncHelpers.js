@@ -5,6 +5,7 @@
  */
 
 import { supabase } from "@/lib/supabaseClient";
+import { getShopifyCredentials } from "@/lib/shopify/accessToken";
 import { shopifyGraphQL } from "@/lib/sync/shopifyHelpers";
 
 // ─── Credential Resolution ────────────────────────────────────────────────────
@@ -14,19 +15,8 @@ import { shopifyGraphQL } from "@/lib/sync/shopifyHelpers";
  * Returns { storeDomain, accessToken }
  */
 export async function resolveShopifyCredentials(tenantId) {
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("shop_domain, access_token")
-    .eq("id", tenantId)
-    .single();
-
-  if (error || !data) throw new Error(`Tenant not found: ${tenantId}`);
-  if (!data.access_token) throw new Error(`No access token for tenant: ${tenantId}`);
-
-  return {
-    storeDomain: data.shop_domain,
-    accessToken: data.access_token,
-      };
+  const { shopDomain, accessToken } = await getShopifyCredentials(tenantId);
+  return { storeDomain: shopDomain, accessToken };
 }
 
 // ─── Shopify Inventory API (Admin GraphQL) ────────────────────────────────────

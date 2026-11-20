@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
 import { logError } from "@/lib/logError";
+import { getShopifyCredentials } from "@/lib/shopify/accessToken";
 import syncLocations from "@/lib/sync/syncLocations";
 
 export async function POST(request) {
@@ -11,31 +12,12 @@ export async function POST(request) {
   const results = {};
   const errors  = [];
 
-  // Look up tenant credentials from the database
-  const { data: tenant, error: tenantError } = await supabase
-    .from("tenants")
-    .select("shop_domain, access_token")
-    .eq("id", tenantId)
-    .single();
-
-  console.log("tenant lookup:", {
-    tenantId,
-    shop_domain: tenant?.shop_domain,
-    has_token: !!tenant?.access_token,
-    tenantError: tenantError?.message,
-  });
-
-  if (tenantError || !tenant?.access_token) {
-    return NextResponse.json(
-      { success: false, error: "Tenant credentials not found" },
-      { status: 401 }
-    );
+  let credentials;
+  try {
+    credentials = await getShopifyCredentials(tenantId);
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 401 });
   }
-
-  const credentials = {
-    shopDomain:  tenant.shop_domain,
-    accessToken: tenant.access_token,
-  };
 
   try {
     await syncLocations(tenantId, credentials);

@@ -32,29 +32,47 @@ export async function POST(request) {
   }
 
   try {
-    // 3. Exchange session token for offline access token
-    console.log("[TokenExchange] Exchanging token for shop:", shop);
-    const accessToken = await exchangeTokenForAccess(shop, sessionToken);
-    console.log("[TokenExchange] Token exchange successful.");
-
-    // 4. Upsert tenant with fresh access token
-    const now = new Date().toISOString();
-    const { error } = await supabase
+    // 3. Exchange session token for an expiring offline access token (+ refresh token).
+    //    Shopify keeps only one expiring offline token per app/store, so a new exchange retires the
+    //    previous one. If the stored token is still good, keep it instead of replacing it on every load.
+    const { data: existing } = await supabase
       .from("tenants")
-      .upsert(
-        {
-          shop_domain:    shop,
-          access_token:   accessToken,
-          installed_at:   now,
-          uninstalled_at: null,
-          updated_at:     now,
-        },
-        { onConflict: "shop_domain", ignoreDuplicates: false }
-      );
+      .select("access_token_expires_at, refresh_token, uninstalled_at")
+      .eq("shop_domain", shop)
+      .maybeSingle();
+    const storedIsGood =
+      existing?.refresh_token &&
+      !existing.uninstalled_at &&
+      existing.access_token_expires_at &&
+      new Date(existing.access_token_expires_at).getTime() - Date.now() > 10 * 60 * 1000;
 
-    if (error) {
-      console.error("[TokenExchange] Supabase upsert failed:", error.message);
-      return NextResponse.json({ error: "Failed to store token" }, { status: 500 });
+    if (!storedIsGood) {
+      console.log("[TokenExchange] Exchanging token for shop:", shop);
+      const tokens = await exchangeTokenForAccess(shop, sessionToken);
+      console.log("[TokenExchange] Token exchange successful.");
+
+      // 4. Upsert tenant with the new token pair
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("tenants")
+        .upsert(
+          {
+            shop_domain:              shop,
+            access_token:             tokens.accessToken,
+            access_token_expires_at:  tokens.expiresAt,
+            refresh_token:            tokens.refreshToken,
+            refresh_token_expires_at: tokens.refreshTokenExpiresAt,
+            installed_at:             now,
+            uninstalled_at:           null,
+            updated_at:               now,
+          },
+          { onConflict: "shop_domain", ignoreDuplicates: false }
+        );
+
+      if (error) {
+        console.error("[TokenExchange] Supabase upsert failed:", error.message);
+        return NextResponse.json({ error: "Failed to store token" }, { status: 500 });
+      }
     }
 
     console.log("[TokenExchange] Tenant upserted successfully for shop:", shop);

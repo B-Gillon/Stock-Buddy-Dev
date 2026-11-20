@@ -26,7 +26,11 @@ export async function POST(request) {
   if (!subject?.trim())    return NextResponse.json({ error: 'Subject is required.' }, { status: 400 });
   if (!message?.trim())    return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
 
-  const installUrl = `https://stock-buddy-dev.brandongillon.com/api/shopify/install?shop=${store_url}`;
+  // Shopify-hosted install link for the app (Dev Dashboard → Distribution). Shopify starts the install.
+  const installUrl = process.env.NEXT_PUBLIC_SHOPIFY_INSTALL_URL;
+  if (!installUrl) {
+    return NextResponse.json({ error: 'NEXT_PUBLIC_SHOPIFY_INSTALL_URL is not set. Add the app\'s Shopify install link in Vercel.' }, { status: 500 });
+  }
 
   const bodyParagraphs = message
     .trim()

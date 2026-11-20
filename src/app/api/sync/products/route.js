@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabaseClient";
 import { getTenantId } from "@/lib/tenants";
 import { logError } from "@/lib/logError";
+import { getShopifyCredentials } from "@/lib/shopify/accessToken";
 import syncProducts from "@/lib/sync/syncProducts";
 import syncVendors  from "@/lib/sync/syncVendors";
 
@@ -14,14 +15,7 @@ export async function POST(request) {
   // Resolve tenant Shopify credentials
   let credentials = null;
   try {
-    const { data: tenant } = await supabase
-      .from("tenants")
-      .select("shop_domain, access_token")
-      .eq("id", tenantId)
-      .single();
-    if (tenant?.shop_domain && tenant?.access_token) {
-      credentials = { shopDomain: tenant.shop_domain, accessToken: tenant.access_token };
-    }
+    credentials = await getShopifyCredentials(tenantId);
   } catch (err) {
     await logError({ source: 'sync/products/tenantLookup', error: err, tenantId });
   }
