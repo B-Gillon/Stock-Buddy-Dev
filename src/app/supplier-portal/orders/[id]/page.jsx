@@ -28,7 +28,7 @@ function fmtDate(val) {
 export default async function OrderPage({ params, searchParams }) {
   const s = await requireSupplier();
   const { id } = await params;
-  const { from } = (await searchParams) ?? {};
+  const { from, ship } = (await searchParams) ?? {};
   const { data: po } = await supabase
     .from('purchase_orders')
     .select(`id, po_number, status, po_date, expected_date, expected_ship_date, currency_code, notes_supplier, released_at,
@@ -82,7 +82,7 @@ export default async function OrderPage({ params, searchParams }) {
 
   return (
     <PortalFrame active={section} supplierName={s.supplierName} email={s.email}>
-      <ShipmentProvider>
+      <ShipmentProvider startCreating={ship === '1' && canShip}>
         <div className="space-y-4">
           <PageHeader
             backHref={`/supplier-portal/${section}`}

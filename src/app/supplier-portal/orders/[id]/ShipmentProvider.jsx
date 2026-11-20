@@ -12,8 +12,8 @@ const idValue = (l, id) => (id === 'sku' ? l.sku : id === 'supplier_sku' ? l.sup
 
 const Ctx = createContext(null);
 
-export function ShipmentProvider({ children }) {
-  const [creating, setCreating] = useState(false);
+export function ShipmentProvider({ children, startCreating = false }) {
+  const [creating, setCreating] = useState(startCreating);
   const [lastShipmentId, setLastShipmentId] = useState(null); // after Save Shipment, the Shipments card shows only this one
   return <Ctx.Provider value={{ creating, setCreating, lastShipmentId, setLastShipmentId }}>{children}</Ctx.Provider>;
 }

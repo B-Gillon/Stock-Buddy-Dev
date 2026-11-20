@@ -38,6 +38,7 @@ export default async function ShippingPage() {
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Waiting to ship ({rows.length})</h2>
           <UploadShipFile />
         </div>
+        <p className="mb-3 text-sm text-gray-500">Click a purchase order below to ship it manually and enter its shipment details. You can also upload a ship file.</p>
         {rows.length === 0 ? <p className="text-sm text-gray-400">Nothing left to ship.</p> : (
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-400">
@@ -49,7 +50,7 @@ export default async function ShippingPage() {
               {rows.map((p) => {
                 const due = p.expected_ship_date || p.expected_date;
                 return (
-                  <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}?from=shipping`} className="border-b border-gray-50 last:border-0">
+                  <ClickRow key={p.id} href={`/supplier-portal/orders/${p.id}?from=shipping&ship=1`} className="border-b border-gray-50 last:border-0">
                     <td className="py-1.5 text-blue-700">{p.po_number}</td>
                     <td className="py-1.5 text-gray-700">{(Array.isArray(p.location) ? p.location[0] : p.location)?.name ?? '—'}</td>
                     <td className="py-1.5 text-gray-700">{fmtDate(p.po_date)}</td>
