@@ -204,6 +204,15 @@ export default function Header() {
             })}
 
             <Link
+              href="/errors"
+              className={`ml-1 px-2 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap ${
+                pathname.startsWith("/errors") ? "text-white bg-white/20" : "text-gray-200 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              Errors
+            </Link>
+
+            <Link
               href="/settings"
               className="ml-1 p-1.5 text-gray-200 hover:text-white hover:bg-white/10 rounded-md transition"
               title="Settings"

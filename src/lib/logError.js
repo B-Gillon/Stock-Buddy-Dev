@@ -8,7 +8,9 @@
  *   await logError({ source: 'syncProducts', error: err, tenantId, context: { poId } });
  */
 
+import { headers } from 'next/headers';
 import { supabase } from '@/lib/supabaseClient';
+import { resolveActingUser } from '@/lib/actingUser';
 
 /**
  * @param {object} opts
@@ -22,8 +24,13 @@ export async function logError({ source, error, tenantId = null, context = null 
     const message = error instanceof Error ? error.message : String(error);
     const stack   = error instanceof Error ? error.stack   : null;
 
+    // Who was signed in when it happened, if this ran inside a request (not for cron / background work)
+    let userName = null;
+    try { userName = (await resolveActingUser({ headers: await headers() }))?.name ?? null; } catch { /* outside a request */ }
+
     await supabase.from('error_log').insert({
       tenant_id: tenantId,
+      user_name: userName,
       source,
       message,
       stack,
