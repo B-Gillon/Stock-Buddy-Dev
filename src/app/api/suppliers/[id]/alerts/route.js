@@ -8,9 +8,9 @@ import { ALERT_TYPES, parseEmailList } from '@/lib/alerts';
 const forbidden = (request) => request.headers.get('x-auth-role') === 'supplier';
 
 async function view(supplierId) {
-  const { data } = await supabase.from('supplier_alert_settings').select('alert_type, enabled, emails').eq('supplier_id', supplierId);
+  const { data } = await supabase.from('supplier_alert_settings').select('alert_type, enabled, emails, cc_emails, bcc_emails').eq('supplier_id', supplierId);
   const by = new Map((data ?? []).map((r) => [r.alert_type, r]));
-  return Object.entries(ALERT_TYPES).map(([type, d]) => ({ type, title: d.title, description: d.description, enabled: !!by.get(type)?.enabled, emails: by.get(type)?.emails ?? '' }));
+  return Object.entries(ALERT_TYPES).map(([type, d]) => ({ type, title: d.title, description: d.description, enabled: !!by.get(type)?.enabled, emails: by.get(type)?.emails ?? '', cc: by.get(type)?.cc_emails ?? '', bcc: by.get(type)?.bcc_emails ?? '' }));
 }
 
 async function ownSupplier(id, tenantId) {
@@ -48,7 +48,11 @@ export async function POST(request, { params }) {
       if (invalid.length) return NextResponse.json({ error: `"${d.title}": these don't look like email addresses: ${invalid.join(', ')}` }, { status: 422 });
       if (valid.length > 10) return NextResponse.json({ error: `"${d.title}": up to 10 email addresses.` }, { status: 422 });
       if (a.enabled && !valid.length) return NextResponse.json({ error: `"${d.title}": enter at least one email address, or turn it off.` }, { status: 422 });
-      rows.push({ tenant_id: tenantId, supplier_id: id, alert_type: type, enabled: !!a.enabled, emails: valid.join(', '), updated_at: new Date().toISOString() });
+      const cc = parseEmailList(a.cc), bcc = parseEmailList(a.bcc);
+      const badAddr = [...cc.invalid, ...bcc.invalid];
+      if (badAddr.length) return NextResponse.json({ error: `"${d.title}": these don't look like email addresses: ${badAddr.join(', ')}` }, { status: 422 });
+      if (cc.valid.length > 10 || bcc.valid.length > 10) return NextResponse.json({ error: `"${d.title}": up to 10 CC and 10 BCC addresses.` }, { status: 422 });
+      rows.push({ tenant_id: tenantId, supplier_id: id, alert_type: type, enabled: !!a.enabled, emails: valid.join(', '), cc_emails: cc.valid.join(', '), bcc_emails: bcc.valid.join(', '), updated_at: new Date().toISOString() });
     }
     if (rows.length) {
       const { error } = await supabase.from('supplier_alert_settings').upsert(rows, { onConflict: 'supplier_id,alert_type' });

@@ -25,7 +25,7 @@ export default function SupplierAlertsTab({ supplierId }) {
   async function save() {
     setSaving(true);
     try {
-      const body = { alerts: Object.fromEntries(alerts.map((a) => [a.type, { enabled: a.enabled, emails: a.emails }])) };
+      const body = { alerts: Object.fromEntries(alerts.map((a) => [a.type, { enabled: a.enabled, emails: a.emails, cc: a.cc, bcc: a.bcc }])) };
       const res = await fetch(`/api/suppliers/${supplierId}/alerts`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const j = await res.json();
       if (!res.ok) throw new Error(j.error ?? "Save failed");
@@ -52,10 +52,20 @@ export default function SupplierAlertsTab({ supplierId }) {
               <span><span className="block text-sm font-medium text-gray-800">{a.title}</span><span className="block text-xs text-gray-500">{a.description}</span></span>
             </label>
             <div className="mt-2 pl-7">
-              <label className="mb-1 block text-xs font-medium text-gray-500">Send to</label>
+              <label className="mb-1 block text-xs font-medium text-gray-500">To</label>
               <textarea rows={2} className={inputCls} disabled={!a.enabled} value={a.emails} placeholder="you@company.com, team@company.com"
                 onChange={(e) => edit(a.type, "emails", e.target.value)} />
-              <p className="mt-1 text-xs text-gray-400">Separate addresses with commas. Up to 10.</p>
+              <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">CC</label>
+                  <textarea rows={2} className={inputCls} disabled={!a.enabled} value={a.cc} onChange={(e) => edit(a.type, "cc", e.target.value)} />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-gray-500">BCC</label>
+                  <textarea rows={2} className={inputCls} disabled={!a.enabled} value={a.bcc} onChange={(e) => edit(a.type, "bcc", e.target.value)} />
+                </div>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">Separate addresses with commas. Up to 10 each. Any CC / BCC set for this alert in Settings → Email Alerts is added automatically.</p>
             </div>
           </div>
         ))}

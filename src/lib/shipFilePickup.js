@@ -38,7 +38,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
   try { found = await fetchShipFiles(s); }
   catch (err) {
     await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
-      vars: { supplier_name: supplier.supplier_name, file_name: '(could not connect to the SFTP site)', po_numbers: 'n/a', problem: err.message } });
+      vars: { supplier_name: supplier.supplier_name, file_name: '(could not connect to the SFTP site)', po_numbers: 'n/a', skus: '', problem: err.message } });
     return { ok: false, error: err.message, files: [] };
   }
 
@@ -86,7 +86,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
     await record(status, message, poNumbers, created.length);
     if (status === 'failed') {
       await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
-        vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', problem: message } });
+        vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', skus: [...new Set((plan?.rows ?? []).map((r) => r.v.sku).filter(Boolean))].join(', '), problem: message } });
     }
     results.push({ name: f.name, status, message, shipments: created });
   }

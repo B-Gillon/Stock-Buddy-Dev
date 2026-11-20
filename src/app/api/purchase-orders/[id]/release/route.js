@@ -97,17 +97,19 @@ export async function POST(request, { params }) {
         }
 
         if (!emailResult.success) {
+          const { data: skuRows } = await supabase.from("purchase_order_lines").select("sku").eq("purchase_order_id", poId);
+          const skus = [...new Set((skuRows ?? []).map((r) => r.sku).filter(Boolean))].join(", ");
           const sftpFailed = emailResult.sftp?.files?.filter((f) => !f.ok).map((f) => `${f.type.toUpperCase()}: ${f.error}`) ?? [];
           await sendAlert({
             tenantId, supplierId: po.supplier_id, kind: "po_release_failed",
-            vars: { supplier_name: supplierName, po_number: po.po_number, problem: sendError ?? emailResult.error ?? (sftpFailed.length ? sftpFailed.join("; ") : "Unknown error") },
+            vars: { supplier_name: supplierName, po_number: po.po_number, skus, problem: sendError ?? emailResult.error ?? (sftpFailed.length ? sftpFailed.join("; ") : "Unknown error") },
           });
         }
       } catch (err) {
         await logError({ source: "releasePO/afterResponse", error: err, tenantId, context: { poId } });
         await logPOActivity({ poId, tenantId, action: "error", request, comments: `Send failed: ${err.message}` });
         await sendAlert({ tenantId, supplierId: po.supplier_id, kind: "po_release_failed",
-          vars: { supplier_name: supplierName, po_number: po.po_number, problem: err.message } });
+          vars: { supplier_name: supplierName, po_number: po.po_number, skus: "", problem: err.message } });
       }
     });
 
