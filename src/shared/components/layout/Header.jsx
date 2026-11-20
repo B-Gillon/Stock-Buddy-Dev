@@ -5,7 +5,8 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { Toast, useToast } from "@/shared/components/ui/Toast";
 import SignOutButton from "@/app/components/SignOutButton";
 
 
@@ -97,21 +98,40 @@ function NavDropdown({ label, items, activePrefixes }) {
   );
 }
 
-export default function Header({
-  pageName,
-  syncLabel,
-  onSync,
-  syncing,
-  lastSyncedAt,
-  formatTimestamp,
-}) {
+export default function Header() {
   // Only the website login (not Shopify) has a session to end
   const [webUser, setWebUser] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const { toast, showToast } = useToast();
+  const router = useRouter();
   useEffect(() => {
     let live = true;
     fetch("/api/auth/me").then((r) => r.json()).then((j) => { if (live) setWebUser(j.user ?? null); }).catch(() => {});
+    fetch("/api/sync/status").then((r) => r.json()).then((j) => { if (live) setLastSyncedAt(j.last_synced_at ?? null); }).catch(() => {});
     return () => { live = false; };
   }, []);
+
+  // The only sync: everything, from any page.
+  async function handleSyncEverything() {
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/sync/all", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (body.last_synced_at) setLastSyncedAt(body.last_synced_at);
+      if (!res.ok) {
+        const detail = Array.isArray(body.errors) && body.errors.length ? body.errors.join("; ") : (body.error ?? res.statusText);
+        showToast(`Sync finished with errors: ${detail}`, "error");
+      } else {
+        showToast("Sync complete.", "info");
+      }
+      router.refresh();
+    } catch (err) {
+      showToast(`Sync failed: ${err.message}`, "error");
+    } finally {
+      setSyncing(false);
+    }
+  }
   const pathname = usePathname();
 
   return (
@@ -141,22 +161,22 @@ export default function Header({
         {/* Right: sync row (optional) + nav always at bottom */}
         <div className="flex flex-col items-end justify-end gap-1.5 min-w-0">
 
-          {/* Sync row — only rendered when onSync is provided */}
-          {onSync && (
+          {/* Sync row — Sync Everything, on every page */}
+          {(
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-400 whitespace-nowrap">
                 {lastSyncedAt
-                  ? `Last Sync: ${formatTimestamp(lastSyncedAt)}`
+                  ? `Last Sync: ${new Date(lastSyncedAt).toLocaleString()}`
                   : "Last Sync: —"}
               </span>
               <button
-                onClick={onSync}
+                onClick={handleSyncEverything}
                 disabled={syncing}
                 className={`whitespace-nowrap px-3 py-1 rounded-md text-sm font-medium transition ${
                   syncing ? "bg-gray-600 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
-                {syncing ? "Syncing..." : syncLabel}
+                {syncing ? "Syncing..." : "Sync Everything"}
               </button>
             </div>
           )}
@@ -200,6 +220,7 @@ export default function Header({
         </div>
 
       </div>
+      <Toast message={toast.message} type={toast.type} />
     </header>
   );
 }

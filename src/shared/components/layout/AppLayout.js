@@ -92,15 +92,6 @@ export default function AppLayout({
   const isLastPage  = currentPage >= totalPages;
 
   // All sync props come from actions
-  const syncLabel    = actions?.syncLabel    ?? "Sync";
-  const onSync       = actions?.onSync       ?? null;
-  const syncing      = actions?.syncing      ?? false;
-  const lastSyncedAt = actions?.lastSyncedAt ?? null;
-
-  // Timestamp shown in the white action bar (below header)
-  const syncTimestamp = lastSyncedAt
-    ? new Date(lastSyncedAt).toLocaleString()
-    : null;
 
   return (
     // w-full + overflow-x-hidden: constrains layout to iframe width.
@@ -113,14 +104,7 @@ export default function AppLayout({
 
       {/* GLOBAL HEADER — sync button lives here */}
       <div className="w-full max-w-6xl mb-3 px-4">
-        <Header
-          pageName={title}
-          syncLabel={syncLabel}
-          onSync={onSync}
-          syncing={syncing}
-          lastSyncedAt={lastSyncedAt}
-          formatTimestamp={(ts) => new Date(ts).toLocaleString()}
-        />
+        <Header />
       </div>
 
       {/* PAGE TITLE — gray area between header and content */}
