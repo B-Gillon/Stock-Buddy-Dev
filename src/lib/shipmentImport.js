@@ -142,9 +142,9 @@ export async function buildImportPlan({ tenantId, supplierId, fileText }) {
       if (!val) continue;
       const hits = (linesByPo.get(po.id) ?? []).filter((l) => l.keys[id].includes(val));
       const label = MAP_FIELDS.find((f) => f.id === id).label;
-      if (hits.length === 0) { err(row, id, `${label} "${row.v[id]}" is not on ${po.po_number}.`); lineId = null; break; }
-      if (hits.length > 1) { err(row, id, `${label} "${row.v[id]}" matches more than one line on ${po.po_number}.`); lineId = null; break; }
-      if (lineId && lineId !== hits[0].id) { err(row, id, `${label} "${row.v[id]}" is a different item than the other identifiers in this row.`); lineId = null; break; }
+      if (hits.length === 0) { err(row, id, `${label} "${row.v[id]}" is not on ${po.po_number}.`); lineId = null; row.badItem = true; break; }
+      if (hits.length > 1) { err(row, id, `${label} "${row.v[id]}" matches more than one line on ${po.po_number}.`); lineId = null; row.badItem = true; break; }
+      if (lineId && lineId !== hits[0].id) { err(row, id, `${label} "${row.v[id]}" is a different item than the other identifiers in this row.`); lineId = null; row.badItem = true; break; }
       lineId = hits[0].id;
     }
     if (lineId) row.lineId = lineId;
@@ -223,6 +223,8 @@ export async function buildImportPlan({ tenantId, supplierId, fileText }) {
       const m = /^Carton (\d+), ([^:]+):/.exec(msg);
       const field = m ? LABEL_TO_FIELD[m[2]] : LABEL_TO_FIELD[msg.split(':')[0]];
       const target = m ? cartons[Number(m[1]) - 1]?._rows ?? g.rows : g.rows;
+      // A row whose item couldn't be identified has no usable quantity: that is the only problem to report, not a knock-on "no quantity" error
+      if (/enter a quantity for at least one item/.test(msg) && target.some((r) => r.badItem)) continue;
       const text = msg.replace(/^Carton \d+, [^:]+:\s*/, '').replace(/^[^:]+:\s*/, (x) => (m ? '' : x));
       for (const r of target) err(r, field && field in r.v ? field : Object.keys(r.v)[0], text.charAt(0).toUpperCase() + text.slice(1));
     }
