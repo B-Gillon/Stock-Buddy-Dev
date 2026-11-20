@@ -95,7 +95,9 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
     if (status === 'failed') {
       await logError({ source: 'shipFilePickup/file', error: new Error(`Ship file ${f.name} from ${supplier.supplier_name} could not be processed:\n${message}`), tenantId, context: { supplierId, file: f.name, pos: poNumbers } });
       await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
-        vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', skus: [...new Set((plan?.rows ?? []).map((r) => r.v.sku).filter(Boolean))].join(', '), problem: message } });
+        vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', skus: [...new Set((plan?.rows ?? []).map((r) => r.v.sku).filter(Boolean))].join(', '), problem: message },
+        // The file is deleted from the SFTP site afterwards, so the email carries the copy
+        attachments: f.text !== undefined ? [{ filename: f.name, content: f.text, contentType: 'text/csv' }] : undefined });
     }
     results.push({ name: f.name, status, message, shipments: created });
     if (f.text !== undefined) readFiles.push(f);

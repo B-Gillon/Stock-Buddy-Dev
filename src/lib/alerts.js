@@ -43,7 +43,7 @@ POs in the file: {{po_numbers}}
 What went wrong:
 {{problem}}
 
-Ask the supplier to correct the file and upload it again.`,
+The file is attached. Ask the supplier to correct it and upload it again.`,
   },
 };
 
@@ -73,8 +73,9 @@ export async function loadTemplates(tenantId) {
 /**
  * @param {'po_release_failed'|'ship_file_failed'} kind
  * @param {object} vars  values for the template placeholders
+ * @param {{filename:string, content:string|Buffer, contentType?:string}[]} [attachments]
  */
-export async function sendAlert({ tenantId, supplierId, kind, vars }) {
+export async function sendAlert({ tenantId, supplierId, kind, vars, attachments }) {
   try {
     if (!ALERT_TYPES[kind] || !supplierId) return { sent: false, reason: 'unknown alert' };
     const { data: s } = await supabase.from('supplier_alert_settings').select('enabled, emails, cc_emails, bcc_emails')
@@ -94,6 +95,7 @@ export async function sendAlert({ tenantId, supplierId, kind, vars }) {
       from: `"Stock Buddy" <${process.env.SMTP_USER}>`, to: valid.join(', '), cc: cc.length ? cc.join(', ') : undefined, bcc: bcc.length ? bcc.join(', ') : undefined,
       subject: renderTemplate(t.subject, vars).replace(/\s+/g, ' ').trim(),
       text: renderTemplate(t.body, vars),
+      attachments: attachments?.length ? attachments : undefined,
     });
     return { sent: true };
   } catch (err) {
