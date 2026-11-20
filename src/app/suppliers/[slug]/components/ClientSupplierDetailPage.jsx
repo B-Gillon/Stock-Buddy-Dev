@@ -11,6 +11,7 @@ import SupplierDeliverySettings from "./SupplierDeliverySettings";
 import AcknowledgementSettings from "./AcknowledgementSettings";
 import CartonLabelSettings from "./CartonLabelSettings";
 import ShippingTab from "./ShippingTab";
+import SupplierAlertsTab from "./SupplierAlertsTab";
 
 // ─── Product column definitions ───────────────────────────────────────────────
 
@@ -889,7 +890,7 @@ function RecipientCard({ record, onUpdate, onRemove }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const DETAIL_TABS = ['General Info', 'Product Data', 'Print/Export', 'Shipping'];
+const DETAIL_TABS = ['General Info', 'Product Data', 'Print/Export', 'Shipping', 'Email Alerts'];
 const TAB_ALIASES = { Transmission: 'Print/Export', 'CSV Overrides': 'Print/Export' }; // old names, for saved links
 
 export default function ClientSupplierDetailPage({ supplier, products, shopDomain = "" }) {
@@ -963,6 +964,7 @@ export default function ClientSupplierDetailPage({ supplier, products, shopDomai
         />
       )}
       {activeTab === 'Shipping' && <ShippingTab supplierId={supplier.id} />}
+      {activeTab === 'Email Alerts' && <div className="space-y-4"><SupplierAlertsTab supplierId={supplier.id} /></div>}
       {activeTab === 'Print/Export' && (
         <div className="space-y-4">
           <TransmissionTab supplierId={supplier.id} />

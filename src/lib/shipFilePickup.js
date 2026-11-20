@@ -37,8 +37,8 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
   let found;
   try { found = await fetchShipFiles(s); }
   catch (err) {
-    await sendAlert({ tenantId, kind: 'ship_file_failed', subject: `Could not check ${supplier.supplier_name}'s SFTP site for ship files`,
-      lines: [`Supplier: ${supplier.supplier_name}`, `Problem: ${err.message}`] });
+    await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
+      vars: { supplier_name: supplier.supplier_name, file_name: '(could not connect to the SFTP site)', po_numbers: 'n/a', problem: err.message } });
     return { ok: false, error: err.message, files: [] };
   }
 
@@ -59,7 +59,7 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
         plan = await buildImportPlan({ tenantId, supplierId, fileText: f.text });
         poNumbers = [...new Set([...(plan.rows ?? []).map((r) => r.v.po_number), ...(plan.groups ?? []).map((g) => g.poNumber)].filter(Boolean))];
         if (plan.ok) {
-          const r = await commitImportPlan({ tenantId, supplierId, userName, plan });
+          const r = await commitImportPlan({ tenantId, supplierId, userName, plan, logActivity: false });
           created = r.created ?? [];
           if (r.ok) { status = 'shipped'; message = `${created.length} shipment${created.length === 1 ? '' : 's'} created: ${created.join(', ')}`; }
           else message = `${r.error}${created.length ? ` (already created before the error: ${created.join(', ')})` : ''}`;
@@ -67,23 +67,26 @@ export async function pickupShipFiles({ tenantId, supplierId, userName = 'System
       } catch (err) { message = `Something went wrong reading the file: ${err.message}`; }
     }
 
-    // History on every PO the file mentions
+    // One History row per PO the file mentions: Ship File Upload (shipped) or Ship File Error (nothing created)
     if (poNumbers.length) {
       const { data: pos } = await supabase.from('purchase_orders').select('id, po_number').eq('tenant_id', tenantId).eq('supplier_id', supplierId).in('po_number', poNumbers);
-      const known = new Map((pos ?? []).map((p) => [low(p.po_number), p.id]));
+      const known = new Map((pos ?? []).map((p) => [low(p.po_number), p]));
       for (const n of poNumbers) {
-        const poId = known.get(low(n));
-        if (!poId) continue;
-        await logPOActivity({ poId, tenantId, userName, action: 'ship_file_retrieved', comments: `${f.name} picked up from SFTP` });
-        if (status === 'failed') await logPOActivity({ poId, tenantId, userName, action: 'ship_file_failed', comments: `${f.name}: ${message.split('\n')[0]}` });
+        const po = known.get(low(n));
+        if (!po) continue;
+        if (status === 'shipped') {
+          const mine = created.filter((c) => c.startsWith(`${po.po_number}-`));
+          await logPOActivity({ poId: po.id, tenantId, userName, action: 'ship_file_upload', comments: `${f.name}: ${mine.length === 1 ? 'shipment' : 'shipments'} ${mine.join(', ')} created` });
+        } else {
+          await logPOActivity({ poId: po.id, tenantId, userName, action: 'ship_file_error', comments: `${f.name}: ${message.split('\n')[0]}` });
+        }
       }
     }
 
     await record(status, message, poNumbers, created.length);
     if (status === 'failed') {
-      await sendAlert({ tenantId, kind: 'ship_file_failed', subject: `Ship file ${f.name} from ${supplier.supplier_name} could not be processed`,
-        lines: [`Supplier: ${supplier.supplier_name}`, `File: ${f.name}`, poNumbers.length ? `POs in the file: ${poNumbers.join(', ')}` : '', 'No shipments were created from this file.', '', 'What went wrong:', message,
-          '', 'Ask the supplier to correct the file and upload it again.'].filter((l, i, a) => l !== '' || a[i - 1] !== '') });
+      await sendAlert({ tenantId, supplierId, kind: 'ship_file_failed',
+        vars: { supplier_name: supplier.supplier_name, file_name: f.name, po_numbers: poNumbers.join(', ') || 'none found', problem: message } });
     }
     results.push({ name: f.name, status, message, shipments: created });
   }

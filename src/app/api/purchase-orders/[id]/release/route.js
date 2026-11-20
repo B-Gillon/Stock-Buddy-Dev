@@ -31,7 +31,7 @@ export async function POST(request, { params }) {
 
     const { data: po, error: poFetchError } = await supabase
       .from("purchase_orders")
-      .select("id, status")
+      .select("id, status, po_number, supplier_id, supplier:suppliers ( supplier_name )")
       .eq("id", poId)
       .eq("tenant_id", tenantId)
       .single();
@@ -72,6 +72,7 @@ export async function POST(request, { params }) {
     // The supplier delivery (PDF, email, SFTP) takes ~10 seconds, so it runs after the response:
     // the PO is already released and its incoming quantities are saved. A failure is written to the
     // PO's History and sent as an email alert (Settings -> Email Alerts).
+    const supplierName = (Array.isArray(po.supplier) ? po.supplier[0] : po.supplier)?.supplier_name ?? "the supplier";
     after(async () => {
       try {
         const emailResult = await sendPOEmail(poId, { isResend: false });
@@ -96,29 +97,17 @@ export async function POST(request, { params }) {
         }
 
         if (!emailResult.success) {
-          const { data: p } = await supabase.from("purchase_orders").select("po_number, supplier:suppliers ( supplier_name )").eq("id", poId).maybeSingle();
-          const sup = Array.isArray(p?.supplier) ? p.supplier[0] : p?.supplier;
           const sftpFailed = emailResult.sftp?.files?.filter((f) => !f.ok).map((f) => `${f.type.toUpperCase()}: ${f.error}`) ?? [];
           await sendAlert({
-            tenantId, kind: "po_release_failed",
-            subject: `${p?.po_number ?? "A PO"} was released but could not be sent to ${sup?.supplier_name ?? "the supplier"}`,
-            lines: [
-              `PO: ${p?.po_number ?? poId}`,
-              `Supplier: ${sup?.supplier_name ?? ""}`,
-              "The PO is released in Stock Buddy, but the supplier did not receive it.",
-              "",
-              "What went wrong:",
-              sendError ?? emailResult.error ?? (sftpFailed.length ? sftpFailed.join("; ") : "Unknown error"),
-              "",
-              "Open the PO and use Resend once the problem is fixed.",
-            ],
+            tenantId, supplierId: po.supplier_id, kind: "po_release_failed",
+            vars: { supplier_name: supplierName, po_number: po.po_number, problem: sendError ?? emailResult.error ?? (sftpFailed.length ? sftpFailed.join("; ") : "Unknown error") },
           });
         }
       } catch (err) {
         await logError({ source: "releasePO/afterResponse", error: err, tenantId, context: { poId } });
         await logPOActivity({ poId, tenantId, action: "error", request, comments: `Send failed: ${err.message}` });
-        await sendAlert({ tenantId, kind: "po_release_failed", subject: `A PO was released but could not be sent to the supplier`,
-          lines: [`PO id: ${poId}`, "The PO is released in Stock Buddy, but sending it to the supplier failed.", "", `What went wrong: ${err.message}`, "", "Open the PO and use Resend."] });
+        await sendAlert({ tenantId, supplierId: po.supplier_id, kind: "po_release_failed",
+          vars: { supplier_name: supplierName, po_number: po.po_number, problem: err.message } });
       }
     });
 

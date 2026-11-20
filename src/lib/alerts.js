@@ -1,11 +1,41 @@
 // /src/lib/alerts.js
-// Email alerts to the retailer's own team (Settings -> Email Alerts). Never throws: an alert that can't be
-// sent must not break the work that triggered it. Server-side only.
+// Email alerts to the retailer's own team about a supplier. What each email says (subject and message) is
+// set once in Settings -> Email Alerts; which alerts a supplier uses, and who gets them, is set on the
+// supplier (Suppliers -> Email Alerts tab). Never throws: an alert that can't be sent must not break the
+// work that triggered it. Server-side only.
 import nodemailer from 'nodemailer';
 import { supabase } from '@/lib/supabaseClient';
 import { logError } from '@/lib/logError';
 
-export const ALERT_KINDS = { po_release_failed: 'alert_po_release_failed', ship_file_failed: 'alert_ship_file_failed' };
+export const ALERT_TYPES = {
+  po_release_failed: {
+    title: 'A PO could not be sent to the supplier',
+    description: 'After a PO is released, the email / SFTP delivery to the supplier runs in the background. This is sent if that delivery fails.',
+    placeholders: ['supplier_name', 'po_number', 'problem'],
+    subject: '{{po_number}} was released but {{supplier_name}} did not receive it',
+    body: `The purchase order {{po_number}} is released in Stock Buddy, but it could not be delivered to {{supplier_name}}.
+
+What went wrong:
+{{problem}}
+
+Open the PO and use Resend once the problem is fixed.`,
+  },
+  ship_file_failed: {
+    title: 'A ship file could not be processed',
+    description: 'A shipment file picked up from the supplier\'s SFTP site had problems (or the SFTP site could not be reached). No shipments are created from a file with problems.',
+    placeholders: ['supplier_name', 'file_name', 'po_numbers', 'problem'],
+    subject: 'Ship file {{file_name}} from {{supplier_name}} could not be processed',
+    body: `The ship file {{file_name}} from {{supplier_name}} could not be processed. No shipments were created from it.
+
+POs in the file: {{po_numbers}}
+
+What went wrong:
+{{problem}}
+
+Ask the supplier to correct the file and upload it again.`,
+  },
+};
+
 const EMAIL_RE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
 
 /** Splits a typed list (commas, semicolons, spaces, new lines) into valid addresses and rejects. */
@@ -14,28 +44,46 @@ export function parseEmailList(text) {
   return { valid: [...new Set(parts.filter((p) => EMAIL_RE.test(p)))], invalid: parts.filter((p) => !EMAIL_RE.test(p)) };
 }
 
-/** @param {'po_release_failed'|'ship_file_failed'} kind */
-export async function sendAlert({ tenantId, kind, subject, lines }) {
+export const renderTemplate = (text, vars) => String(text ?? '').replace(/\{\{(\w+)\}\}/g, (_, k) => (vars[k] != null && vars[k] !== '' ? String(vars[k]) : ''));
+
+/** Placeholders in a text that this alert type doesn't offer (typos such as {{po_numbr}}). */
+export function unknownPlaceholders(text, type) {
+  const allowed = new Set(ALERT_TYPES[type]?.placeholders ?? []);
+  return [...new Set([...String(text ?? '').matchAll(/\{\{(\w+)\}\}/g)].map((m) => m[1]))].filter((k) => !allowed.has(k));
+}
+
+/** The retailer's saved templates merged over the built-in ones. */
+export async function loadTemplates(tenantId) {
+  const { data } = await supabase.from('alert_templates').select('alert_type, subject, body').eq('tenant_id', tenantId);
+  const saved = new Map((data ?? []).map((r) => [r.alert_type, r]));
+  return Object.fromEntries(Object.entries(ALERT_TYPES).map(([type, d]) => [type, { subject: saved.get(type)?.subject ?? d.subject, body: saved.get(type)?.body ?? d.body, isDefault: !saved.has(type) }]));
+}
+
+/**
+ * @param {'po_release_failed'|'ship_file_failed'} kind
+ * @param {object} vars  values for the template placeholders
+ */
+export async function sendAlert({ tenantId, supplierId, kind, vars }) {
   try {
-    const col = ALERT_KINDS[kind];
-    if (!col) return { sent: false, reason: 'unknown kind' };
-    const { data: s } = await supabase.from('tenant_alert_settings').select('*').eq('tenant_id', tenantId).maybeSingle();
-    // Alerts default to on; they only go out once someone has entered an address
-    if (!s || s[col] === false) return { sent: false, reason: 'off' };
-    const { valid } = parseEmailList(s.alert_emails);
+    if (!ALERT_TYPES[kind] || !supplierId) return { sent: false, reason: 'unknown alert' };
+    const { data: s } = await supabase.from('supplier_alert_settings').select('enabled, emails')
+      .eq('tenant_id', tenantId).eq('supplier_id', supplierId).eq('alert_type', kind).maybeSingle();
+    if (!s?.enabled) return { sent: false, reason: 'off for this supplier' };
+    const { valid } = parseEmailList(s.emails);
     if (!valid.length) return { sent: false, reason: 'no recipients' };
+    const t = (await loadTemplates(tenantId))[kind];
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT), secure: true,
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
     await transporter.sendMail({
       from: `"Stock Buddy" <${process.env.SMTP_USER}>`, to: valid.join(', '),
-      subject: `[Stock Buddy alert] ${subject}`,
-      text: [...lines, '', 'You get this because Email Alerts is turned on in Stock Buddy (Settings → Email Alerts).'].join('\n'),
+      subject: renderTemplate(t.subject, vars).replace(/\s+/g, ' ').trim(),
+      text: renderTemplate(t.body, vars),
     });
     return { sent: true };
   } catch (err) {
-    await logError({ source: 'alerts/sendAlert', error: err, tenantId, context: { kind } }).catch(() => {});
+    await logError({ source: 'alerts/sendAlert', error: err, tenantId, context: { kind, supplierId } }).catch(() => {});
     return { sent: false, reason: err.message };
   }
 }

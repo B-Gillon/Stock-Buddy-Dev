@@ -1,23 +1,26 @@
-// Email Alerts settings (Settings -> Email Alerts), one row per tenant.
+// Email Alerts templates (Settings -> Email Alerts): the subject and message of each alert, per tenant.
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
 import { logError } from '@/lib/logError';
-import { parseEmailList } from '@/lib/alerts';
+import { ALERT_TYPES, loadTemplates, unknownPlaceholders } from '@/lib/alerts';
 
 const forbidden = (request) => request.headers.get('x-auth-role') === 'supplier';
+
+async function view(tenantId) {
+  const saved = await loadTemplates(tenantId);
+  return Object.entries(ALERT_TYPES).map(([type, d]) => ({
+    type, title: d.title, description: d.description, placeholders: d.placeholders,
+    subject: saved[type].subject, body: saved[type].body, defaultSubject: d.subject, defaultBody: d.body,
+  }));
+}
 
 export async function GET(request) {
   if (forbidden(request)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   let tenantId = null;
   try {
     tenantId = await getTenantId(request);
-    const { data } = await supabase.from('tenant_alert_settings').select('*').eq('tenant_id', tenantId).maybeSingle();
-    return NextResponse.json({
-      alert_emails: data?.alert_emails ?? '',
-      alert_po_release_failed: data?.alert_po_release_failed ?? true,
-      alert_ship_file_failed: data?.alert_ship_file_failed ?? true,
-    });
+    return NextResponse.json({ alerts: await view(tenantId) });
   } catch (err) {
     await logError({ source: 'api/settings/alerts/GET', error: err, tenantId });
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -30,16 +33,22 @@ export async function POST(request) {
   try {
     tenantId = await getTenantId(request);
     const b = await request.json();
-    const { valid, invalid } = parseEmailList(b.alert_emails);
-    if (invalid.length) return NextResponse.json({ error: `These don't look like email addresses: ${invalid.join(', ')}` }, { status: 422 });
-    if (valid.length > 10) return NextResponse.json({ error: 'Up to 10 email addresses.' }, { status: 422 });
-    const { error } = await supabase.from('tenant_alert_settings').upsert({
-      tenant_id: tenantId, alert_emails: valid.join(', '),
-      alert_po_release_failed: !!b.alert_po_release_failed, alert_ship_file_failed: !!b.alert_ship_file_failed,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'tenant_id' });
-    if (error) throw error;
-    return NextResponse.json({ success: true, alert_emails: valid.join(', ') });
+    const rows = [];
+    for (const [type, d] of Object.entries(ALERT_TYPES)) {
+      const t = b.templates?.[type];
+      if (!t) continue;
+      const subject = String(t.subject ?? '').trim(), body = String(t.body ?? '').trim();
+      if (!subject || !body) return NextResponse.json({ error: `"${d.title}": the subject and message can't be empty.` }, { status: 422 });
+      if (subject.length > 200 || body.length > 5000) return NextResponse.json({ error: `"${d.title}": the subject is limited to 200 characters and the message to 5,000.` }, { status: 422 });
+      const bad = [...unknownPlaceholders(subject, type), ...unknownPlaceholders(body, type)];
+      if (bad.length) return NextResponse.json({ error: `"${d.title}": unknown placeholder ${[...new Set(bad)].map((x) => `{{${x}}}`).join(', ')}. Use only ${d.placeholders.map((x) => `{{${x}}}`).join(', ')}.` }, { status: 422 });
+      rows.push({ tenant_id: tenantId, alert_type: type, subject, body, updated_at: new Date().toISOString() });
+    }
+    if (rows.length) {
+      const { error } = await supabase.from('alert_templates').upsert(rows, { onConflict: 'tenant_id,alert_type' });
+      if (error) throw error;
+    }
+    return NextResponse.json({ success: true, alerts: await view(tenantId) });
   } catch (err) {
     await logError({ source: 'api/settings/alerts/POST', error: err, tenantId });
     return NextResponse.json({ error: err.message }, { status: 500 });

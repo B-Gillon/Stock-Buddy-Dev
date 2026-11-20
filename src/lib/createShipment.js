@@ -16,7 +16,7 @@ const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null
 /**
  * @returns {Promise<{ok:true, shipmentNumber:string, shipmentId:string} | {ok:false, error:string, status:number}>}
  */
-export async function createShipment({ tenantId, supplierId, userName, poId, shipment, cartons, clientDate }) {
+export async function createShipment({ tenantId, supplierId, userName, poId, shipment, cartons, clientDate, logActivity = true }) {
   const { data: po } = await supabase.from('purchase_orders').select('id, po_number, status')
     .eq('id', poId).eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
   if (!po) return { ok: false, error: 'Purchase order not found.', status: 404 };
@@ -137,7 +137,8 @@ export async function createShipment({ tenantId, supplierId, userName, poId, shi
     .eq('id', po.id).in('status', ['waiting_to_ship', 'partially_shipped']);
 
   const units = lineRows.reduce((t, r) => t + r.shipped_qty, 0);
-  await logPOActivity({ poId: po.id, tenantId, action: fullyShipped ? 'shipped' : 'partially_shipped', userName,
+  // The SFTP ship file pickup writes its own single History row instead
+  if (logActivity) await logPOActivity({ poId: po.id, tenantId, action: fullyShipped ? 'shipped' : 'partially_shipped', userName,
     comments: `Shipment ${number}` });
   return { ok: true, shipmentNumber: number, shipmentId: created.id };
 }

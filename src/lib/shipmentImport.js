@@ -276,10 +276,10 @@ export async function buildImportPlan({ tenantId, supplierId, fileText, clientDa
 }
 
 /** Creates every shipment in a clean plan, one after another. Stops at the first failure. */
-export async function commitImportPlan({ tenantId, supplierId, userName, plan, clientDate }) {
+export async function commitImportPlan({ tenantId, supplierId, userName, plan, clientDate, logActivity = true }) {
   const created = [];
   for (const p of plan.payloads) {
-    const r = await createShipment({ tenantId, supplierId, userName, poId: p.poId, shipment: p.shipment, cartons: p.cartons, clientDate });
+    const r = await createShipment({ tenantId, supplierId, userName, poId: p.poId, shipment: p.shipment, cartons: p.cartons, clientDate, logActivity });
     if (!r.ok) return { ok: false, created, error: r.error };
     created.push(r.shipmentNumber);
   }
