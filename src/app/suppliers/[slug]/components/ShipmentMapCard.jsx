@@ -24,6 +24,7 @@ export default function ShipmentMapCard({ supplierId }) {
   const [cfg, setCfg] = useState(null);      // current (edited) config
   const [saved, setSaved] = useState(null);  // last saved config
   const [saving, setSaving] = useState(false);
+  const [showErrors, setShowErrors] = useState(false); // after a Save click, unmapped required fields turn red
 
   useEffect(() => {
     let live = true;
@@ -51,6 +52,7 @@ export default function ShipmentMapCard({ supplierId }) {
   const missing = MAP_FIELDS.filter((f) => f.required && !has(f.id)).map((f) => f.label);
   const noIdentifier = !["sku", "supplier_sku", "barcode"].some(has);
   const problems = [...missing, ...(noIdentifier ? ["at least one of SKU, Supplier SKU or Barcode"] : [])];
+  const isMissing = (f) => (f.required && !has(f.id)) || (f.identifier && noIdentifier);
 
   async function onFile(e) {
     const file = e.target.files?.[0];
@@ -62,14 +64,19 @@ export default function ShipmentMapCard({ supplierId }) {
     const best = DELIMITERS.map((d) => ({ id: d.id, n: first.split(d.char).length - 1 })).sort((a, b) => b.n - a.n)[0];
     const delimiter = best.n > 0 ? best.id : cfg.delimiter;
     const parsed = parseDelimited(text, delimChar(delimiter), 50);
-    const guess = cfg.hasHeader && parsed[0] ? autoMatch(parsed[0]) : {};
+    // A first row that names at least two known fields is a header record
+    const guess = parsed[0] ? autoMatch(parsed[0]) : {};
+    const hasHeader = Object.keys(guess).length >= 2;
+    if (!hasHeader) for (const k of Object.keys(guess)) delete guess[k];
     const map = emptyMap();
     for (const f of MAP_FIELDS) map[f.id] = { col: guess[f.id] ?? null, fixed: cfg.map[f.id]?.fixed ?? null };
-    setCfg((c) => ({ ...c, sampleName: file.name, sampleText: text, delimiter, map }));
-    showToast(cfg.hasHeader ? `Loaded ${file.name}. Matched ${Object.keys(guess).length} columns by name.` : `Loaded ${file.name}.`, "success");
+    setCfg((c) => ({ ...c, sampleName: file.name, sampleText: text, delimiter, hasHeader, map }));
+    setShowErrors(false);
+    showToast(hasHeader ? `Loaded ${file.name}. Header record found; matched ${Object.keys(guess).length} columns by name.` : `Loaded ${file.name}. No header record found.`, "success");
   }
 
   async function save() {
+    if (problems.length) { setShowErrors(true); showToast("Map the fields highlighted in red.", "error"); return; }
     setSaving(true);
     try {
       const res = await fetch(`/api/suppliers/${supplierId}/shipment-map`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg) });
@@ -107,9 +114,7 @@ export default function ShipmentMapCard({ supplierId }) {
           </select>
         </label>
         <div className="ml-auto flex items-center gap-3">
-          {problems.length === 0
-            ? <span className="text-xs font-medium text-green-700">✓ Ready: all required fields are mapped</span>
-            : <span className="text-xs text-amber-700">Still needed: {problems.join("; ")}</span>}
+          {problems.length === 0 && <span className="text-xs font-medium text-green-700">✓ Ready: all required fields are mapped</span>}
           <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>
         </div>
       </div>
@@ -167,7 +172,7 @@ export default function ShipmentMapCard({ supplierId }) {
                       </td>
                       <td className="whitespace-nowrap border-b border-gray-100 py-1.5">
                         <div className="flex items-center gap-2">
-                          <select className={selectCls.replace("w-full ", "")} style={{ width: "11rem" }} value={m.col ?? ""} disabled={headers.length === 0}
+                          <select className={(showErrors && isMissing(f) ? selectCls.replace("w-full ", "").replace("border-gray-300 bg-gray-100", "border-red-500 bg-red-50") : selectCls.replace("w-full ", ""))} style={{ width: "11rem" }} value={m.col ?? ""} disabled={headers.length === 0}
                             onChange={(e) => setMap(f.id, { col: e.target.value === "" ? null : Number(e.target.value) })}>
                             <option value=""></option>
                             {headers.map((h, ci) => <option key={ci} value={ci}>{h}</option>)}
