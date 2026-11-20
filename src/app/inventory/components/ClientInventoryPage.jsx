@@ -234,6 +234,7 @@ export default function ClientInventoryPage({
       if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error ?? res.statusText); }
       setLastSynced(new Date().toISOString());
       setBanner({ type: "success", message: "Inventory sync complete." });
+      router.refresh();
     } catch (err) {
       setBanner({ type: "error", message: err.message ?? "Sync failed." });
     } finally {
