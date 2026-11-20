@@ -1,0 +1,2 @@
+alter table public.po_activity_log drop constraint po_activity_log_action_check;
+alter table public.po_activity_log add constraint po_activity_log_action_check check (action = any (array['created','edited','released','resent','received','acknowledged','cancelled','closed','error','sftp_uploaded','sftp_retrieved','sftp_deleted','sftp_failed','reminder_sent','retrieved','shipped','partially_shipped','putaway','ship_file_retrieved','ship_file_failed']::text[]));
