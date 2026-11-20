@@ -12,23 +12,23 @@ export const DELIMITERS = [
 // group, id, label, required, aliases (header names we recognise)
 export const MAP_GROUPS = [
   { id: 'shipment', label: 'Shipment', fields: [
-    { id: 'po_number', label: 'PO Number', required: true, aliases: ['ponumber', 'po', 'pono', 'purchaseorder', 'purchaseordernumber', 'ponum'] },
-    { id: 'ship_date', label: 'Ship Date', required: true, aliases: ['shipdate', 'dateshipped', 'shippeddate', 'shipmentdate', 'actualshipdate'] },
-    { id: 'tracking_number', label: 'PRO / Tracking #', aliases: ['pro', 'pronumber', 'trackingnumber', 'tracking', 'trackingno', 'trackingnum'] },
-    { id: 'supplier_reference', label: 'Supplier Shipment Reference', aliases: ['shipmentreference', 'shipmentref', 'supplierreference', 'shipmentid', 'shipmentnumber', 'asnnumber'] },
-    { id: 'packing_slip_number', label: 'Packing Slip Number', aliases: ['packingslip', 'packingslipnumber', 'packslip', 'packslipnumber'] },
+    { id: 'po_number', label: 'PO Number', explain: 'The purchase order being shipped.', required: true, aliases: ['ponumber', 'po', 'pono', 'purchaseorder', 'purchaseordernumber', 'ponum'] },
+    { id: 'ship_date', label: 'Ship Date', explain: 'The date the shipment actually left the supplier. Rows in the same carton must all have the same date.', required: true, aliases: ['shipdate', 'dateshipped', 'shippeddate', 'shipmentdate', 'actualshipdate'] },
+    { id: 'tracking_number', label: 'PRO / Tracking #', explain: 'Freight (PRO) or master tracking number for the whole shipment. Optional. Must be the same on every row of a shipment.', aliases: ['pro', 'pronumber', 'trackingnumber', 'tracking', 'trackingno', 'trackingnum'] },
+    { id: 'supplier_reference', label: 'Supplier Shipment Reference', explain: 'The supplier\'s own ID for the shipment. Optional. Must be the same on every row of a shipment.', aliases: ['shipmentreference', 'shipmentref', 'supplierreference', 'shipmentid', 'shipmentnumber', 'asnnumber'] },
+    { id: 'packing_slip_number', label: 'Packing Slip Number', explain: 'Optional. Must be the same on every row of a shipment.', aliases: ['packingslip', 'packingslipnumber', 'packslip', 'packslipnumber'] },
   ] },
   { id: 'carton', label: 'Carton', fields: [
-    { id: 'supplier_carton_id', label: 'SSCC Case Number (Carton ID)', aliases: ['sscc', 'ssccnumber', 'casenumber', 'cartonid', 'cartonnumber', 'caseid', 'sscc18'] },
-    { id: 'carton_tracking', label: 'Carton Tracking Number', aliases: ['cartontracking', 'cartontrackingnumber', 'parceltracking'] },
+    { id: 'supplier_carton_id', label: 'SSCC Case Number (Carton ID)', explain: 'Identifies one carton and prints on its case label. Must be unique, never used on any other carton. Rows sharing a number are items in the same carton. When "Enforce Valid SSCC#s" is on, it must be 20 digits, start with 00, and have a valid check digit. When mixed cases are blocked, a carton can hold only one item.', aliases: ['sscc', 'ssccnumber', 'casenumber', 'cartonid', 'cartonnumber', 'caseid', 'sscc18'] },
+    { id: 'carton_tracking', label: 'Carton Tracking Number', explain: 'Optional. Parcel tracking number for the carton. Must be the same on every row of a carton.', aliases: ['cartontracking', 'cartontrackingnumber', 'parceltracking'] },
   ] },
   { id: 'item', label: 'Item', fields: [
-    { id: 'sku', label: 'SKU', identifier: true, aliases: ['sku', 'itemsku', 'itemnumber', 'item', 'itemno', 'productsku'] },
-    { id: 'supplier_sku', label: 'Supplier SKU', identifier: true, aliases: ['suppliersku', 'vendorsku', 'vendoritem', 'vendoritemnumber', 'vendorpart', 'supplieritem'] },
-    { id: 'barcode', label: 'Barcode', identifier: true, aliases: ['barcode', 'upc', 'ean', 'gtin', 'upccode'] },
-    { id: 'ship_qty', label: 'Ship Qty (units)', required: true, aliases: ['shipqty', 'qtyshipped', 'quantityshipped', 'shippedqty', 'shippedquantity', 'qty', 'quantity'] },
-    { id: 'lot_number', label: 'Lot Number', aliases: ['lot', 'lotnumber', 'lotno', 'batch', 'batchnumber'] },
-    { id: 'expiration_date', label: 'Expiration Date', aliases: ['expiration', 'expirationdate', 'expiry', 'expirydate', 'expdate', 'expires', 'bestby'] },
+    { id: 'sku', label: 'SKU', explain: 'Identifies the item on the PO by our SKU. Include at least one of SKU, Supplier SKU and Barcode. If more than one is included, all must point to the same item.', identifier: true, aliases: ['sku', 'itemsku', 'itemnumber', 'item', 'itemno', 'productsku'] },
+    { id: 'supplier_sku', label: 'Supplier SKU', explain: 'Identifies the item by the supplier\'s own item number, as saved on the product. Same rule as SKU.', identifier: true, aliases: ['suppliersku', 'vendorsku', 'vendoritem', 'vendoritemnumber', 'vendorpart', 'supplieritem'] },
+    { id: 'barcode', label: 'Barcode', explain: 'Identifies the item by its UPC/EAN, as saved on the product. Same rule as SKU.', identifier: true, aliases: ['barcode', 'upc', 'ean', 'gtin', 'upccode'] },
+    { id: 'ship_qty', label: 'Ship Qty (units)', explain: 'Units of this item in this carton. Must be a whole number above 0. Total shipped for an item can\'t exceed what\'s still unshipped on the PO.', required: true, aliases: ['shipqty', 'qtyshipped', 'quantityshipped', 'shippedqty', 'shippedquantity', 'qty', 'quantity'] },
+    { id: 'lot_number', label: 'Lot Number', explain: 'Optional. The lot for this item in this carton. An item can have only one lot per carton. A second lot needs a separate carton.', aliases: ['lot', 'lotnumber', 'lotno', 'batch', 'batchnumber'] },
+    { id: 'expiration_date', label: 'Expiration Date', explain: 'Optional. The expiry for this item\'s lot. Must be a valid date.', aliases: ['expiration', 'expirationdate', 'expiry', 'expirydate', 'expdate', 'expires', 'bestby'] },
   ] },
 ];
 

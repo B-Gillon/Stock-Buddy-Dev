@@ -154,13 +154,14 @@ export default function ShipmentMapCard({ supplierId }) {
           <thead>
             <tr>
               <th className="whitespace-nowrap border-b border-gray-300 pb-1.5 pr-14 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Stock Buddy Fields</th>
-              <th className="whitespace-nowrap border-b border-gray-300 pb-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Fields in File</th>
+              <th className="whitespace-nowrap border-b border-gray-300 pb-1.5 pr-7 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Fields in File</th>
+              <th className="whitespace-nowrap border-b border-gray-300 pb-1.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-600">Explanation</th>
             </tr>
           </thead>
           <tbody>
             {MAP_GROUPS.map((g) => (
               <Fragment key={g.id}>
-                <tr><td colSpan={2} className="whitespace-nowrap pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">{g.label}</td></tr>
+                <tr><td colSpan={3} className="whitespace-nowrap pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">{g.label}</td></tr>
                 {g.fields.map((f) => {
                   const m = cfg.map[f.id];
                   return (
@@ -168,9 +169,9 @@ export default function ShipmentMapCard({ supplierId }) {
                       <td className="whitespace-nowrap border-b border-gray-100 py-1.5 pr-14 text-gray-800">
                         {f.label}
                         {f.required && <span className="ml-2 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">Req</span>}
-                        {f.identifier && <span className="ml-2 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">1+ req</span>}
+                        {f.identifier && <span className="ml-2 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">1 of 3 req</span>}
                       </td>
-                      <td className="whitespace-nowrap border-b border-gray-100 py-1.5">
+                      <td className="whitespace-nowrap border-b border-gray-100 py-1.5 pr-7">
                         <div className="flex items-center gap-2">
                           <select className={(showErrors && isMissing(f) ? selectCls.replace("w-full ", "").replace("border-gray-300 bg-gray-100", "border-red-500 bg-red-50") : selectCls.replace("w-full ", ""))} style={{ width: "11rem" }} value={m.col ?? ""} disabled={headers.length === 0}
                             onChange={(e) => setMap(f.id, { col: e.target.value === "" ? null : Number(e.target.value) })}>
@@ -179,6 +180,7 @@ export default function ShipmentMapCard({ supplierId }) {
                           </select>
                         </div>
                       </td>
+                      <td className="max-w-xl border-b border-gray-100 py-1.5 text-xs leading-snug text-gray-600">{f.explain}</td>
                     </tr>
                   );
                 })}
