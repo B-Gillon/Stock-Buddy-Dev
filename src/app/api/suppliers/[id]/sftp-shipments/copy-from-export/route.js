@@ -1,12 +1,11 @@
-// Copies the connection (host, port, username, password / key, pinned host key) from the supplier's
-// SFTP Delivery settings into SFTP Shipments. Done server-side so secrets never reach the browser.
-// Pickup folder, prefix and the Enabled flag are left as they are.
+// Preview of the SFTP Delivery connection for "Copy from Export": host, port and username only.
+// Nothing is saved here and no secret is returned; the secrets are copied server-side when the user clicks Save.
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { getTenantId } from '@/lib/tenants';
 import { logError } from '@/lib/logError';
 
-export async function POST(request, { params }) {
+export async function GET(request, { params }) {
   if (request.headers.get('x-auth-role') === 'supplier') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   let tenantId = null;
   try {
@@ -14,26 +13,13 @@ export async function POST(request, { params }) {
     const { id } = await params;
     const { data: sup } = await supabase.from('suppliers').select('id').eq('id', id).eq('tenant_id', tenantId).maybeSingle();
     if (!sup) return NextResponse.json({ error: 'Supplier not found' }, { status: 404 });
-
-    const { data: src } = await supabase.from('supplier_transmission_settings').select('*').eq('supplier_id', id).maybeSingle();
+    const { data: src } = await supabase.from('supplier_transmission_settings').select('sftp_host, sftp_port, sftp_username, sftp_password_enc, sftp_private_key_enc').eq('supplier_id', id).maybeSingle();
     if (!src?.sftp_host || !src?.sftp_username || (!src.sftp_password_enc && !src.sftp_private_key_enc)) {
       return NextResponse.json({ error: 'SFTP Delivery is not set up for this supplier (Print/Export tab), so there is nothing to copy.' }, { status: 422 });
     }
-
-    const { data: cur } = await supabase.from('supplier_shipment_sftp_settings').select('*').eq('supplier_id', id).maybeSingle();
-    const row = {
-      tenant_id: tenantId, supplier_id: id,
-      sftp_enabled: cur?.sftp_enabled ?? false, sftp_folder: cur?.sftp_folder ?? null, sftp_pickup_prefix: cur?.sftp_pickup_prefix ?? null,
-      sftp_host: src.sftp_host, sftp_port: src.sftp_port ?? 22, sftp_username: src.sftp_username,
-      sftp_password_enc: src.sftp_password_enc ?? null, sftp_private_key_enc: src.sftp_private_key_enc ?? null,
-      sftp_host_fingerprint: src.sftp_host_fingerprint ?? null,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from('supplier_shipment_sftp_settings').upsert(row, { onConflict: 'supplier_id' });
-    if (error) throw error;
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ host: src.sftp_host, port: src.sftp_port ?? 22, username: src.sftp_username, has_password: !!src.sftp_password_enc, has_private_key: !!src.sftp_private_key_enc });
   } catch (err) {
-    await logError({ source: 'api/suppliers/[id]/sftp-shipments/copy-from-export/POST', error: err, tenantId });
+    await logError({ source: 'api/suppliers/[id]/sftp-shipments/copy-from-export/GET', error: err, tenantId });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

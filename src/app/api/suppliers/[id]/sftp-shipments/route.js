@@ -75,9 +75,22 @@ export async function POST(request, { params }) {
     row.sftp_password_enc    = pw ? encryptSecret(pw) : existing?.sftp_password_enc ?? null;
     row.sftp_private_key_enc = key ? encryptSecret(key) : existing?.sftp_private_key_enc ?? null;
 
+    // "Copy from Export": take the secrets from SFTP Delivery on the server (they never go through the browser)
+    let copiedFingerprint = null;
+    if (b.copy_credentials) {
+      const { data: src } = await supabase.from('supplier_transmission_settings').select('*').eq('supplier_id', id).maybeSingle();
+      if (!src?.sftp_host || (!src.sftp_password_enc && !src.sftp_private_key_enc)) {
+        return NextResponse.json({ error: 'SFTP Delivery is not set up for this supplier, so there is nothing to copy.' }, { status: 422 });
+      }
+      row.sftp_host = src.sftp_host; row.sftp_port = src.sftp_port ?? 22; row.sftp_username = src.sftp_username;
+      row.sftp_password_enc = src.sftp_password_enc ?? null; row.sftp_private_key_enc = src.sftp_private_key_enc ?? null;
+      copiedFingerprint = src.sftp_host_fingerprint ?? null;
+    }
+
     // The pinned host key only holds for the same server
     const serverChanged = existing && (existing.sftp_host !== row.sftp_host || existing.sftp_port !== row.sftp_port);
     row.sftp_host_fingerprint = (serverChanged || b.reset_host_key) ? null : existing?.sftp_host_fingerprint ?? null;
+    if (b.copy_credentials && !b.reset_host_key) row.sftp_host_fingerprint = copiedFingerprint;
 
     if (row.sftp_enabled) {
       if (!username) return NextResponse.json({ error: 'SFTP username is required.' }, { status: 422 });

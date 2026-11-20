@@ -28,6 +28,7 @@ export default function SftpShipmentsCard({ supplierId }) {
   const [testResult, setTestResult] = useState(null);
   const [edit, setEdit] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [copied, setCopied] = useState(null); // credentials staged from SFTP Delivery; applied on Save
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,7 +39,7 @@ export default function SftpShipmentsCard({ supplierId }) {
       const { has_password, has_private_key, host_fingerprint, ...s } = json.settings;
       setForm(s); setSaved(s);
       setMeta({ has_password, has_private_key, host_fingerprint });
-      setPassword(""); setPrivateKey("");
+      setPassword(""); setPrivateKey(""); setCopied(null);
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -49,7 +50,10 @@ export default function SftpShipmentsCard({ supplierId }) {
   useEffect(() => { load(); }, [load]);
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
-  const dirty = FIELDS.some((k) => String(form[k] ?? "") !== String(saved[k] ?? "")) || password !== "" || privateKey !== "";
+  const dirty = FIELDS.some((k) => String(form[k] ?? "") !== String(saved[k] ?? "")) || password !== "" || privateKey !== "" || !!copied;
+  const hasSecret = !!copied || meta.has_password || meta.has_private_key || password.trim() !== "" || privateKey.trim() !== "";
+  const populated = !!String(form.sftp_host ?? "").trim() && !!String(form.sftp_username ?? "").trim() && hasSecret;
+  const canSave = !form.sftp_enabled || (populated && !!String(form.sftp_folder ?? "").trim());
   const folderMissing = form.sftp_enabled && !String(form.sftp_folder ?? "").trim();
 
   async function save(extra = {}) {
@@ -58,7 +62,7 @@ export default function SftpShipmentsCard({ supplierId }) {
     try {
       const body = extra.reset_host_key
         ? { ...saved, sftp_password: "", sftp_private_key: "", ...extra }
-        : { ...form, sftp_password: password, sftp_private_key: privateKey };
+        : { ...form, sftp_password: password, sftp_private_key: privateKey, copy_credentials: !!copied };
       const res = await fetch(`/api/suppliers/${supplierId}/sftp-shipments`, {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       });
@@ -90,17 +94,13 @@ export default function SftpShipmentsCard({ supplierId }) {
   }
 
   async function copyFromExport() {
-    if (!window.confirm("Replace this card's host, port, username and password/key with the ones from SFTP Delivery? This is saved right away.")) return;
     setCopying(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplierId}/sftp-shipments/copy-from-export`, { method: "POST" });
+      const res = await fetch(`/api/suppliers/${supplierId}/sftp-shipments/copy-from-export`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Copy failed");
-      const keep = { sftp_enabled: form.sftp_enabled, sftp_folder: form.sftp_folder, sftp_pickup_prefix: form.sftp_pickup_prefix };
-      await load();
-      setForm((f) => ({ ...f, ...keep }));
-      setTestResult(null);
-      showToast("Connection copied from SFTP Delivery.", "success");
+      setForm((f) => ({ ...f, sftp_host: json.host, sftp_port: json.port, sftp_username: json.username }));
+      setPassword(""); setPrivateKey(""); setCopied(json); setTestResult(null);
     } catch (err) {
       showToast(err.message, "error");
     } finally {
@@ -109,7 +109,7 @@ export default function SftpShipmentsCard({ supplierId }) {
   }
 
   function cancel() {
-    setForm(saved); setPassword(""); setPrivateKey(""); setTestResult(null); setEdit(false);
+    setForm(saved); setPassword(""); setPrivateKey(""); setCopied(null); setTestResult(null); setEdit(false);
   }
 
   if (loading) return null;
@@ -124,7 +124,7 @@ export default function SftpShipmentsCard({ supplierId }) {
               className="h-4 w-4 rounded border-gray-300 text-blue-600" />
             Enabled
           </label>
-          {edit && <Button variant="secondary" size="sm" onClick={copyFromExport} disabled={copying}>{copying ? "Copying…" : "Copy from Export"}</Button>}
+          {edit && <Button variant="secondary" size="sm" onClick={copyFromExport} disabled={copying || populated}>{copying ? "Copying…" : "Copy from Export"}</Button>}
           <Button variant="secondary" size="sm" onClick={edit ? cancel : () => setEdit(true)}>{edit ? "Cancel" : "Edit"}</Button>
         </div>
       </div>
@@ -152,11 +152,11 @@ export default function SftpShipmentsCard({ supplierId }) {
               </div>
               <div>
                 <label className={labelCls}>
-                  Password {meta.has_password && <span className="font-normal text-green-600">(saved)</span>}
+                  Password {copied ? <span className="font-normal text-blue-600">(copied, click Save)</span> : meta.has_password && <span className="font-normal text-green-600">(saved)</span>}
                 </label>
                 <input type="password" className={inputCls} value={password} autoComplete="new-password"
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={meta.has_password ? "leave blank to keep" : ""} />
+                  placeholder={copied ? "copied from SFTP Delivery" : meta.has_password ? "leave blank to keep" : ""} />
               </div>
             </div>
 
@@ -215,7 +215,7 @@ export default function SftpShipmentsCard({ supplierId }) {
               {testing ? "Testing…" : dirty ? "Save to test" : "Test connection"}
             </Button>
           )}
-          {edit && <Button size="sm" onClick={() => save()} disabled={!dirty || saving}>{saving ? "Saving…" : "Save"}</Button>}
+          {edit && <Button size="sm" onClick={() => save()} disabled={!dirty || saving || !canSave}>{saving ? "Saving…" : "Save"}</Button>}
         </div>
       )}
     </div>
