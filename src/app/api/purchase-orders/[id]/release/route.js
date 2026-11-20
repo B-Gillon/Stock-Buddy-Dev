@@ -7,11 +7,11 @@
  *      an acknowledgement), sets released_at
  *   3. Pushes incoming quantities via pushIncomingToShopify
  *   4. Rolls back DB status if push fails
- *   5. Sends PO email to supplier
+ *   5. Returns right away; the supplier email / SFTP delivery then runs in the background (after())
  *
  * Returns: { success, error? }
  */
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getTenantId } from "@/lib/tenants";
 import { supabase } from "@/lib/supabaseClient";
 import { pushIncomingToShopify } from "@/lib/sync/po/pushIncoming";
@@ -19,6 +19,10 @@ import { sendPOEmail } from "@/lib/sendPOEmail";
 import { logPOActivity } from "@/lib/logPOActivity";
 import { logSftpUpload } from "@/lib/sftp";
 import { logError } from "@/lib/logError";
+import { sendAlert } from "@/lib/alerts";
+
+// The supplier delivery (PDF, email, SFTP) runs after the response, so give it room to finish
+export const maxDuration = 60;
 
 export async function POST(request, { params }) {
   try {
@@ -65,36 +69,58 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, error: "Shopify sync failed — PO rolled back to draft" }, { status: 500 });
     }
 
-    // Send email — must be awaited before returning or Vercel will
-    // terminate the function before the email is sent
-    const emailResult = await sendPOEmail(poId, { isResend: false });
+    // The supplier delivery (PDF, email, SFTP) takes ~10 seconds, so it runs after the response:
+    // the PO is already released and its incoming quantities are saved. A failure is written to the
+    // PO's History and sent as an email alert (Settings -> Email Alerts).
+    after(async () => {
+      try {
+        const emailResult = await sendPOEmail(poId, { isResend: false });
 
-    // Supplier must acknowledge → hold in Pending Acknowledgement until they do
-    if (emailResult.ackRequested) {
-      await supabase.from("purchase_orders").update({ status: "pending_acknowledgement" }).eq("id", poId);
-    }
+        // Supplier must acknowledge → hold in Pending Acknowledgement until they do
+        if (emailResult.ackRequested) {
+          await supabase.from("purchase_orders").update({ status: "pending_acknowledgement" }).eq("id", poId);
+        }
 
-    await logPOActivity({
-      poId, tenantId, action: "released", request,
-      comments: emailResult.notes || (emailResult.success ? null : "PO was not sent to the supplier"),
+        await logPOActivity({
+          poId, tenantId, action: "released", request,
+          comments: emailResult.notes || (emailResult.success ? null : "PO was not sent to the supplier"),
+        });
+
+        if (emailResult.sftp) await logSftpUpload({ poId, tenantId, request, sftp: emailResult.sftp });
+
+        // SFTP problems are already in History as "SFTP Failed"; log an error row only for email/other failures
+        const sendError = emailResult.success ? null : (emailResult.emailError ?? (emailResult.sftp ? null : emailResult.error));
+        if (sendError) {
+          await logError({ source: "releasePO/sendEmail", error: new Error(sendError), tenantId, context: { poId } });
+          await logPOActivity({ poId, tenantId, action: "error", request, comments: `Send failed: ${sendError}` });
+        }
+
+        if (!emailResult.success) {
+          const { data: p } = await supabase.from("purchase_orders").select("po_number, supplier:suppliers ( supplier_name )").eq("id", poId).maybeSingle();
+          const sup = Array.isArray(p?.supplier) ? p.supplier[0] : p?.supplier;
+          const sftpFailed = emailResult.sftp?.files?.filter((f) => !f.ok).map((f) => `${f.type.toUpperCase()}: ${f.error}`) ?? [];
+          await sendAlert({
+            tenantId, kind: "po_release_failed",
+            subject: `${p?.po_number ?? "A PO"} was released but could not be sent to ${sup?.supplier_name ?? "the supplier"}`,
+            lines: [
+              `PO: ${p?.po_number ?? poId}`,
+              `Supplier: ${sup?.supplier_name ?? ""}`,
+              "The PO is released in Stock Buddy, but the supplier did not receive it.",
+              "",
+              "What went wrong:",
+              sendError ?? emailResult.error ?? (sftpFailed.length ? sftpFailed.join("; ") : "Unknown error"),
+              "",
+              "Open the PO and use Resend once the problem is fixed.",
+            ],
+          });
+        }
+      } catch (err) {
+        await logError({ source: "releasePO/afterResponse", error: err, tenantId, context: { poId } });
+        await logPOActivity({ poId, tenantId, action: "error", request, comments: `Send failed: ${err.message}` });
+        await sendAlert({ tenantId, kind: "po_release_failed", subject: `A PO was released but could not be sent to the supplier`,
+          lines: [`PO id: ${poId}`, "The PO is released in Stock Buddy, but sending it to the supplier failed.", "", `What went wrong: ${err.message}`, "", "Open the PO and use Resend."] });
+      }
     });
-
-    if (emailResult.sftp) await logSftpUpload({ poId, tenantId, request, sftp: emailResult.sftp });
-
-    // SFTP problems are already in History as "SFTP Failed"; log an error row only for email/other failures
-    const sendError = emailResult.success ? null : (emailResult.emailError ?? (emailResult.sftp ? null : emailResult.error));
-    if (sendError) {
-      await logError({
-        source: "releasePO/sendEmail",
-        error: new Error(sendError),
-        tenantId,
-        context: { poId },
-      });
-      await logPOActivity({
-        poId, tenantId, action: "error", request,
-        comments: `Send failed: ${sendError}`,
-      });
-    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

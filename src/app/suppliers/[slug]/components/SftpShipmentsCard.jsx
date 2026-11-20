@@ -26,6 +26,8 @@ export default function SftpShipmentsCard({ supplierId }) {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [picking, setPicking] = useState(false);
+  const [pickup, setPickup] = useState(null); // { error?, files: [...] }
   const [edit, setEdit] = useState(false);
   const [copying, setCopying] = useState(false);
   const [copied, setCopied] = useState(null); // credentials staged from SFTP Delivery; applied on Save
@@ -113,6 +115,18 @@ export default function SftpShipmentsCard({ supplierId }) {
   }
 
   if (loading) return null;
+  // Temporary manual trigger for the ship file pickup (a schedule comes later)
+  async function pickUpNow() {
+    setPicking(true); setPickup(null);
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/sftp-shipments/pickup`, { method: "POST" });
+      const json = await res.json().catch(() => ({}));
+      setPickup(res.ok && json.ok ? { files: json.files } : { error: json.error ?? "Pickup failed.", files: [] });
+    } catch { setPickup({ error: "Pickup failed.", files: [] }); }
+    finally { setPicking(false); }
+  }
+
+
   return (
     <div className="flex h-full flex-col rounded-lg border border-gray-200 bg-white shadow-sm">
       <div className="flex items-start justify-between px-4 pt-3 pb-1">
@@ -201,6 +215,21 @@ export default function SftpShipmentsCard({ supplierId }) {
         </div>
       )}
 
+      {form.sftp_enabled && pickup && (
+        <div className="px-4 pb-3">
+          <div className={`rounded border px-3 py-2 text-xs ${pickup.error || pickup.files.some((f) => f.status === "failed") ? "border-red-200 bg-red-50 text-red-800" : "border-green-200 bg-green-50 text-green-800"}`}>
+            {pickup.error && <p>{pickup.error}</p>}
+            {!pickup.error && pickup.files.length === 0 && <p>No files to pick up.</p>}
+            {pickup.files.map((f) => (
+              <div key={f.name} className="mb-1 last:mb-0">
+                <p className="font-medium">{f.status === "shipped" ? "✓" : f.status === "failed" ? "✗" : "–"} {f.name}</p>
+                <p className="whitespace-pre-line pl-4">{f.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {(form.sftp_enabled || edit) && (
         <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2.5">
           {form.sftp_enabled && meta.host_fingerprint && (
@@ -213,6 +242,12 @@ export default function SftpShipmentsCard({ supplierId }) {
           {form.sftp_enabled && (
             <Button variant="secondary" size="sm" onClick={testConnection} disabled={testing || dirty}>
               {testing ? "Testing…" : dirty ? "Save to test" : "Test connection"}
+            </Button>
+          )}
+          {form.sftp_enabled && (
+            <Button variant="secondary" size="sm" onClick={pickUpNow} disabled={picking || dirty || !canSave}
+              title="Temporary: picks up this supplier's ship files now">
+              {picking ? "Picking up…" : dirty ? "Save to pick up" : "Pick Up Ship Files Now"}
             </Button>
           )}
           {edit && <Button size="sm" onClick={() => save()} disabled={!dirty || saving || !canSave}>{saving ? "Saving…" : "Save"}</Button>}

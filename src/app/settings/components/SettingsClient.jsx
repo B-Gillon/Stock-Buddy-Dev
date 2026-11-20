@@ -6,6 +6,7 @@ import PDFTab from './PDFTab';
 import CSVTab from './CSVTab';
 import UsersTab from './UsersTab';
 import ShipmentSettingsTab from './ShipmentSettingsTab';
+import EmailAlertsTab from './EmailAlertsTab';
 
 // ── Shared UI helpers ──────────────────────────────────────────────────────────
 
@@ -391,7 +392,7 @@ function PurchaseOrdersTab({ poNextNumber: initialPoNextNumber }) {
 
 // ── Main Settings component ────────────────────────────────────────────────────
 
-const TABS = ['PDF', 'CSV', 'Email', 'Purchase Orders', 'Shipment Settings', 'Users'];
+const TABS = ['PDF', 'CSV', 'Email', 'Purchase Orders', 'Shipment Settings', 'Email Alerts', 'Users'];
 
 export default function SettingsClient({ suppliers, locations, poNextNumber }) {
   const [activeTab, setActiveTab] = useState('PDF');
@@ -429,6 +430,7 @@ export default function SettingsClient({ suppliers, locations, poNextNumber }) {
             {activeTab === 'Email'           && <EmailTab />}
             {activeTab === 'Purchase Orders' && <PurchaseOrdersTab poNextNumber={poNextNumber} />}
             {activeTab === 'Shipment Settings' && <ShipmentSettingsTab />}
+            {activeTab === 'Email Alerts' && <EmailAlertsTab />}
             {activeTab === 'Users'           && <UsersTab />}
           </div>
         )}

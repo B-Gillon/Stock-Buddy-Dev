@@ -143,6 +143,34 @@ export async function testSftpShipments(settings) {
   });
 }
 
+// ── Ship file pickup ──────────────────────────────────────────────────────────
+
+const SHIP_FILE_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Lists the pickup folder and reads every file that starts with the pickup prefix. Nothing is changed or
+ * deleted on the supplier's server. Temporary upload names (.tmp, .part, .filepart) are skipped.
+ * @returns {Promise<{name:string, size:number, mtime:Date, text?:string, error?:string}[]>}
+ */
+export async function fetchShipFiles(settings) {
+  return withSftp({ ...settings, fingerprint_table: 'supplier_shipment_sftp_settings' }, async (client) => {
+    const dir = cleanRemoteDir(settings.sftp_folder) || '.';
+    const prefix = String(settings.sftp_pickup_prefix ?? '');
+    const list = (await client.list(dir))
+      .filter((f) => f.type === '-' && f.name.startsWith(prefix) && !/\.(tmp|part|filepart)$/i.test(f.name))
+      .sort((a, b) => a.modifyTime - b.modifyTime);
+    const out = [];
+    for (const f of list) {
+      const file = { name: f.name, size: Number(f.size), mtime: new Date(f.modifyTime) };
+      if (file.size > SHIP_FILE_MAX_BYTES) { file.error = 'The file is too large (2 MB maximum).'; out.push(file); continue; }
+      try { file.text = (await client.get(remotePath(dir, f.name))).toString('utf8'); }
+      catch (err) { file.error = `Could not read the file: ${String(err?.message ?? err)}`; }
+      out.push(file);
+    }
+    return out;
+  });
+}
+
 // ── Upload ────────────────────────────────────────────────────────────────────
 
 /** Picks a file name that is not already on the server: name.pdf, name_2.pdf, name_3.pdf ... */
