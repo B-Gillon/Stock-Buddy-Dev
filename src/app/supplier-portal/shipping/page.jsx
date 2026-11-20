@@ -4,6 +4,7 @@ import { requireSupplier, fmtDate } from '@/lib/supplierPortal';
 import { shippedByLine } from '@/lib/shipments';
 import ClickRow from '../components/ClickRow';
 import PortalFrame from '../components/PortalFrame';
+import UploadShipFile from './UploadShipFile';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Shipping – Stock Buddy', robots: { index: false, follow: false } };
@@ -33,7 +34,10 @@ export default async function ShippingPage() {
   return (
     <PortalFrame supplierName={s.supplierName} email={s.email}>
       <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Waiting to ship ({rows.length})</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Waiting to ship ({rows.length})</h2>
+          <UploadShipFile />
+        </div>
         {rows.length === 0 ? <p className="text-sm text-gray-400">Nothing left to ship.</p> : (
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-100 text-left text-xs text-gray-400">

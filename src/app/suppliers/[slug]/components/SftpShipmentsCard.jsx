@@ -27,6 +27,7 @@ export default function SftpShipmentsCard({ supplierId }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [edit, setEdit] = useState(false);
+  const [copying, setCopying] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +89,25 @@ export default function SftpShipmentsCard({ supplierId }) {
     }
   }
 
+  async function copyFromExport() {
+    if (!window.confirm("Replace this card's host, port, username and password/key with the ones from SFTP Delivery? This is saved right away.")) return;
+    setCopying(true);
+    try {
+      const res = await fetch(`/api/suppliers/${supplierId}/sftp-shipments/copy-from-export`, { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Copy failed");
+      const keep = { sftp_enabled: form.sftp_enabled, sftp_folder: form.sftp_folder, sftp_pickup_prefix: form.sftp_pickup_prefix };
+      await load();
+      setForm((f) => ({ ...f, ...keep }));
+      setTestResult(null);
+      showToast("Connection copied from SFTP Delivery.", "success");
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setCopying(false);
+    }
+  }
+
   function cancel() {
     setForm(saved); setPassword(""); setPrivateKey(""); setTestResult(null); setEdit(false);
   }
@@ -104,6 +124,7 @@ export default function SftpShipmentsCard({ supplierId }) {
               className="h-4 w-4 rounded border-gray-300 text-blue-600" />
             Enabled
           </label>
+          {edit && <Button variant="secondary" size="sm" onClick={copyFromExport} disabled={copying}>{copying ? "Copying…" : "Copy from Export"}</Button>}
           <Button variant="secondary" size="sm" onClick={edit ? cancel : () => setEdit(true)}>{edit ? "Cancel" : "Edit"}</Button>
         </div>
       </div>
