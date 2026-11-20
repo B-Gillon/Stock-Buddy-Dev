@@ -4,6 +4,7 @@
  * Handles Shopify API calls, credential resolution, and DB logging.
  */
 
+import { randomUUID } from "crypto";
 import { supabase } from "@/lib/supabaseClient";
 import { getShopifyCredentials } from "@/lib/shopify/accessToken";
 import { shopifyGraphQL } from "@/lib/sync/shopifyHelpers";
@@ -46,8 +47,8 @@ const INVENTORY_LEVEL_QUERY = `
 `;
 
 const INVENTORY_ADJUST_MUTATION = `
-  mutation InventoryAdjust($input: InventoryAdjustQuantitiesInput!) {
-    inventoryAdjustQuantities(input: $input) {
+  mutation InventoryAdjust($input: InventoryAdjustQuantitiesInput!, $key: String!) {
+    inventoryAdjustQuantities(input: $input) @idempotent(key: $key) {
       inventoryAdjustmentGroup { id }
       userErrors { code field message }
     }
@@ -121,6 +122,7 @@ export async function adjustShopifyAvailable(
     const data = await shopifyGraphQL(
       INVENTORY_ADJUST_MUTATION,
       {
+        key: randomUUID(),
         input: {
           reason: "received",
           name: "available",
