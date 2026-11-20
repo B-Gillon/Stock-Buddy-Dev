@@ -1,24 +1,17 @@
-// Supplier edits a saved carton: its fields and item quantities. If the label is generated, the label data is recreated:
-// a changed carton content gets a NEW SSCC (the old one is voided); other edits keep the SSCC and just refresh the label.
+// Supplier deletes a saved carton. Its items go back to unshipped (the PO status follows), its SSCC is voided,
+// the remaining cartons of the shipment are renumbered (their labels must be reprinted), and a shipment left
+// with no cartons is deleted. A carton with receiving activity against it can never be deleted.
 import { userLabel } from '@/lib/userLabel';
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabaseClient';
 import { logPOActivity } from '@/lib/logPOActivity';
 import { shippedByLine } from '@/lib/shipments';
-import { loadShipmentConfig } from '@/lib/shipmentSettings';
-import { validateShipment, normalizeSscc } from '@/lib/shipmentFields';
-import { loadLabelSettings, reserveSscc } from '@/lib/sscc';
-import { findUsedLots, usedLotsMessage } from '@/lib/lotCheck';
 
-const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
-const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
-
-export async function PATCH(request, { params }) {
+export async function DELETE(request, { params }) {
   const supplierId = request.headers.get('x-auth-supplier');
   const userId = request.headers.get('x-auth-user');
   if (request.headers.get('x-auth-role') !== 'supplier' || !supplierId || !userId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { cartonId } = await params;
-  let body; try { body = await request.json(); } catch { body = {}; }
   const bad = (error, status = 400) => NextResponse.json({ ok: false, error }, { status });
 
   const [{ data: sup }, { data: user }] = await Promise.all([
@@ -34,112 +27,53 @@ export async function PATCH(request, { params }) {
   const { data: shipment } = await supabase.from('shipments').select('id, po_id, shipment_number')
     .eq('id', carton.shipment_id).eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
   if (!shipment) return bad('Carton not found.', 404);
-  if (carton.received_at) return bad('This carton has already been received and can’t be changed.', 409);
-  const { data: po } = await supabase.from('purchase_orders').select('id, status').eq('id', shipment.po_id).eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
+  const { data: po } = await supabase.from('purchase_orders').select('id, status')
+    .eq('id', shipment.po_id).eq('tenant_id', tenantId).eq('supplier_id', supplierId).maybeSingle();
   if (!po) return bad('Carton not found.', 404);
-  if (po.status === 'cancelled') return bad('This purchase order was cancelled.');
+  if (!['shipped', 'partially_shipped', 'partially_received'].includes(po.status)) return bad('Cartons can’t be deleted on this purchase order.', 409);
 
-  const labels = await loadLabelSettings(tenantId, supplierId);
-  const config = await loadShipmentConfig(tenantId, supplierId);
-  const c = body.carton ?? {};
-  const forCheck = { ...c, sscc: labels.enabled ? (carton.sscc || '000000000000000000') : c.sscc };
-  const errs = validateShipment(config, { ship_date: '2000-01-01' }, [forCheck]).filter((e) => e.startsWith('Carton 1'));
-  if (errs.length) return bad(errs[0].replace('Carton 1', `Carton ${carton.carton_no}`));
-
-  // Lot numbers: not used on any other shipment, and one expire date per lot within this shipment
-  const vcfg = config.carton;
-  const newLines = (c.lines ?? []).filter((r) => Number(r.qty) > 0);
-  if (vcfg.lot_number.visible) {
-    const lots = newLines.map((r) => r.lot_number);
-    try {
-      const usedLots = await findUsedLots({ tenantId, supplierId, lots, excludeShipmentId: shipment.id });
-      if (usedLots.length) return bad(usedLotsMessage(usedLots));
-    } catch (e) { return bad(e.message, 500); }
-    const keys = [...new Set(lots.map((l) => clean(l)?.toLowerCase()).filter(Boolean))];
-    if (keys.length) {
-      const { data: sameShip } = await supabase.from('shipment_lines').select('lot_key, expiration_date')
-        .eq('shipment_id', shipment.id).neq('carton_id', carton.id).in('lot_key', keys);
-      for (const r of newLines) {
-        const k = clean(r.lot_number)?.toLowerCase(); const e = clean(r.expiration_date);
-        if (k && e && (sameShip ?? []).some((x) => x.lot_key === k && x.expiration_date && x.expiration_date !== e)) {
-          return bad(`Lot ${clean(r.lot_number)} has a different expire date on another carton of this shipment.`);
-        }
-      }
+  // Receiving activity: never delete
+  if (carton.received_at) return bad('This carton has been received and can’t be deleted.', 409);
+  const { data: cartonLines } = await supabase.from('shipment_lines').select('po_line_id, shipped_qty').eq('carton_id', carton.id);
+  const { data: poLines } = await supabase.from('purchase_order_lines').select('id, sku, order_qty_units, received_qty_units').eq('purchase_order_id', po.id);
+  const lineMap = new Map((poLines ?? []).map((l) => [l.id, l]));
+  const shippedBefore = await shippedByLine([...lineMap.keys()]);
+  const removed = {};
+  for (const r of cartonLines ?? []) removed[r.po_line_id] = (removed[r.po_line_id] ?? 0) + r.shipped_qty;
+  for (const [lineId, q] of Object.entries(removed)) {
+    const l = lineMap.get(lineId);
+    if (l && (shippedBefore[lineId] ?? 0) - q < (l.received_qty_units ?? 0)) {
+      return bad(`${l.sku || 'An item'} on this carton already has received quantity, so the carton can’t be deleted.`, 409);
     }
   }
 
-  // Quantities: everything shipped on other cartons + this carton's new quantities must stay within the ordered quantity
-  const { data: lines } = await supabase.from('purchase_order_lines').select('id, order_qty_units').eq('purchase_order_id', po.id);
-  const lineMap = new Map((lines ?? []).map((l) => [l.id, l]));
-  const { data: oldRows } = await supabase.from('shipment_lines').select('po_line_id, shipped_qty, lot_number, expiration_date').eq('carton_id', carton.id);
-  const oldQ = {}; const oldLx = {};
-  for (const r of oldRows ?? []) { oldQ[r.po_line_id] = (oldQ[r.po_line_id] ?? 0) + r.shipped_qty; oldLx[r.po_line_id] = { lot: r.lot_number ?? null, exp: r.expiration_date ?? null }; }
-  const newQ = {}; const newLx = {};
-  for (const r of c.lines ?? []) {
-    const q = Number(r.qty) || 0;
-    if (!q) continue;
-    if (!lineMap.has(r.lineId)) return bad('A line does not belong to this purchase order.');
-    newQ[r.lineId] = (newQ[r.lineId] ?? 0) + q;
-    newLx[r.lineId] = { lot: vcfg.lot_number.visible ? clean(r.lot_number) : null, exp: vcfg.expiration_date.visible ? clean(r.expiration_date) : null };
-  }
-  const shipped = await shippedByLine([...lineMap.keys()]);
-  for (const [lineId, q] of Object.entries(newQ)) {
-    if ((shipped[lineId] ?? 0) - (oldQ[lineId] ?? 0) + q > (lineMap.get(lineId).order_qty_units ?? 0)) return bad('A quantity is more than the remaining unshipped quantity.');
-  }
-  const ids = new Set([...Object.keys(oldQ), ...Object.keys(newQ)]);
-  const contentChanged = [...ids].some((id) => (oldQ[id] ?? 0) !== (newQ[id] ?? 0));
-  const lotChanged = Object.keys(newQ).some((id) => (newLx[id]?.lot ?? null) !== (oldLx[id]?.lot ?? null) || (newLx[id]?.exp ?? null) !== (oldLx[id]?.exp ?? null));
+  // Delete the carton (its item rows go with it) and void its SSCC
+  const { error: delErr } = await supabase.from('shipment_cartons').delete().eq('id', carton.id).eq('tenant_id', tenantId).is('received_at', null);
+  if (delErr) { console.error('[carton delete] failed:', delErr); return bad('Could not delete the carton. Please try again.', 500); }
+  if (carton.sscc) await supabase.from('supplier_ssccs').update({ voided_at: new Date().toISOString() }).eq('tenant_id', tenantId).eq('sscc', carton.sscc);
 
-  // Label data: new SSCC when contents changed (or there was none), same SSCC otherwise
-  const vc = config.carton;
-  let sscc = carton.sscc;
-  let ssccChanged = false;
-  if (labels.enabled) {
-    if (!sscc || contentChanged) {
-      try { sscc = await reserveSscc({ tenantId, supplierId, poId: po.id, cartonNo: carton.carton_no }); }
-      catch (e) { return bad(e.message); }
-      ssccChanged = true;
+  // Renumber what is left (or remove the shipment if nothing is left)
+  const { data: left } = await supabase.from('shipment_cartons').select('id, carton_no').eq('shipment_id', shipment.id).order('carton_no', { ascending: true });
+  let shipmentDeleted = false;
+  if (!(left ?? []).length) {
+    await supabase.from('shipments').delete().eq('id', shipment.id).eq('tenant_id', tenantId);
+    shipmentDeleted = true;
+  } else {
+    for (let i = 0; i < left.length; i++) {
+      if (left[i].carton_no !== i + 1) await supabase.from('shipment_cartons').update({ carton_no: i + 1 }).eq('id', left[i].id);
     }
-  } else if (vc.sscc.visible) {
-    sscc = clean(c.sscc) ? normalizeSscc(c.sscc) : null;
+    await supabase.from('shipments').update({ total_cartons: left.length }).eq('id', shipment.id);
   }
 
-  const hasW = vc.weight.visible && numOrNull(c.weight) != null;
-  const hasD = vc.dimensions.visible && numOrNull(c.length) != null;
-  const { error: upErr } = await supabase.from('shipment_cartons').update({
-    supplier_carton_id: vc.supplier_carton_id.visible ? clean(c.supplier_carton_id) : null,
-    sscc,
-    tracking_number: vc.carton_tracking.visible ? clean(c.tracking_number) : null,
-    weight: hasW ? numOrNull(c.weight) : null, weight_unit: hasW ? c.weight_unit : null,
-    length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,
-    dim_unit: hasD ? c.dim_unit : null,
-    pallet_id: vc.pallet_id.visible ? clean(c.pallet_id) : null,
-  }).eq('id', carton.id);
-  if (upErr) { console.error('[carton edit] update failed:', upErr); return bad('Could not save the carton. Please try again.', 500); }
+  // PO status follows what is still shipped (a PO the retailer has started receiving keeps its receiving status)
+  const after = await shippedByLine([...lineMap.keys()]);
+  const all = [...lineMap.values()];
+  const fully = all.length > 0 && all.every((l) => (after[l.id] ?? 0) >= (l.order_qty_units ?? 0));
+  const any = all.some((l) => (after[l.id] ?? 0) > 0);
+  await supabase.from('purchase_orders').update({ status: fully ? 'shipped' : any ? 'partially_shipped' : 'waiting_to_ship' })
+    .eq('id', po.id).in('status', ['shipped', 'partially_shipped']);
 
-  if (ssccChanged) {
-    await supabase.from('supplier_ssccs').update({ shipment_id: shipment.id }).eq('tenant_id', tenantId).eq('sscc', sscc);
-    if (carton.sscc) await supabase.from('supplier_ssccs').update({ voided_at: new Date().toISOString() }).eq('tenant_id', tenantId).eq('sscc', carton.sscc);
-  }
-
-  if (contentChanged || lotChanged) {
-    await supabase.from('shipment_lines').delete().eq('carton_id', carton.id);
-    const rows = Object.entries(newQ).map(([lineId, q]) => ({ tenant_id: tenantId, shipment_id: shipment.id, carton_id: carton.id, po_line_id: lineId, shipped_qty: q, lot_number: newLx[lineId]?.lot ?? null, expiration_date: newLx[lineId]?.exp ?? null }));
-    const { error: lErr } = await supabase.from('shipment_lines').insert(rows);
-    if (lErr) {
-      console.error('[carton edit] lines failed, restoring:', lErr);
-      await supabase.from('shipment_lines').insert(Object.entries(oldQ).map(([lineId, q]) => ({ tenant_id: tenantId, shipment_id: shipment.id, carton_id: carton.id, po_line_id: lineId, shipped_qty: q, lot_number: oldLx[lineId]?.lot ?? null, expiration_date: oldLx[lineId]?.exp ?? null })));
-      return bad('Could not save the carton. Please try again.', 500);
-    }
-    // Status follows the shipments
-    const after = await shippedByLine([...lineMap.keys()]);
-    const fully = [...lineMap.values()].every((l) => (after[l.id] ?? 0) >= (l.order_qty_units ?? 0));
-    await supabase.from('purchase_orders').update({ status: fully ? 'shipped' : 'partially_shipped' }).eq('id', po.id).in('status', ['shipped', 'partially_shipped']);
-  }
-
-  const { data: poNow } = await supabase.from('purchase_orders').select('status').eq('id', po.id).single();
-  const poStatusNow = poNow?.status;
-  await logPOActivity({ poId: po.id, tenantId, action: poStatusNow === 'shipped' ? 'shipped' : 'partially_shipped', userName: userLabel(user),
-    comments: `Shipment ${shipment.shipment_number} carton ${carton.carton_no} edited${ssccChanged ? ' (new SSCC issued)' : ''}` });
-  return NextResponse.json({ ok: true, sscc, ssccChanged });
+  await logPOActivity({ poId: po.id, tenantId, action: 'edited', userName: userLabel(user),
+    comments: `Shipment ${shipment.shipment_number} carton ${carton.carton_no} deleted${shipmentDeleted ? ' (shipment removed, no cartons left)' : '; remaining cartons renumbered'}` });
+  return NextResponse.json({ ok: true, shipmentDeleted });
 }

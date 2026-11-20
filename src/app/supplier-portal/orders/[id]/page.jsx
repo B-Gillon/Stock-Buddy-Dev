@@ -160,10 +160,6 @@ export default async function OrderPage({ params, searchParams }) {
                   cartons: [...(sh.shipment_cartons ?? [])].sort((a, b) => a.carton_no - b.carton_no)
                     .map((c) => ({ ...c, lines: (shipLineRows ?? []).filter((x) => x.carton_id === c.id) })),
                 }))}
-                lines={lines}
-                config={shipConfig}
-                lineColumns={lineColumns}
-                labels={{ enabled: labelSettings.enabled, printMode: labelSettings.printMode }}
               />
             )}
           </HideWhileCreating>
