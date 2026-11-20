@@ -225,8 +225,8 @@ function ReportDonut({ poReport, onNavigate, rows = REPORT_ROWS }) {
           return el;
         })}
         <text x="60" y="60" textAnchor="middle" dominantBaseline="central" style={{ pointerEvents: "none" }}>
-          <tspan className="fill-gray-800" style={{ fontSize: 24, fontWeight: 700 }}>{total}</tspan>
-          <tspan className="fill-gray-800" style={{ fontSize: 24, fontWeight: 700 }} dx="4">POs</tspan>
+          <tspan className="fill-gray-800" style={{ fontSize: 17, fontWeight: 700 }}>{total}</tspan>
+          <tspan className="fill-gray-800" style={{ fontSize: 17, fontWeight: 700 }} dx="4">POs</tspan>
         </text>
       </svg>
       {hovered && (
