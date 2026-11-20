@@ -189,12 +189,12 @@ function GettingStartedCard({ onNavigate }) {
 const money = (n) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n ?? 0);
 
 const REPORT_ROWS = [
-  { key: "overdue",  label: "Overdue",                     color: "#dc2626", tone: "text-gray-900",   href: "/purchase-orders?status=overdue" },
-  { key: "thisWeek", label: "Ships this Week",               color: "#f59e0b", tone: "text-gray-900", href: "/purchase-orders?status=ship_this_week" },
-  { key: "later",    label: "Ships after this Week",         color: "#16a34a", tone: "text-gray-900", href: "/purchase-orders?status=ship_later" },
-  { key: "transit",  label: "In Transit",                  color: "#7c3aed", tone: "text-gray-900", href: "/purchase-orders?status=in_transit" },
-  { key: "putaway",  label: "Received / Pending Putaway",   color: "#0d9488", tone: "text-gray-900", href: "/purchase-orders?status=not_put_away" },
-  { key: "drafts",   label: "Drafts",                      color: "#2563eb", tone: "text-gray-900",  href: "/purchase-orders?status=draft" },
+  { key: "overdue",  label: "Overdue",                     color: "#1e3a8a", tone: "text-gray-900",   href: "/purchase-orders?status=overdue" },
+  { key: "thisWeek", label: "Ships this Week",               color: "#2563eb", tone: "text-gray-900", href: "/purchase-orders?status=ship_this_week" },
+  { key: "later",    label: "Ships after this Week",         color: "#60a5fa", tone: "text-gray-900", href: "/purchase-orders?status=ship_later" },
+  { key: "transit",  label: "In Transit",                  color: "#111827", tone: "text-gray-900", href: "/purchase-orders?status=in_transit" },
+  { key: "putaway",  label: "Received / Pending Putaway",   color: "#6b7280", tone: "text-gray-900", href: "/purchase-orders?status=not_put_away" },
+  { key: "drafts",   label: "Drafts",                      color: "#d1d5db", tone: "text-gray-900",  href: "/purchase-orders?status=draft" },
 ];
 
 function ReportDonut({ poReport, onNavigate, rows = REPORT_ROWS }) {
