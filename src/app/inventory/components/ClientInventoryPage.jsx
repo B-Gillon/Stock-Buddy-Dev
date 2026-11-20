@@ -110,14 +110,11 @@ export default function ClientInventoryPage({
   pageSize = 20,
   currentFilters = {},
   filterOptions = {},
-  lastSyncedAt: initialLastSyncedAt,
 }) {
   const router       = useRouter();
   const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  const [syncing,      setSyncing]      = useState(false);
-  const [lastSynced,   setLastSynced]   = useState(initialLastSyncedAt);
   const [banner,       setBanner]       = useState(null);
   const [searchOpen,   setSearchOpen]   = useState(false);
   const [searchTerm,   setSearchTerm]   = useState(currentFilters.search ?? "");
@@ -225,23 +222,6 @@ export default function ClientInventoryPage({
   };
 
   // ── Sync ──────────────────────────────────────────────────────────────────
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res = await fetch("/api/sync/inventory", { method: "POST" });
-      if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error ?? res.statusText); }
-      setLastSynced(new Date().toISOString());
-      setBanner({ type: "success", message: "Inventory sync complete." });
-      router.refresh();
-    } catch (err) {
-      setBanner({ type: "error", message: err.message ?? "Sync failed." });
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   // ── Export ────────────────────────────────────────────────────────────────
 
   function exportCSV() {
@@ -332,10 +312,6 @@ export default function ClientInventoryPage({
       title="Inventory"
       paginationControls={paginationControls}
       actions={{
-        onSync:       handleSync,
-        syncing:      syncing,
-        syncLabel:    "Sync Inventory",
-        lastSyncedAt: lastSynced,
         onSearch:     () => setSearchOpen(true),
         onFilter:     () => setFilterOpen(true),
         onExport:     exportCSV,

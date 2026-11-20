@@ -137,33 +137,15 @@ function ContactModal({ contact, onSave, onClose, saving, error }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function ClientLocationDetailPage({ location, initialContacts, lastSyncedAt, slug }) {
+export default function ClientLocationDetailPage({ location, initialContacts, slug }) {
   const router   = useRouter();
   const [contacts,     setContacts]     = useState(initialContacts);
   const [modalContact, setModalContact] = useState(null);
   const [saving,       setSaving]       = useState(false);
   const [modalError,   setModalError]   = useState(null);
-  const [syncing,      setSyncing]      = useState(false);
-  const [syncedAt,     setSyncedAt]     = useState(lastSyncedAt);
   const { toast, showToast: _showToast } = useToast();
 
   function showToast(msg) { _showToast(msg); }
-
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/sync/locations", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
-      setSyncedAt(data.last_synced_at ?? new Date().toISOString());
-      showToast("Locations synced.");
-    } catch (err) {
-      showToast(`Sync error: ${err.message}`);
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   async function handleSaveContact(draft) {
     setSaving(true);
     setModalError(null);
@@ -224,12 +206,6 @@ export default function ClientLocationDetailPage({ location, initialContacts, la
     <AppLayout
       title={location.name}
       showActionBar={false}
-      actions={{
-        syncLabel:    "Sync Locations",
-        onSync:       handleSync,
-        syncing:      syncing,
-        lastSyncedAt: syncedAt,
-      }}
     >
 
       {/* ── Back + Title ── */}

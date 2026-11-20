@@ -207,12 +207,10 @@ function exportToCSV(rows) {
   URL.revokeObjectURL(url);
 }
 
-export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
+export default function ClientVendorsPage({ vendors }) {
   const router      = useRouter();
   const vendors_raw = vendors ?? [];
 
-  const [syncing,       setSyncing]       = useState(false);
-  const [lastSynced,    setLastSynced]    = useState(lastSyncedAt);
   const [banner,        setBanner]        = useState(null);
   const [sortKey,       setSortKey]       = useState("name");
   const [sortDir,       setSortDir]       = useState("asc");
@@ -235,26 +233,6 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
     else if (sortDir === "asc") setSortDir("desc");
     else setSortDir("asc");
   }
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res  = await fetch("/api/sync/vendors", { method: "POST" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ?? "Sync failed. Please try again.");
-      setLastSynced(new Date().toISOString());
-      setBanner({
-        type:    "success",
-        message: `Vendors sync complete. ${body.count} vendor${body.count !== 1 ? "s" : ""} processed.`,
-      });
-    } catch (err) {
-      setBanner({ type: "error", message: err.message ?? "Sync failed. Please try again." });
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   // Derive product types for filter dropdown
   const productTypes = [
     ...new Set(
@@ -308,10 +286,6 @@ export default function ClientVendorsPage({ vendors, lastSyncedAt }) {
       <AppLayout
         title="Vendors"
         actions={{
-          onSync:       handleSync,
-          syncing:      syncing,
-          lastSyncedAt: lastSynced,
-          syncLabel:    "Sync Vendors",
           onFilter:     () => setFilterOpen(true),
           onExport:     () => exportToCSV(filteredRows),
           columnsMenu: (

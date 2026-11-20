@@ -29,7 +29,7 @@ export default async function VendorDetailPage({ params }) {
   const vendor = (vendors ?? []).find((v) => toSlug(v.name) === slug);
   if (!vendor) notFound();
 
-  const [productsRes, variantsRes, syncRes, settings] = await Promise.all([
+  const [productsRes, variantsRes, settings] = await Promise.all([
     supabase
       .from("products")
       .select("*")
@@ -40,17 +40,11 @@ export default async function VendorDetailPage({ params }) {
       .from("variants")
       .select("product_id")
       .limit(2000),
-    supabase
-      .from("sync_status")
-      .select("last_synced_at")
-      .eq("sync_type", "products")
-      .single(),
     getStoreSettings(tenantId),
   ]);
 
   const products     = productsRes.data  ?? [];
   const variants     = variantsRes.data  ?? [];
-  const lastSyncedAt = syncRes.data?.last_synced_at ?? null;
   const storeName    = settings.store_name;
 
   const variantCountMap = new Map();
@@ -71,7 +65,6 @@ export default async function VendorDetailPage({ params }) {
     <ClientVendorDetailPage
       vendor={vendor}
       initialProducts={enrichedProducts}
-      initialLastSyncedAt={lastSyncedAt}
       storeName={storeName}
       shopDomain={`https://${shopDomain}`}
     />

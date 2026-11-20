@@ -169,13 +169,12 @@ export default async function InventoryPage({ searchParams }) {
     : inventory;
 
   // ── Filter options ─────────────────────────────────────────────────────────
-  const [vendorsRes, categoriesRes, collectionsRes, tagsRes, locationsRes, syncRes] = await Promise.all([
+  const [vendorsRes, categoriesRes, collectionsRes, tagsRes, locationsRes] = await Promise.all([
     supabase.from("inventory_summary").select("vendor_name").eq("tenant_id", tenantId).not("vendor_name", "is", null).order("vendor_name"),
     supabase.from("inventory_summary").select("category").eq("tenant_id", tenantId).not("category", "is", null).order("category"),
     supabase.from("inventory_summary").select("collection").eq("tenant_id", tenantId).not("collection", "is", null).order("collection"),
     supabase.from("inventory_summary").select("tags").eq("tenant_id", tenantId).not("tags", "is", null),
     supabase.from("locations").select("name").eq("tenant_id", tenantId).eq("active", true).order("name"),
-    supabase.from("sync_status").select("last_synced_at").eq("tenant_id", tenantId).eq("sync_type", "inventory_levels").maybeSingle(),
   ]);
 
   const filterOptions = {
@@ -201,7 +200,6 @@ export default async function InventoryPage({ searchParams }) {
         inventory_policy, sort: safeSortKey, dir: sortDir,
       }}
       filterOptions={filterOptions}
-      lastSyncedAt={syncRes.data?.last_synced_at ?? null}
     />
   );
 }

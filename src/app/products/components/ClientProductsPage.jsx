@@ -109,7 +109,6 @@ export default function ClientProductsPage({
   pageSize = 20,
   currentFilters = {},
   filterOptions = {},
-  lastSyncedAt: initialLastSyncedAt,
   storeName = "My Store",
   shopDomain = "",
 }) {
@@ -117,8 +116,6 @@ export default function ClientProductsPage({
   const pathname     = usePathname();
   const searchParams = useSearchParams();
 
-  const [syncing,      setSyncing]      = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState(initialLastSyncedAt);
   const [banner,       setBanner]       = useState(null);
   const { toast, showToast: _showToast } = useToast();
 
@@ -228,23 +225,6 @@ export default function ClientProductsPage({
   };
 
   // ── Sync ──────────────────────────────────────────────────────────────────
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res  = await fetch("/api/sync/products", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
-      setLastSyncedAt(data.last_synced_at ?? new Date().toISOString());
-      setBanner({ type: "success", message: "Products sync complete." });
-    } catch (err) {
-      setBanner({ type: "error", message: err.message });
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   // ── Export (current filtered page) ───────────────────────────────────────
 
   function exportCSV() {
@@ -297,10 +277,6 @@ export default function ClientProductsPage({
         onSearch:     () => setSearchOpen(true),
         onFilter:     () => setFilterOpen(true),
         onExport:     exportCSV,
-        onSync:       handleSync,
-        syncing:      syncing,
-        lastSyncedAt: lastSyncedAt,
-        syncLabel:    "Sync Products",
         columnsMenu:  (
           <ColumnToggleMenu
             columns={ALL_COLUMNS}

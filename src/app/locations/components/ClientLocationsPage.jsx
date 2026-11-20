@@ -34,12 +34,10 @@ function sortRows(rows, key, direction) {
   });
 }
 
-export default function ClientLocationsPage({ locations, lastSyncedAt }) {
+export default function ClientLocationsPage({ locations }) {
   const router        = useRouter();
   const locations_raw = locations ?? [];
 
-  const [syncing,    setSyncing]    = useState(false);
-  const [lastSynced, setLastSynced] = useState(lastSyncedAt);
   const [banner,     setBanner]     = useState(null);
   const [sortKey,    setSortKey]    = useState("name");
   const [sortDir,    setSortDir]    = useState("asc");
@@ -49,35 +47,12 @@ export default function ClientLocationsPage({ locations, lastSyncedAt }) {
     else if (sortDir === "asc") setSortDir("desc");
     else setSortDir("asc");
   }
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res  = await fetch("/api/sync/locations", { method: "POST" });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error ?? "Sync failed. Please try again.");
-      setLastSynced(new Date().toISOString());
-      setBanner({ type: "success", message: "Locations sync complete." });
-    } catch (err) {
-      setBanner({ type: "error", message: err.message ?? "Sync failed. Please try again." });
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   const sortedRows = sortRows(locations_raw, sortKey, sortDir);
 
   return (
     <AppLayout
       title="Locations"
       showActionBar={false}
-      actions={{
-        onSync:       handleSync,
-        syncing:      syncing,
-        lastSyncedAt: lastSynced,
-        syncLabel:    "Sync Locations",
-      }}
     >
       {banner && (
         <div className={`mb-4 px-4 py-3 rounded-md text-sm font-medium ${

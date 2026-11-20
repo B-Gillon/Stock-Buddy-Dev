@@ -94,12 +94,11 @@ export default async function ProductsPage({ searchParams }) {
   }));
 
   // ── Filter options (distinct values) ──────────────────────────────────────
-  const [vendorsRes, categoriesRes, collectionsRes, tagsRes, syncRes, settings] = await Promise.all([
+  const [vendorsRes, categoriesRes, collectionsRes, tagsRes, settings] = await Promise.all([
     supabase.from("products").select("vendor").eq("tenant_id", tenantId).not("vendor", "is", null).order("vendor"),
     supabase.from("products").select("category").eq("tenant_id", tenantId).not("category", "is", null).order("category"),
     supabase.from("products").select("collection").eq("tenant_id", tenantId).not("collection", "is", null).order("collection"),
     supabase.from("products").select("tags").eq("tenant_id", tenantId).not("tags", "is", null),
-    supabase.from("sync_status").select("last_synced_at").eq("tenant_id", tenantId).eq("sync_type", "products").single(),
     getStoreSettings(tenantId),
   ]);
 
@@ -121,7 +120,6 @@ export default async function ProductsPage({ searchParams }) {
       pageSize={PAGE_SIZE}
       currentFilters={{ search, vendors, categories, collections, status: statuses, tags, sort: safeSortKey, dir: sortDir }}
       filterOptions={filterOptions}
-      lastSyncedAt={syncRes.data?.last_synced_at ?? null}
       storeName={settings.store_name}
       shopDomain={`https://${shopDomain}`}
     />

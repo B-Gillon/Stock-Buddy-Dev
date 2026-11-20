@@ -176,14 +176,6 @@ export default async function DashboardPage() {
   }
   const lowStockWithPipeline = lowStock.map((v) => ({ ...v, ...(pipeline[v.variant_id] ?? { onOrder: 0, inTransit: 0, received: 0 }) }));
 
-  // ── Last sync timestamp ────────────────────────────────────────────────────
-  const { data: syncStatus } = await supabase
-    .from("sync_status")
-    .select("last_synced_at")
-    .eq("tenant_id", tenantId)
-    .eq("sync_type", "all")
-    .maybeSingle();
-
   return (
     <ClientDashboard
       lowStock={lowStockWithPipeline}
@@ -191,7 +183,6 @@ export default async function DashboardPage() {
       poReport={report}
       totalIncoming={totalIncoming}
       topIncoming={topIncoming}
-      lastSyncedAt={syncStatus?.last_synced_at ?? null}
     />
   );
 }

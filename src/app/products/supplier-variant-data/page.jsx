@@ -11,16 +11,8 @@ export default async function SupplierVariantDataPage() {
   const headersList = await headers();
   const tenantId    = await getTenantIdFromHeaders(headersList);
 
-  const { data: syncRes } = await supabase
-    .from("sync_status")
-    .select("last_synced_at")
-    .eq("tenant_id", tenantId)
-    .eq("sync_type", "products")
-    .maybeSingle();
-
   return (
     <ClientSupplierVariantDataPage
-      lastSyncedAt={syncRes?.last_synced_at ?? null}
     />
   );
 }

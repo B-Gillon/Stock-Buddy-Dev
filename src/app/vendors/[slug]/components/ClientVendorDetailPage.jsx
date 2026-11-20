@@ -109,15 +109,12 @@ function ColumnToggleMenu({ columns, visibility, onChange }) {
 export default function ClientVendorDetailPage({
   vendor,
   initialProducts,
-  initialLastSyncedAt,
   storeName = "My Store",
   shopDomain = "",
 }) {
   const products = initialProducts ?? [];
   const router   = useRouter();
 
-  const [syncing,      setSyncing]      = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState(initialLastSyncedAt);
   const [banner,       setBanner]       = useState(null);
   const { toast, showToast: _showToast } = useToast();
   const [sortKey,      setSortKey]      = useState("title");
@@ -158,23 +155,6 @@ export default function ClientVendorDetailPage({
     else if (sortDir === "asc") setSortDir("desc");
     else setSortDir("asc");
   }
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res  = await fetch("/api/sync/vendors", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
-      setLastSyncedAt(data.last_synced_at ?? new Date().toISOString());
-      setBanner({ type: "success", message: "Products sync complete." });
-    } catch (err) {
-      setBanner({ type: "error", message: err.message });
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   const sortedProducts = useMemo(
     () => sortRows(products, sortKey, sortDir),
     [products, sortKey, sortDir]
@@ -187,12 +167,6 @@ export default function ClientVendorDetailPage({
     <AppLayout
       title={vendor.name}
       showActionBar={false}
-      actions={{
-        onSync:       handleSync,
-        syncing:      syncing,
-        lastSyncedAt: lastSyncedAt,
-        syncLabel:    "Sync Products",
-      }}
     >
       {banner && (
         <div className={`mb-4 px-4 py-3 rounded-md text-sm font-medium ${

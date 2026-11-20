@@ -191,36 +191,17 @@ function Dropzone({ file, onFile }) {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function ClientImportPage({ suppliers, lastSyncedAt }) {
+export default function ClientImportPage({ suppliers }) {
   const router = useRouter();
   const [file,            setFile]            = useState(null);
   const [supplierId,      setSupplierId]      = useState("");
   const [unknownHandling, setUnknownHandling] = useState("error");
   const [error,           setError]           = useState(null);
   const [processing,      setProcessing]      = useState(false);
-  const [syncing,         setSyncing]         = useState(false);
-  const [lastSynced,      setLastSynced]      = useState(lastSyncedAt);
   const [banner,          setBanner]          = useState(null);
   const [downloading,     setDownloading]     = useState(false);
 
   const selectedSupplier = suppliers.find((s) => s.id === supplierId) ?? null;
-
-  async function handleSync() {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res  = await fetch("/api/sync/products", { method: "POST" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Sync failed.");
-      setLastSynced(data.last_synced_at ?? new Date().toISOString());
-      setBanner({ type: "success", message: "Products sync complete." });
-    } catch (err) {
-      setBanner({ type: "error", message: err.message });
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   async function handleContinue() {
     if (!file)       { setError("Please select a CSV file."); return; }
     if (!supplierId) { setError("Please select a supplier."); return; }
@@ -267,12 +248,6 @@ export default function ClientImportPage({ suppliers, lastSyncedAt }) {
     <AppLayout
       title="Import Supplier Variant Info"
       showActionBar={false}
-      actions={{
-        onSync:       handleSync,
-        syncing:      syncing,
-        lastSyncedAt: lastSynced,
-        syncLabel:    "Sync Products",
-      }}
     >
       {banner && (
         <div className={`mb-4 px-4 py-3 rounded-md text-sm font-medium ${

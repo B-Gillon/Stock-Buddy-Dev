@@ -19,12 +19,6 @@ export default async function VendorsPage() {
   const headersList = await headers();
   const tenantId    = await getTenantIdFromHeaders(headersList);
 
-  const { data: syncStatus } = await supabase
-    .from("sync_status")
-    .select("last_synced_at")
-    .eq("tenant_id", tenantId)
-    .eq("sync_type", "vendors")
-    .maybeSingle();
 
   const { data: vendors } = await supabase
     .from("vendors")
@@ -96,7 +90,6 @@ export default async function VendorsPage() {
   return (
     <ClientVendorsPage
       vendors={enrichedVendors}
-      lastSyncedAt={syncStatus?.last_synced_at ?? null}
     />
   );
 }

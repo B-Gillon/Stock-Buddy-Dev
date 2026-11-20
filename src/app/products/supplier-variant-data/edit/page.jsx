@@ -11,7 +11,7 @@ export default async function SupplierVariantDataEditPage() {
   const headersList = await headers();
   const tenantId    = await getTenantIdFromHeaders(headersList);
 
-  const [suppliersRes, rowsRes, syncRes] = await Promise.all([
+  const [suppliersRes, rowsRes] = await Promise.all([
     supabase
       .from("suppliers")
       .select("id, supplier_name, currency")
@@ -31,12 +31,6 @@ export default async function SupplierVariantDataEditPage() {
       .eq("tenant_id", tenantId)
       .order("updated_at", { ascending: false })
       .limit(2000),
-    supabase
-      .from("sync_status")
-      .select("last_synced_at")
-      .eq("tenant_id", tenantId)
-      .eq("sync_type", "products")
-      .maybeSingle(),
   ]);
 
   const suppliers = suppliersRes.data ?? [];
@@ -77,7 +71,6 @@ export default async function SupplierVariantDataEditPage() {
       initialRows={rows}
       categories={categories}
       collections={collections}
-      lastSyncedAt={syncRes?.last_synced_at ?? null}
     />
   );
 }

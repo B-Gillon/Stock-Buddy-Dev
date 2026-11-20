@@ -317,35 +317,12 @@ export default function ClientDashboard({
   poReport,
   totalIncoming,
   topIncoming,
-  lastSyncedAt,
 }) {
   const router = useRouter();
-  const [syncing,    setSyncing]    = useState(false);
-  const [lastSynced, setLastSynced] = useState(lastSyncedAt);
-
-  async function handleSync() {
-    setSyncing(true);
-    try {
-      const res = await fetch("/api/sync/all", { method: "POST" });
-      if (!res.ok) throw new Error("Sync failed.");
-      setLastSynced(new Date().toISOString());
-    } catch (err) {
-      console.error("Dashboard sync error:", err.message);
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   return (
     <AppLayout
       title="Dashboard"
       showActionBar={false}
-      actions={{
-        onSync:       handleSync,
-        syncing:      syncing,
-        syncLabel:    "Sync Everything",
-        lastSyncedAt: lastSynced,
-      }}
     >
       <div className="grid grid-cols-[3fr_2fr] gap-4">
         <style>{'.dashboard-table tbody tr { height: 22px !important; } .dashboard-table tbody td { padding-top: 2px !important; padding-bottom: 2px !important; }'}</style>

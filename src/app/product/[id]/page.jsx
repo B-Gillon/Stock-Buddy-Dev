@@ -13,7 +13,7 @@ export default async function ProductDetailPage({ params }) {
   const headersList = await headers();
   const { tenantId, shopDomain } = await getTenantFromHeaders(headersList);
 
-  const [productRes, variantsRes, syncRes] = await Promise.all([
+  const [productRes, variantsRes] = await Promise.all([
     supabase.from("products").select("*").eq("shopify_product_id", id).eq("tenant_id", tenantId).single(),
     supabase
       .from("variants")
@@ -21,12 +21,6 @@ export default async function ProductDetailPage({ params }) {
       .eq("shopify_product_id", id)
       .eq("tenant_id", tenantId)
       .order("display_title", { ascending: true }),
-    supabase
-      .from("sync_status")
-      .select("last_synced_at")
-      .eq("tenant_id", tenantId)
-      .eq("sync_type", "products")
-      .single(),
   ]);
 
   if (!productRes.data) notFound();
@@ -35,7 +29,6 @@ export default async function ProductDetailPage({ params }) {
     <ClientProductDetailPage
       product={productRes.data}
       variants={variantsRes.data || []}
-      lastSyncedAt={syncRes.data?.last_synced_at ?? null}
       shopDomain={`https://${shopDomain}`}
     />
   );

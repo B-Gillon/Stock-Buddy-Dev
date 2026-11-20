@@ -35,12 +35,6 @@ export default async function LocationsPage() {
     (primaryContacts ?? []).map((c) => [c.location_id, c])
   );
 
-  const { data: syncStatus } = await supabase
-    .from("sync_status")
-    .select("last_synced_at")
-    .eq("tenant_id", tenantId)
-    .eq("sync_type", "locations")
-    .maybeSingle();
 
   const enrichedLocations = (locations ?? []).map((location) => {
     const primary = primaryByLocation.get(location.id);
@@ -57,7 +51,6 @@ export default async function LocationsPage() {
   return (
     <ClientLocationsPage
       locations={enrichedLocations}
-      lastSyncedAt={syncStatus?.last_synced_at ?? null}
     />
   );
 }
