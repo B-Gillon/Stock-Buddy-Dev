@@ -1,0 +1,28 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "a4cd12728e076d66ae9f660ae0d35c6c"
+name = "Stock Buddy Dev"
+application_url = "https://stock-buddy-dev.brandongillon.com"
+embedded = true
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_products,read_inventory,write_inventory,read_locations"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://stock-buddy-dev.brandongillon.com/api/shopify/callback"
+]
+
+[webhooks]
+api_version = "2026-10"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "https://stock-buddy-dev.brandongillon.com/api/webhooks/shopify"
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "https://stock-buddy-dev.brandongillon.com/api/webhooks/shopify"
