@@ -8,6 +8,7 @@ import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { validateShipment, normalizeSscc, resolveToday } from '@/lib/shipmentFields';
 import { loadLabelSettings, validSscc } from '@/lib/sscc';
+import { findUsedLots, usedLotsMessage } from '@/lib/lotCheck';
 
 const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
 const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -29,6 +30,13 @@ export async function createShipment({ tenantId, supplierId, userName, poId, shi
   const cartonsIn = Array.isArray(cartons) ? cartons : [];
   const errors = validateShipment(config, sh, cartonsIn);
   if (errors.length) return { ok: false, error: errors[0] + (errors.length > 1 ? ` (and ${errors.length - 1} more)` : ''), status: 400 };
+
+  // A lot number can only ever be used once
+  if (config.carton.lot_number.visible) {
+    const usedLots = await findUsedLots({ tenantId, supplierId,
+      lots: cartonsIn.flatMap((c) => (c.lines ?? []).filter((r) => Number(r.qty) > 0).map((r) => r.lot_number)) });
+    if (usedLots.length) return { ok: false, error: usedLotsMessage(usedLots), status: 400 };
+  }
 
   // Generated SSCCs must be ones this supplier reserved for this PO and hasn't used yet
   const labels = await loadLabelSettings(tenantId, supplierId);
@@ -99,8 +107,6 @@ export async function createShipment({ tenantId, supplierId, userName, poId, shi
       length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,
       dim_unit: hasD ? c.dim_unit : null,
       pallet_id: vc.pallet_id.visible ? clean(c.pallet_id) : null,
-      lot_number: vc.lot_number.visible ? clean(c.lot_number) : null,
-      expiration_date: vc.expiration_date.visible ? clean(c.expiration_date) : null,
     };
   });
   const { data: cartonIds, error: cErr } = await supabase.from('shipment_cartons').insert(cartonRows).select('id, carton_no');
@@ -112,7 +118,11 @@ export async function createShipment({ tenantId, supplierId, userName, poId, shi
   cartonsIn.forEach((c, i) => {
     for (const r of c.lines ?? []) {
       const q = Number(r.qty) || 0;
-      if (q > 0) lineRows.push({ tenant_id: tenantId, shipment_id: created.id, carton_id: idByNo.get(i + 1), po_line_id: r.lineId, shipped_qty: q });
+      if (q > 0) lineRows.push({
+        tenant_id: tenantId, shipment_id: created.id, carton_id: idByNo.get(i + 1), po_line_id: r.lineId, shipped_qty: q,
+        lot_number: vc.lot_number.visible ? clean(r.lot_number) : null,
+        expiration_date: vc.expiration_date.visible ? clean(r.expiration_date) : null,
+      });
     }
   });
   const { error: lErr } = await supabase.from('shipment_lines').insert(lineRows);

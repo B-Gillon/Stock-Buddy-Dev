@@ -8,6 +8,7 @@ import { shippedByLine } from '@/lib/shipments';
 import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { validateShipment, normalizeSscc } from '@/lib/shipmentFields';
 import { loadLabelSettings, reserveSscc } from '@/lib/sscc';
+import { findUsedLots, usedLotsMessage } from '@/lib/lotCheck';
 
 const clean = (v) => { const t = String(v ?? '').replace(/\s+/g, ' ').trim(); return t === '' ? null : t; };
 const numOrNull = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -45,17 +46,41 @@ export async function PATCH(request, { params }) {
   const errs = validateShipment(config, { ship_date: '2000-01-01' }, [forCheck]).filter((e) => e.startsWith('Carton 1'));
   if (errs.length) return bad(errs[0].replace('Carton 1', `Carton ${carton.carton_no}`));
 
+  // Lot numbers: not used on any other shipment, and one expire date per lot within this shipment
+  const vcfg = config.carton;
+  const newLines = (c.lines ?? []).filter((r) => Number(r.qty) > 0);
+  if (vcfg.lot_number.visible) {
+    const lots = newLines.map((r) => r.lot_number);
+    try {
+      const usedLots = await findUsedLots({ tenantId, supplierId, lots, excludeShipmentId: shipment.id });
+      if (usedLots.length) return bad(usedLotsMessage(usedLots));
+    } catch (e) { return bad(e.message, 500); }
+    const keys = [...new Set(lots.map((l) => clean(l)?.toLowerCase()).filter(Boolean))];
+    if (keys.length) {
+      const { data: sameShip } = await supabase.from('shipment_lines').select('lot_key, expiration_date')
+        .eq('shipment_id', shipment.id).neq('carton_id', carton.id).in('lot_key', keys);
+      for (const r of newLines) {
+        const k = clean(r.lot_number)?.toLowerCase(); const e = clean(r.expiration_date);
+        if (k && e && (sameShip ?? []).some((x) => x.lot_key === k && x.expiration_date && x.expiration_date !== e)) {
+          return bad(`Lot ${clean(r.lot_number)} has a different expire date on another carton of this shipment.`);
+        }
+      }
+    }
+  }
+
   // Quantities: everything shipped on other cartons + this carton's new quantities must stay within the ordered quantity
   const { data: lines } = await supabase.from('purchase_order_lines').select('id, order_qty_units').eq('purchase_order_id', po.id);
   const lineMap = new Map((lines ?? []).map((l) => [l.id, l]));
-  const { data: oldRows } = await supabase.from('shipment_lines').select('po_line_id, shipped_qty').eq('carton_id', carton.id);
-  const oldQ = {}; for (const r of oldRows ?? []) oldQ[r.po_line_id] = (oldQ[r.po_line_id] ?? 0) + r.shipped_qty;
-  const newQ = {};
+  const { data: oldRows } = await supabase.from('shipment_lines').select('po_line_id, shipped_qty, lot_number, expiration_date').eq('carton_id', carton.id);
+  const oldQ = {}; const oldLx = {};
+  for (const r of oldRows ?? []) { oldQ[r.po_line_id] = (oldQ[r.po_line_id] ?? 0) + r.shipped_qty; oldLx[r.po_line_id] = { lot: r.lot_number ?? null, exp: r.expiration_date ?? null }; }
+  const newQ = {}; const newLx = {};
   for (const r of c.lines ?? []) {
     const q = Number(r.qty) || 0;
     if (!q) continue;
     if (!lineMap.has(r.lineId)) return bad('A line does not belong to this purchase order.');
     newQ[r.lineId] = (newQ[r.lineId] ?? 0) + q;
+    newLx[r.lineId] = { lot: vcfg.lot_number.visible ? clean(r.lot_number) : null, exp: vcfg.expiration_date.visible ? clean(r.expiration_date) : null };
   }
   const shipped = await shippedByLine([...lineMap.keys()]);
   for (const [lineId, q] of Object.entries(newQ)) {
@@ -63,6 +88,7 @@ export async function PATCH(request, { params }) {
   }
   const ids = new Set([...Object.keys(oldQ), ...Object.keys(newQ)]);
   const contentChanged = [...ids].some((id) => (oldQ[id] ?? 0) !== (newQ[id] ?? 0));
+  const lotChanged = Object.keys(newQ).some((id) => (newLx[id]?.lot ?? null) !== (oldLx[id]?.lot ?? null) || (newLx[id]?.exp ?? null) !== (oldLx[id]?.exp ?? null));
 
   // Label data: new SSCC when contents changed (or there was none), same SSCC otherwise
   const vc = config.carton;
@@ -88,8 +114,6 @@ export async function PATCH(request, { params }) {
     length: hasD ? numOrNull(c.length) : null, width: hasD ? numOrNull(c.width) : null, height: hasD ? numOrNull(c.height) : null,
     dim_unit: hasD ? c.dim_unit : null,
     pallet_id: vc.pallet_id.visible ? clean(c.pallet_id) : null,
-    lot_number: vc.lot_number.visible ? clean(c.lot_number) : null,
-    expiration_date: vc.expiration_date.visible ? clean(c.expiration_date) : null,
   }).eq('id', carton.id);
   if (upErr) { console.error('[carton edit] update failed:', upErr); return bad('Could not save the carton. Please try again.', 500); }
 
@@ -98,13 +122,13 @@ export async function PATCH(request, { params }) {
     if (carton.sscc) await supabase.from('supplier_ssccs').update({ voided_at: new Date().toISOString() }).eq('tenant_id', tenantId).eq('sscc', carton.sscc);
   }
 
-  if (contentChanged) {
+  if (contentChanged || lotChanged) {
     await supabase.from('shipment_lines').delete().eq('carton_id', carton.id);
-    const rows = Object.entries(newQ).map(([lineId, q]) => ({ tenant_id: tenantId, shipment_id: shipment.id, carton_id: carton.id, po_line_id: lineId, shipped_qty: q }));
+    const rows = Object.entries(newQ).map(([lineId, q]) => ({ tenant_id: tenantId, shipment_id: shipment.id, carton_id: carton.id, po_line_id: lineId, shipped_qty: q, lot_number: newLx[lineId]?.lot ?? null, expiration_date: newLx[lineId]?.exp ?? null }));
     const { error: lErr } = await supabase.from('shipment_lines').insert(rows);
     if (lErr) {
       console.error('[carton edit] lines failed, restoring:', lErr);
-      await supabase.from('shipment_lines').insert(Object.entries(oldQ).map(([lineId, q]) => ({ tenant_id: tenantId, shipment_id: shipment.id, carton_id: carton.id, po_line_id: lineId, shipped_qty: q })));
+      await supabase.from('shipment_lines').insert(Object.entries(oldQ).map(([lineId, q]) => ({ tenant_id: tenantId, shipment_id: shipment.id, carton_id: carton.id, po_line_id: lineId, shipped_qty: q, lot_number: oldLx[lineId]?.lot ?? null, expiration_date: oldLx[lineId]?.exp ?? null })));
       return bad('Could not save the carton. Please try again.', 500);
     }
     // Status follows the shipments

@@ -26,7 +26,7 @@ export default async function ShipmentsView({ poId, lines }) {
   const [{ data: cartons }, { data: items }] = ids.length
     ? await Promise.all([
         supabase.from("shipment_cartons").select("*").in("shipment_id", ids).order("carton_no", { ascending: true }),
-        supabase.from("shipment_lines").select("shipment_id, carton_id, po_line_id, shipped_qty").in("shipment_id", ids),
+        supabase.from("shipment_lines").select("shipment_id, carton_id, po_line_id, shipped_qty, lot_number, expiration_date").in("shipment_id", ids),
       ])
     : [{ data: [] }, { data: [] }];
 
@@ -60,9 +60,10 @@ export default async function ShipmentsView({ poId, lines }) {
           has("weight") && { key: "weight", head: "Weight", get: (c) => (c.weight != null ? `${Number(c.weight)} ${c.weight_unit ?? ""}` : null) },
           has("length") && { key: "dims", head: "Dimensions", get: (c) => (c.length != null ? `${Number(c.length)} × ${Number(c.width)} × ${Number(c.height)} ${c.dim_unit ?? ""}` : null) },
           has("pallet_id") && { key: "pallet_id", head: "Pallet ID", get: (c) => c.pallet_id },
-          has("lot_number") && { key: "lot_number", head: "Lot Number", get: (c) => c.lot_number },
-          has("expiration_date") && { key: "expiration_date", head: "Lot Expire", get: (c) => (c.expiration_date ? fmtDate(c.expiration_date) : null) },
         ].filter(Boolean);
+        // Lot and expire date belong to each item in a carton
+        const hasLot = its.some((i) => i.lot_number);
+        const hasExp = its.some((i) => i.expiration_date);
 
         return (
           <Card key={s.id} title={`${s.shipment_number} · ${units.toLocaleString()} unit${units === 1 ? "" : "s"}${cs.length ? ` · ${cs.filter((c) => c.received_at).length} of ${cs.length} cartons received` : ""}`}>
@@ -91,6 +92,8 @@ export default async function ShipmentsView({ poId, lines }) {
                       {cols.map((c) => <th key={c.key} className="px-3 py-2 font-medium">{c.head}</th>)}
                       <th className="px-3 py-2 font-medium">SKU</th>
                       <th className="px-3 py-2 font-medium">Quantity</th>
+                      {hasLot && <th className="px-3 py-2 font-medium">Lot Number</th>}
+                      {hasExp && <th className="px-3 py-2 font-medium">Expire Date</th>}
                       <th className="px-3 py-2 font-medium">Received</th>
                     </tr>
                   </thead>
@@ -107,6 +110,8 @@ export default async function ShipmentsView({ poId, lines }) {
                           <td className="px-3 py-2 text-gray-800">
                             {ci.map((i) => <div key={i.po_line_id}>{i.shipped_qty}</div>)}
                           </td>
+                          {hasLot && <td className="px-3 py-2 text-gray-700">{ci.map((i) => <div key={i.po_line_id}>{i.lot_number || "—"}</div>)}</td>}
+                          {hasExp && <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{ci.map((i) => <div key={i.po_line_id}>{i.expiration_date ? fmtDate(i.expiration_date) : "—"}</div>)}</td>}
                           <td className="px-3 py-2 text-gray-700 whitespace-nowrap">
                             {c.received_at ? <span className="text-green-700">{fmtDateTime(c.received_at)}</span> : "—"}
                           </td>

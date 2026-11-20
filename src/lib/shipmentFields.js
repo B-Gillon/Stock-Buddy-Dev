@@ -43,8 +43,8 @@ export const CARTON_FIELDS = [
   { id: 'weight',             label: 'Weight (with unit)', kind: 'weight', hiddenByDefault: true },
   { id: 'dimensions',         label: 'Dimensions: Length × Width × Height (with unit)', kind: 'dims', hiddenByDefault: true },
   { id: 'pallet_id',          label: 'Pallet ID',          kind: 'text', hiddenByDefault: true },
-  { id: 'lot_number',         label: 'Lot Number',         kind: 'text', hiddenByDefault: true },
-  { id: 'expiration_date',    label: 'Expiration Date',    kind: 'date', hiddenByDefault: true },
+  { id: 'lot_number',         label: 'Lot Number',         kind: 'text', hiddenByDefault: true, perItem: true },
+  { id: 'expiration_date',    label: 'Expire Date',        kind: 'date', hiddenByDefault: true, perItem: true },
 ];
 
 export const SHIPMENT_FIELDS = [
@@ -153,12 +153,23 @@ export function validateShipment(config, shipment, cartons) {
       carton_tracking: () => ({ value: c.tracking_number }), weight: () => ({ value: c.weight, unit: c.weight_unit }),
       dimensions: () => ({ length: c.length, width: c.width, height: c.height, unit: c.dim_unit }),
       pallet_id: () => ({ value: c.pallet_id }),
-      lot_number: () => ({ value: c.lot_number }), expiration_date: () => ({ value: c.expiration_date }),
     };
-    if (config.carton.lot_number.visible && !blank(c.lot_number) && !LOT_RE.test(String(c.lot_number).trim())) {
-      errors.push(`${n}, Lot Number: up to 20 letters, numbers or - . / _ (no spaces).`);
+    // Lot Number and Expire Date are entered per item in the carton, not per carton
+    const lotCfg = config.carton.lot_number, expCfg = config.carton.expiration_date;
+    for (const l of c.lines ?? []) {
+      if (!(Number(l.qty) > 0)) continue;
+      const who = l.sku ? ` (item ${l.sku})` : '';
+      if (lotCfg.visible) {
+        if (blank(l.lot_number)) { if (lotCfg.required) errors.push(`${n}, Lot Number: required${who}.`); }
+        else if (!LOT_RE.test(String(l.lot_number).trim())) errors.push(`${n}, Lot Number: up to 20 letters, numbers or - . / _ (no spaces)${who}.`);
+      }
+      if (expCfg.visible) {
+        if (blank(l.expiration_date)) { if (expCfg.required) errors.push(`${n}, Expire Date: required${who}.`); }
+        else if (!isDate(String(l.expiration_date))) errors.push(`${n}, Expire Date: not a valid date${who}.`);
+      }
     }
     for (const def of CARTON_FIELDS) {
+      if (def.perItem) continue;
       const g = cget[def.id]();
       checkField(def, config.carton[def.id], (k) => g[k], `${n}, ${def.label.replace(/ \(with unit\)/, '').replace(/:.*/, '')}`, errors);
     }
@@ -167,6 +178,17 @@ export function validateShipment(config, shipment, cartons) {
     if (config.enforceValidSscc && config.carton.supplier_carton_id.visible && cn) {
       if (!/^\d{20}$/.test(cn)) errors.push(`${n}, SSCC Case Number: enter exactly 20 digits.`);
       else if (!(cn.startsWith('00') && isValidSscc(cn))) errors.push(`${n}, SSCC Case Number: not a valid SSCC. It must start with 00 and end with a correct GS1 check digit.`);
+    }
+  });
+  // One lot, one expire date: the same lot can't carry two different expire dates within a shipment
+  const expByLot = new Map();
+  (cartons ?? []).forEach((c, i) => {
+    for (const l of c.lines ?? []) {
+      if (!(Number(l.qty) > 0) || blank(l.lot_number) || blank(l.expiration_date)) continue;
+      const k = String(l.lot_number).trim().toLowerCase();
+      const prev = expByLot.get(k);
+      if (prev && prev !== l.expiration_date) errors.push(`Carton ${i + 1}, Lot Number: lot ${String(l.lot_number).trim()} has two different expire dates in this shipment.`);
+      else expByLot.set(k, l.expiration_date);
     }
   });
   return errors;

@@ -7,6 +7,7 @@ import { loadShipmentConfig } from '@/lib/shipmentSettings';
 import { validateShipment, resolveToday } from '@/lib/shipmentFields';
 import { shippedByLine } from '@/lib/shipments';
 import { createShipment } from '@/lib/createShipment';
+import { findUsedLots } from '@/lib/lotCheck';
 import { MAP_FIELDS, DELIMITERS, parseDelimited, autoMatch } from '@/lib/shipmentMapFields';
 
 const MAX_ROWS = 5000;
@@ -28,7 +29,7 @@ export function normalizeDate(v) {
 
 // Labels used in validateShipment messages -> the file field they come from
 const LABEL_TO_FIELD = {
-  'SSCC Case Number': 'supplier_carton_id', 'Lot Number': 'lot_number', 'Expiration Date': 'expiration_date',
+  'SSCC Case Number': 'supplier_carton_id', 'Lot Number': 'lot_number', 'Expire Date': 'expiration_date', 'Expiration Date': 'expiration_date',
   'Carton Tracking Number': 'carton_tracking', 'PRO/Tracking#': 'tracking_number', 'Packing Slip Number': 'packing_slip_number',
   'Supplier Shipment Reference': 'supplier_reference', 'Ship Date': 'ship_date',
 };
@@ -177,8 +178,13 @@ export async function buildImportPlan({ tenantId, supplierId, fileText, clientDa
     if (some && none) for (const r of g.rows) if (!r.v.supplier_carton_id) err(r, 'supplier_carton_id', 'Carton ID is blank. Every row of this shipment needs one.');
     for (const c of g.cartons.values()) {
       conflicts(c.rows, 'carton_tracking', 'Must be the same on every row of this carton.');
-      conflicts(c.rows, 'lot_number', 'Items in one carton must share a lot. Use separate cartons for different lots.');
-      conflicts(c.rows, 'expiration_date', 'Items in one carton must share an expiration date. Use separate cartons for different lots.');
+      // Lot and expire date belong to each item: one item can have only one of each per carton
+      const byItem = new Map();
+      for (const r of c.rows) if (r.lineId) { if (!byItem.has(r.lineId)) byItem.set(r.lineId, []); byItem.get(r.lineId).push(r); }
+      for (const rs of byItem.values()) {
+        conflicts(rs, 'lot_number', 'An item can have only one lot per carton. Use a separate carton for a second lot.');
+        conflicts(rs, 'expiration_date', 'An item can have only one expire date per carton.');
+      }
       if (c.id) {
         const owner = cartonOwner.get(c.id.toLowerCase());
         if (owner && owner !== key) for (const r of c.rows) err(r, 'supplier_carton_id', `Carton ID ${c.id} is used on more than one shipment in this file.`);
@@ -186,6 +192,23 @@ export async function buildImportPlan({ tenantId, supplierId, fileText, clientDa
       }
     }
   }
+  // A lot number can only be used once: not twice in this file on different shipments, and not on any earlier shipment
+  const lotOwner = new Map();
+  for (const [key, g] of groups) {
+    for (const r of g.rows) {
+      const k = low(r.v.lot_number);
+      if (!k) continue;
+      const owner = lotOwner.get(k);
+      if (owner && owner !== key) err(r, 'lot_number', `Lot ${r.v.lot_number} is used on more than one shipment in this file. A lot number can only be used once.`);
+      else lotOwner.set(k, key);
+    }
+  }
+  const lotRows = rows.filter((r) => r.v.lot_number);
+  if (lotRows.length) {
+    const usedLots = new Set((await findUsedLots({ tenantId, supplierId, lots: lotRows.map((r) => r.v.lot_number) })).map(low));
+    for (const r of lotRows) if (usedLots.has(low(r.v.lot_number))) err(r, 'lot_number', `Lot ${r.v.lot_number} was already used on an earlier shipment. A lot number can only be used once.`);
+  }
+
   // Carton IDs already used on an earlier shipment
   const ids = [...new Set(rows.map((r) => r.v.supplier_carton_id).filter(Boolean))];
   if (ids.length) {
@@ -211,12 +234,15 @@ export async function buildImportPlan({ tenantId, supplierId, fileText, clientDa
     const shipment = { today: resolveToday(clientDate), ship_date: g.date, tracking_number: first.tracking_number, supplier_reference: first.supplier_reference, packing_slip_number: first.packing_slip_number };
     const cartons = [...g.cartons.values()].map((c) => {
       const byLine = new Map();
-      for (const r of c.rows) if (r.lineId && r.qty) byLine.set(r.lineId, (byLine.get(r.lineId) ?? 0) + r.qty);
+      for (const r of c.rows) {
+        if (!(r.lineId && r.qty)) continue;
+        const cur = byLine.get(r.lineId) ?? { qty: 0, sku: lineById.get(r.lineId)?.sku, lot_number: r.v.lot_number ?? '', expiration_date: r.exp ?? '' };
+        cur.qty += r.qty; byLine.set(r.lineId, cur);
+      }
       const f0 = c.rows[0].v;
       return {
-        supplier_carton_id: c.id, tracking_number: f0.carton_tracking, lot_number: f0.lot_number,
-        expiration_date: c.rows[0].exp ?? '', _rows: c.rows,
-        lines: [...byLine].map(([lineId, qty]) => ({ lineId, qty })),
+        supplier_carton_id: c.id, tracking_number: f0.carton_tracking, _rows: c.rows,
+        lines: [...byLine].map(([lineId, x]) => ({ lineId, ...x })),
       };
     });
     for (const msg of validateShipment(config, shipment, cartons)) {
@@ -233,9 +259,9 @@ export async function buildImportPlan({ tenantId, supplierId, fileText, clientDa
       poNumber: g.po.po_number, shipDate: g.date, tracking: first.tracking_number || null, reference: first.supplier_reference || null,
       packingSlip: first.packing_slip_number || null, units,
       cartons: cartons.map((c, i) => ({
-        no: i + 1, cartonId: c.supplier_carton_id || null, tracking: c.tracking_number || null, lot: c.lot_number || null, exp: c.expiration_date || null,
+        no: i + 1, cartonId: c.supplier_carton_id || null, tracking: c.tracking_number || null,
         units: c.lines.reduce((t, x) => t + x.qty, 0),
-        items: c.lines.map((x) => ({ sku: lineById.get(x.lineId)?.sku ?? '', title: lineById.get(x.lineId)?.title ?? '', qty: x.qty })),
+        items: c.lines.map((x) => ({ sku: lineById.get(x.lineId)?.sku ?? '', title: lineById.get(x.lineId)?.title ?? '', qty: x.qty, lot: x.lot_number || null, exp: x.expiration_date || null })),
       })),
     });
     payloads.push({ poId: g.po.id, shipment, cartons: cartons.map(({ _rows, ...rest }) => rest) });

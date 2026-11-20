@@ -177,17 +177,14 @@ export default function ImportRecap() {
             <thead><tr className="text-left text-gray-400">
               <th className="px-4 py-1.5 font-medium">Carton</th><th className="px-2 py-1.5 font-medium">Carton ID</th>
               <th className="px-2 py-1.5 font-medium">Items</th><th className="px-2 py-1.5 font-medium">Units</th>
-              <th className="px-2 py-1.5 font-medium">Lot</th><th className="px-2 py-1.5 font-medium">Expires</th>
             </tr></thead>
             <tbody>
               {g.cartons.map((c) => (
                 <tr key={c.no} className="border-t border-gray-50 align-top">
                   <td className="px-4 py-1.5 text-gray-800">Carton {c.no}</td>
                   <td className="px-2 py-1.5 font-mono text-gray-700">{c.cartonId ?? '—'}</td>
-                  <td className="px-2 py-1.5 text-gray-700">{c.items.map((it, i) => <div key={i}>{it.sku}{it.title ? ` – ${it.title}` : ''} × {it.qty.toLocaleString()}</div>)}</td>
+                  <td className="px-2 py-1.5 text-gray-700">{c.items.map((it, i) => <div key={i}>{it.sku}{it.title ? ` – ${it.title}` : ''} × {it.qty.toLocaleString()}{it.lot ? ` · Lot ${it.lot}` : ''}{it.exp ? ` · Exp ${fmtDate(it.exp)}` : ''}</div>)}</td>
                   <td className="px-2 py-1.5 text-gray-700">{c.units.toLocaleString()}</td>
-                  <td className="px-2 py-1.5 text-gray-700">{c.lot ?? '—'}</td>
-                  <td className="px-2 py-1.5 text-gray-700">{fmtDate(c.exp)}</td>
                 </tr>
               ))}
             </tbody>

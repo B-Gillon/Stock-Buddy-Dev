@@ -27,8 +27,8 @@ export const MAP_GROUPS = [
     { id: 'supplier_sku', label: 'Supplier SKU', explain: 'Identifies the item by the supplier\'s own item number, as saved on the product. Same rule as SKU.', identifier: true, aliases: ['suppliersku', 'vendorsku', 'vendoritem', 'vendoritemnumber', 'vendorpart', 'supplieritem'] },
     { id: 'barcode', label: 'Barcode', explain: 'Identifies the item by its UPC/EAN, as saved on the product. Same rule as SKU.', identifier: true, aliases: ['barcode', 'upc', 'ean', 'gtin', 'upccode'] },
     { id: 'ship_qty', label: 'Ship Qty (units)', explain: 'Units of this item in this carton. Must be a whole number above 0. Total shipped for an item can\'t exceed what\'s still unshipped on the PO.', required: true, aliases: ['shipqty', 'qtyshipped', 'quantityshipped', 'shippedqty', 'shippedquantity', 'qty', 'quantity'] },
-    { id: 'lot_number', label: 'Lot Number', explain: 'Optional. The lot for this item in this carton. An item can have only one lot per carton. A second lot needs a separate carton.', aliases: ['lot', 'lotnumber', 'lotno', 'batch', 'batchnumber'] },
-    { id: 'expiration_date', label: 'Expiration Date', explain: 'Optional. The expiry for this item\'s lot. Must be a valid date.', aliases: ['expiration', 'expirationdate', 'expiry', 'expirydate', 'expdate', 'expires', 'bestby'] },
+    { id: 'lot_number', label: 'Lot Number', explain: 'Optional. The lot for this item in this carton. An item can have only one lot per carton. A second lot needs a separate carton. A lot number can only be used once, ever.', aliases: ['lot', 'lotnumber', 'lotno', 'batch', 'batchnumber'] },
+    { id: 'expiration_date', label: 'Expire Date', explain: 'Optional. The expiry for this item\'s lot. Must be a valid date.', aliases: ['expiration', 'expirationdate', 'expiry', 'expirydate', 'expdate', 'expires', 'bestby'] },
   ] },
 ];
 

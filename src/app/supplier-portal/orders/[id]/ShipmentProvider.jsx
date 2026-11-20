@@ -35,7 +35,7 @@ export function CreateShipmentButton({ enabled, hint }) {
 
 const input = 'h-9 w-full rounded border border-gray-300 bg-white px-2 text-sm';
 const today = () => new Date().toLocaleDateString('en-CA');
-const blankCarton = () => ({ f: { weight_unit: 'lb', dim_unit: 'in' }, q: {} });
+const blankCarton = () => ({ f: { weight_unit: 'lb', dim_unit: 'in' }, q: {}, lx: {} }); // q: qty per line, lx: lot / expire date per line
 
 function Field({ label, required, children, wide }) {
   return (
@@ -81,8 +81,6 @@ export function CartonFields({ cfg, f, set, autoSscc, enforce }) {
         </Field>
       )}
       {v('pallet_id') && <Field label="Pallet ID" required={r('pallet_id')}>{text('pallet_id')}</Field>}
-      {v('lot_number') && <Field label="Lot Number" required={r('lot_number')}>{text('lot_number')}</Field>}
-      {v('expiration_date') && <Field label="Expiration Date" required={r('expiration_date')}><input className={input} type="date" value={f.expiration_date ?? ''} onChange={(e) => set({ expiration_date: e.target.value })} /></Field>}
     </div>
   );
 }
@@ -127,13 +125,16 @@ function ShipmentDetails({ cfg, s, set }) {
 
 const th = 'text-left px-3 py-2 font-medium';
 
-export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
+export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols, cfg, onLx }) {
+  const lotOn = cfg?.lot_number?.visible; const expOn = cfg?.expiration_date?.visible;
   return (
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-gray-100 text-left text-xs text-gray-500">
           {idCols.map((c) => <th key={c.id} className="py-1 pr-3 font-medium">{c.label}</th>)}<th className="py-1 pr-3 font-medium">Description</th>
-          <th className="py-1 pr-3 font-medium">Left to Ship</th><th className="py-1 font-medium">Carton Qty</th>
+          <th className="py-1 pr-3 font-medium">Left to Ship</th><th className="py-1 pr-3 font-medium">Carton Qty</th>
+          {lotOn && <th className="py-1 pr-3 font-medium">Lot Number{cfg.lot_number.required ? <span className="text-red-600"> *</span> : null}</th>}
+          {expOn && <th className="py-1 font-medium">Expire Date{cfg.expiration_date.required ? <span className="text-red-600"> *</span> : null}</th>}
         </tr>
       </thead>
       <tbody>
@@ -145,11 +146,13 @@ export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
               {idCols.map((c) => <td key={c.id} className="py-1.5 pr-3 text-gray-600">{idValue(l, c.id)}</td>)}
               <td className="py-1.5 pr-3 text-gray-800">{l.title}</td>
               <td className="py-1.5 pr-3 text-gray-800">{Math.max(0, left - mine)}</td>
-              <td className="py-1">
+              <td className="py-1 pr-3">
                 <input type="number" min="0" max={left} step="1" inputMode="numeric" disabled={left === 0 && !mine}
                   value={carton.q[l.id] ?? ''} onChange={(e) => onQty(l.id, e.target.value)}
                   className="h-8 w-24 rounded border border-gray-300 px-2 text-sm disabled:bg-gray-100" />
               </td>
+              {lotOn && <td className="py-1 pr-3"><input maxLength={20} value={carton.lx?.[l.id]?.lot ?? ''} onChange={(e) => onLx(l.id, { lot: e.target.value })} className="h-8 w-32 rounded border border-gray-300 px-2 text-sm" /></td>}
+              {expOn && <td className="py-1"><input type="date" value={carton.lx?.[l.id]?.exp ?? ''} onChange={(e) => onLx(l.id, { exp: e.target.value })} className="h-8 w-36 rounded border border-gray-300 px-1 text-sm" /></td>}
             </tr>
           );
         })}
@@ -158,13 +161,21 @@ export function ItemQtyTable({ lines, carton, leftFor, onQty, idCols }) {
   );
 }
 
-const labelUrl = (sscc, c) => `/supplier-portal/labels?sscc=${sscc}${c?.f?.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c?.f?.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`;
+// A case label carries one lot / expire date: used when every item in the carton has the same ones, otherwise left off
+function cartonLotExp(c, lines) {
+  const pairs = new Set();
+  for (const l of lines) if ((Number(c.q?.[l.id] || 0) || 0) > 0) pairs.add(`${c.lx?.[l.id]?.lot || ''}|${c.lx?.[l.id]?.exp || ''}`);
+  if (pairs.size !== 1) return { lot: null, exp: null };
+  const [lot, exp] = [...pairs][0].split('|');
+  return { lot: lot || null, exp: exp || null };
+}
+const labelUrl = (sscc, le) => `/supplier-portal/labels?sscc=${sscc}${le?.lot ? `&lot=${encodeURIComponent(le.lot)}` : ''}${le?.exp ? `&exp=${le.exp}` : ''}`;
 // Case label for a carton still being built: prints the 20-digit SSCC Case Number (or the generated SSCC)
 export const BTN_BLUE = 'inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700';
 const hasCaseNo = (c) => /^[\x20-\x7E]{1,40}$/.test((c?.f?.supplier_carton_id ?? '').trim());
-const caseLabelUrl = (c, n, poId) => hasCaseNo(c)
-  ? `/supplier-portal/labels?code=${encodeURIComponent(c.f.supplier_carton_id.trim())}&po=${poId}&n=${n}${c.f.lot_number ? `&lot=${encodeURIComponent(c.f.lot_number)}` : ''}${c.f.expiration_date ? `&exp=${c.f.expiration_date}` : ''}`
-  : (c?.f?.sscc ? labelUrl(c.f.sscc, c) : null);
+const caseLabelUrl = (c, n, poId, le) => hasCaseNo(c)
+  ? `/supplier-portal/labels?code=${encodeURIComponent(c.f.supplier_carton_id.trim())}&po=${poId}&n=${n}${le?.lot ? `&lot=${encodeURIComponent(le.lot)}` : ''}${le?.exp ? `&exp=${le.exp}` : ''}`
+  : (c?.f?.sscc ? labelUrl(c.f.sscc, le) : null);
 const SSCC_PLACEHOLDER = '000000000000000000';
 
 export function LinesTable({ poId, lines, currency, exportLinks, config, lineColumns, labels }) {
@@ -178,11 +189,14 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   const [error, setError] = useState('');
   const [cols, setCols] = useState(lineColumns);
   const [colsOpen, setColsOpen] = useState(false);
-  const [showAll, setShowAll] = useState(false);       // Create Shipment list: only unshipped lines by default
   const idCols = LINE_COLUMN_DEFS.filter((c) => cols[c.id] && ['sku','supplier_sku','barcode'].includes(c.id));
-  const visible = LINE_COLUMN_DEFS.filter((c) => cols[c.id]).map((c) => c.id);
-  const order = creating ? visible.flatMap((id) => (id === 'unit_cost' ? ['ship_qty', 'carton_qty', id] : [id])) : visible;
-  if (creating && !order.includes('ship_qty')) order.push('ship_qty', 'carton_qty');
+  const lotCfg = config.carton.lot_number; const expCfg = config.carton.expiration_date;
+  // Creating a shipment: no Received column here; Carton Qty is followed by Lot Number and Expire Date
+  const colDefs = LINE_COLUMN_DEFS.filter((c) => !(creating && c.id === 'received'));
+  const visible = colDefs.filter((c) => cols[c.id]).map((c) => c.id);
+  const packCols = ['carton_qty', ...(lotCfg.visible ? ['lot_number'] : []), ...(expCfg.visible ? ['expiration_date'] : [])];
+  const order = creating ? visible.flatMap((id) => (id === 'unit_cost' ? [...packCols, id] : [id])) : visible;
+  if (creating && !order.includes('carton_qty')) order.push(...packCols);
 
   async function toggleCol(id) {
     const next = { ...cols, [id]: !cols[id] };
@@ -206,12 +220,24 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
   const leftFor = (l, own) => remainingBase(l) - ((thisShipment[l.id] ?? 0) - qtyIn(own, l.id));
 
   const curNo = saved.length + 1; // each shipment numbers its cartons from 1
-  const shownLines = creating && !showAll ? lines.filter((l) => remainingBase(l) > 0) : lines;
+  const shownLines = creating ? lines.filter((l) => remainingBase(l) > 0) : lines; // Create Shipment lists only lines with unshipped quantity
   const totalUnits = lines.reduce((t, l) => t + (l.ordered ?? 0), 0);
   const totalCost = lines.reduce((t, l) => t + (parseFloat(l.extended) || 0), 0);
   const cartonCount = saved.length + (hasQty(cur) ? 1 : 0);
 
-  const cartonPayload = (c) => ({ ...c.f, lines: lines.map((l) => ({ lineId: l.id, qty: qtyIn(c, l.id) })).filter((x) => x.qty) });
+  const cartonPayload = (c) => ({ ...c.f, lines: lines.map((l) => ({ lineId: l.id, sku: l.sku, qty: qtyIn(c, l.id), lot_number: c.lx?.[l.id]?.lot ?? '', expiration_date: c.lx?.[l.id]?.exp ?? '' })).filter((x) => x.qty) });
+  // Has any lot on these cartons already been used on an earlier shipment? ('' = no)
+  async function usedLotsError(cartons) {
+    if (!lotCfg.visible) return '';
+    const lots = cartons.flatMap((c) => lines.filter((l) => qtyIn(c, l.id) > 0).map((l) => (c.lx?.[l.id]?.lot ?? '').trim())).filter(Boolean);
+    if (!lots.length) return '';
+    try {
+      const res = await fetch('/api/supplier-portal/lots', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lots }) });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.ok && d.used?.length) return `Lot Number ${d.used.join(', ')} ${d.used.length === 1 ? 'was' : 'were'} already used on an earlier shipment. A lot number can only be used once.`;
+    } catch { /* the server checks again when the shipment is saved */ }
+    return '';
+  }
   const withPh = (c) => (labels?.enabled && !c.f.sscc ? { ...c, f: { ...c.f, sscc: SSCC_PLACEHOLDER } } : c);
   async function reserve(cartonNo) {
     const res = await fetch('/api/supplier-portal/sscc', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ poId, cartonNo }) });
@@ -235,6 +261,8 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     const errs = cartonErrors(cur, curNo);
     if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
     setError('');
+    const lotErr = await usedLotsError([cur]);
+    if (lotErr) { setError(lotErr); return; }
     let carton = cur;
     if (labels?.enabled) {
       const w = labels.printMode === 'each_carton' ? window.open('', '_blank') : null; // opened now so the browser allows it
@@ -242,7 +270,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
       try {
         const sscc = await reserve(curNo);
         carton = { ...cur, f: { ...cur.f, sscc } };
-        if (w) w.location.href = labelUrl(sscc, cur);
+        if (w) w.location.href = labelUrl(sscc, cartonLotExp(cur, lines));
       } catch (e) { w?.close(); setError(e.message); setBusy(false); return; }
       setBusy(false);
     }
@@ -254,9 +282,11 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     setSaved((cs) => cs.filter((_, k) => k !== i));
     setEditIdx((e) => (e == null ? null : e === i ? null : e > i ? e - 1 : e));
   }
-  function doneEditing(i) {
+  async function doneEditing(i) {
     const errs = cartonErrors(saved[i], i + 1);
     if (errs.length) { setError(errs.slice(0, 3).join(' ')); return; }
+    const lotErr = await usedLotsError([saved[i]]);
+    if (lotErr) { setError(lotErr); return; }
     setError(''); setEditIdx(null);
   }
 
@@ -276,6 +306,8 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
     for (const l of lines) if ((thisShipment[l.id] ?? 0) > remainingBase(l)) errs.push(`${l.sku || `Line ${l.lineNo}`}: more than the ${remainingBase(l)} remaining unshipped.`);
     if (errs.length) { setError(errs.slice(0, 4).join(' ') + (errs.length > 4 ? ` (and ${errs.length - 4} more)` : '')); return; }
     setBusy(true);
+    const lotErr = await usedLotsError(all);
+    if (lotErr) { setError(lotErr); setBusy(false); return; }
     const wantWin = labels?.enabled && (labels.printMode === 'end' || (labels.printMode === 'each_carton' && hasQty(cur)));
     const w = wantWin ? window.open('', '_blank') : null;
     try {
@@ -291,7 +323,7 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
       const res = await fetch('/api/supplier-portal/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, clientDate: today() }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) { w?.close(); setError(data.error || 'Something went wrong.'); setBusy(false); return; }
-      if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc, cartons[cartons.length - 1]);
+      if (w) w.location.href = labels.printMode === 'end' ? `/supplier-portal/labels?shipment=${data.shipmentId}` : labelUrl(cartons[cartons.length - 1].f.sscc, cartonLotExp(cartons[cartons.length - 1], lines));
       setLastShipmentId(data.shipmentId);
       cancel(); setBusy(false); router.refresh();
     } catch (e) { w?.close(); setError(e?.message || 'Something went wrong.'); setBusy(false); }
@@ -322,21 +354,13 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
             {creating ? 'Create Shipment' : 'Line Items'}
           </h2>
           <div className="flex items-center gap-2">
-            {creating && (
-              <div className="flex overflow-hidden rounded border border-gray-300 text-xs" role="group" aria-label="Which line items to show">
-                {[[false, 'Unshipped'], [true, 'All lines']].map(([v, label]) => (
-                  <button key={label} type="button" onClick={() => setShowAll(v)}
-                    className={`px-3 py-1 transition ${showAll === v ? 'bg-gray-200 font-semibold text-gray-900' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>{label}</button>
-                ))}
-              </div>
-            )}
             <div className="relative">
               <button type="button" onClick={() => setColsOpen((o) => !o)}
                 className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 text-gray-600 transition">Columns</button>
               {colsOpen && (
                 <div className="absolute right-0 z-10 mt-1 w-52 rounded-md border border-gray-200 bg-white p-2 shadow-lg">
                   <p className="px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400">Show columns</p>
-                  {LINE_COLUMN_DEFS.map((c) => (
+                  {colDefs.map((c) => (
                     <label key={c.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm text-gray-700 hover:bg-gray-50">
                       <input type="checkbox" checked={!!cols[c.id]} onChange={() => toggleCol(c.id)} />{c.label}
                     </label>
@@ -357,7 +381,8 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200 text-xs text-gray-600">
               {order.map((id) => {
-                if (id === 'ship_qty') return <th key={id} className={th}>Shipment Qty</th>;
+                if (id === 'lot_number') return <th key={id} className={th}>Lot Number{lotCfg.required ? <span className="text-red-600"> *</span> : null}</th>;
+                if (id === 'expiration_date') return <th key={id} className={th}>Expire Date{expCfg.required ? <span className="text-red-600"> *</span> : null}</th>;
                 if (id === 'carton_qty') return (
                   <th key={id} className={th}>
                     <button type="button" onClick={fillCurrent} title={`Fill Carton ${curNo} with every remaining unshipped quantity`}
@@ -391,9 +416,16 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
                   case 'ordered': return <td key={id} className="px-3 py-2 text-gray-800">{l.ordered?.toLocaleString() ?? '—'}</td>;
                   case 'shipped': return <td key={id} className="px-3 py-2 text-gray-800">{(l.shipped ?? 0).toLocaleString()}</td>;
                   case 'received': return <td key={id} className="px-3 py-2 text-gray-800">{(l.received ?? 0).toLocaleString()}</td>;
-                  case 'ship_qty': return (
-                    <td key={id} className={`px-3 py-2 font-medium ${(thisShipment[l.id] ?? 0) > remainingBase(l) ? 'text-red-600' : 'text-gray-900'}`}>
-                      {(thisShipment[l.id] ?? 0).toLocaleString()}
+                  case 'lot_number': return (
+                    <td key={id} className="px-3 py-1.5">
+                      <input maxLength={20} value={cur.lx?.[l.id]?.lot ?? ''} onChange={(e) => setCur((c) => ({ ...c, lx: { ...c.lx, [l.id]: { ...c.lx?.[l.id], lot: e.target.value } } }))}
+                        className="h-8 w-32 rounded border border-gray-300 px-2 text-sm" />
+                    </td>
+                  );
+                  case 'expiration_date': return (
+                    <td key={id} className="px-3 py-1.5">
+                      <input type="date" value={cur.lx?.[l.id]?.exp ?? ''} onChange={(e) => setCur((c) => ({ ...c, lx: { ...c.lx, [l.id]: { ...c.lx?.[l.id], exp: e.target.value } } }))}
+                        className="h-8 w-36 rounded border border-gray-300 px-1 text-sm" />
                     </td>
                   );
                   case 'carton_qty': return (
@@ -446,20 +478,23 @@ export function LinesTable({ poId, lines, currency, exportLinks, config, lineCol
                   ? <button type="button" className="text-blue-700 hover:underline" onClick={() => doneEditing(i)}>Done</button>
                   : <button type="button" className="text-blue-700 hover:underline" onClick={() => { setEditIdx(i); setError(''); }}>Edit</button>}
                 <button type="button" className="text-red-600 hover:underline" onClick={() => removeSaved(i)}>Remove</button>
-                {caseLabelUrl(c, i + 1, poId) && <a className={BTN_BLUE} href={caseLabelUrl(c, i + 1, poId)} target="_blank" rel="noopener noreferrer">Print Case Label</a>}
+                {caseLabelUrl(c, i + 1, poId, cartonLotExp(c, lines)) && <a className={BTN_BLUE} href={caseLabelUrl(c, i + 1, poId, cartonLotExp(c, lines))} target="_blank" rel="noopener noreferrer">Print Case Label</a>}
               </div>
             </div>
             <div className="border-t border-gray-100 px-4 py-3">
               {editing ? (
                 <div className="space-y-4">
                   <CartonFields autoSscc={labels?.enabled} enforce={config.enforceValidSscc} cfg={config.carton} f={c.f} set={(patch) => patchSaved(i, { f: { ...c.f, ...patch } })} />
-                  <ItemQtyTable lines={lines} carton={c} idCols={idCols} leftFor={(l) => leftFor(l, c)}
-                    onQty={(lineId, v) => patchSaved(i, { q: { ...c.q, [lineId]: v } })} />
+                  <ItemQtyTable lines={lines} carton={c} idCols={idCols} leftFor={(l) => leftFor(l, c)} cfg={config.carton}
+                    onQty={(lineId, v) => patchSaved(i, { q: { ...c.q, [lineId]: v } })}
+                    onLx={(lineId, patch) => patchSaved(i, { lx: { ...c.lx, [lineId]: { ...c.lx?.[lineId], ...patch } } })} />
                 </div>
               ) : (
                 <ul className="text-sm text-gray-700">
                   {lines.filter((l) => qtyIn(c, l.id) > 0).map((l) => (
-                    <li key={l.id} className="flex gap-3"><span className="w-28 text-gray-500">{l.sku || '—'}</span><span className="flex-1">{l.title}</span><span className="font-medium">{qtyIn(c, l.id)}</span></li>
+                    <li key={l.id} className="flex gap-3"><span className="w-28 text-gray-500">{l.sku || '—'}</span><span className="flex-1">{l.title}</span>
+                      {(c.lx?.[l.id]?.lot || c.lx?.[l.id]?.exp) && <span className="mr-4 text-xs text-gray-500">{[c.lx?.[l.id]?.lot && `Lot ${c.lx[l.id].lot}`, c.lx?.[l.id]?.exp && `Exp ${c.lx[l.id].exp}`].filter(Boolean).join(' · ')}</span>}
+                      <span className="font-medium">{qtyIn(c, l.id)}</span></li>
                   ))}
                 </ul>
               )}

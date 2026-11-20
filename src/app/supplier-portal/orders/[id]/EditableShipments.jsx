@@ -15,9 +15,10 @@ const toDraft = (c, cartonLines) => ({
     supplier_carton_id: s2(c.supplier_carton_id), sscc: s2(c.sscc), tracking_number: s2(c.tracking_number),
     weight: s2(c.weight), weight_unit: c.weight_unit || 'lb',
     length: s2(c.length), width: s2(c.width), height: s2(c.height), dim_unit: c.dim_unit || 'in',
-    pallet_id: s2(c.pallet_id), lot_number: s2(c.lot_number), expiration_date: s2(c.expiration_date),
+    pallet_id: s2(c.pallet_id),
   },
   q: Object.fromEntries(cartonLines.map((l) => [l.po_line_id, String(l.shipped_qty)])),
+  lx: Object.fromEntries(cartonLines.map((l) => [l.po_line_id, { lot: s2(l.lot_number), exp: s2(l.expiration_date) }])),
 });
 
 export default function EditableShipments({ shipments: allShipments, lines, config, lineColumns, labels }) {
@@ -38,7 +39,7 @@ export default function EditableShipments({ shipments: allShipments, lines, conf
   function cancel() { setEditId(null); setDraft(null); setError(''); }
 
   async function save(c) {
-    const payload = { ...draft.f, lines: lines.map((l) => ({ lineId: l.id, qty: Number(draft.q[l.id] || 0) || 0 })).filter((x) => x.qty) };
+    const payload = { ...draft.f, lines: lines.map((l) => ({ lineId: l.id, sku: l.sku, qty: Number(draft.q[l.id] || 0) || 0, lot_number: draft.lx?.[l.id]?.lot ?? '', expiration_date: draft.lx?.[l.id]?.exp ?? '' })).filter((x) => x.qty) };
     const errs = validateShipment(config, { ship_date: '2000-01-01' }, [{ ...payload, sscc: labels?.enabled ? (c.sscc || '000000000000000000') : payload.sscc }])
       .filter((e) => e.startsWith('Carton 1'));
     if (errs.length) { setError(errs[0].replace('Carton 1', `Carton ${c.carton_no}`)); return; }
@@ -86,7 +87,8 @@ export default function EditableShipments({ shipments: allShipments, lines, conf
                   {editing && draft && (
                     <div className="space-y-4 border-t border-gray-100 px-3 py-3">
                       <CartonFields enforce={config.enforceValidSscc} cfg={cartonCfg} f={draft.f} set={(patch) => setDraft((d) => ({ ...d, f: { ...d.f, ...patch } }))} autoSscc={labels?.enabled} />
-                      <ItemQtyTable lines={lines} carton={draft} idCols={idCols}
+                      <ItemQtyTable lines={lines} carton={draft} idCols={idCols} cfg={cartonCfg}
+                        onLx={(lineId, patch) => setDraft((d) => ({ ...d, lx: { ...d.lx, [lineId]: { ...d.lx?.[lineId], ...patch } } }))}
                         leftFor={(l) => Math.max(0, l.ordered - l.shipped) + savedQty(c, l.id)}
                         onQty={(lineId, v) => setDraft((d) => ({ ...d, q: { ...d.q, [lineId]: v } }))} />
                       {labels?.enabled && <p className="text-xs text-gray-500">If you change the quantities, a new SSCC and label are issued for this carton and the old label is voided.</p>}

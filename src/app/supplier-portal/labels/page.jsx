@@ -32,6 +32,20 @@ const barcode = (code) => {
 };
 const codeText = (code) => { const s = asSscc(code); return s ? `(00) ${fmt(s)}` : code; };
 
+// A case label carries one lot / expire date: used when every item in the carton has the same ones, otherwise left off
+async function lotsByCarton(cartonIds) {
+  const out = new Map();
+  if (!cartonIds.length) return out;
+  const { data } = await supabase.from('shipment_lines').select('carton_id, lot_number, expiration_date').in('carton_id', cartonIds);
+  const pairs = new Map();
+  for (const r of data ?? []) {
+    if (!pairs.has(r.carton_id)) pairs.set(r.carton_id, new Map());
+    pairs.get(r.carton_id).set(`${r.lot_number ?? ''}|${r.expiration_date ?? ''}`, { lot: r.lot_number, exp: r.expiration_date });
+  }
+  for (const [id, m] of pairs) out.set(id, m.size === 1 ? [...m.values()][0] : { lot: null, exp: null });
+  return out;
+}
+
 export default async function LabelsPage({ searchParams }) {
   const s = await requireSupplier();
   const { shipment: shipmentId, carton: cartonParam, code: codeParam, po: poParam, n: nParam, sscc: ssccParam, lot: lotParam, exp: expParam } = (await searchParams) ?? {};
@@ -41,16 +55,18 @@ export default async function LabelsPage({ searchParams }) {
     const { data: sh } = await supabase.from('shipments').select('id, po_id, shipment_number, total_cartons')
       .eq('id', shipmentId).eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).maybeSingle();
     if (!sh) notFound();
-    const { data: cartons } = await supabase.from('shipment_cartons').select('carton_no, sscc, supplier_carton_id, lot_number, expiration_date')
+    const { data: cartons } = await supabase.from('shipment_cartons').select('id, carton_no, sscc, supplier_carton_id')
       .eq('shipment_id', sh.id).order('carton_no');
-    labels = (cartons ?? []).filter((c) => codeOf(c)).map((c) => ({ code: codeOf(c), cartonNo: c.carton_no, lot: c.lot_number, exp: c.expiration_date, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
+    const le = await lotsByCarton((cartons ?? []).map((c) => c.id));
+    labels = (cartons ?? []).filter((c) => codeOf(c)).map((c) => ({ code: codeOf(c), cartonNo: c.carton_no, lot: le.get(c.id)?.lot ?? null, exp: le.get(c.id)?.exp ?? null, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }));
   } else if (cartonParam) {
     const { data: c } = await supabase.from('shipment_cartons')
-      .select('carton_no, sscc, supplier_carton_id, lot_number, expiration_date, shipment:shipments!shipment_id!inner ( id, po_id, shipment_number, total_cartons, supplier_id )')
+      .select('id, carton_no, sscc, supplier_carton_id, shipment:shipments!shipment_id!inner ( id, po_id, shipment_number, total_cartons, supplier_id )')
       .eq('id', cartonParam).eq('tenant_id', s.tenantId).maybeSingle();
     const sh = Array.isArray(c?.shipment) ? c.shipment[0] : c?.shipment;
     if (!c || !sh || sh.supplier_id !== s.supplierId || !codeOf(c)) notFound();
-    labels = [{ code: codeOf(c), cartonNo: c.carton_no, lot: c.lot_number, exp: c.expiration_date, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }];
+    const le = (await lotsByCarton([c.id])).get(c.id);
+    labels = [{ code: codeOf(c), cartonNo: c.carton_no, lot: le?.lot ?? null, exp: le?.exp ?? null, total: sh.total_cartons, poId: sh.po_id, shipmentNumber: sh.shipment_number }];
   } else if (codeParam) {
     // Carton not saved yet: print straight from what the supplier typed
     if (!PRINTABLE.test(String(codeParam).trim()) || !poParam) notFound();
@@ -63,9 +79,10 @@ export default async function LabelsPage({ searchParams }) {
     let sh = null;
     if (r.shipment_id) ({ data: sh } = await supabase.from('shipments').select('shipment_number, total_cartons').eq('id', r.shipment_id).maybeSingle());
     // Saved carton: use its stored lot/expiry; not saved yet: use what the supplier just entered
-    const { data: saved } = r.shipment_id ? await supabase.from('shipment_cartons').select('lot_number, expiration_date').eq('tenant_id', s.tenantId).eq('sscc', r.sscc).maybeSingle() : { data: null };
-    const lot = saved ? saved.lot_number : String(lotParam ?? '').slice(0, 40) || null;
-    const exp = saved ? saved.expiration_date : /^\d{4}-\d{2}-\d{2}$/.test(String(expParam ?? '')) ? expParam : null;
+    const { data: saved } = r.shipment_id ? await supabase.from('shipment_cartons').select('id').eq('tenant_id', s.tenantId).eq('sscc', r.sscc).maybeSingle() : { data: null };
+    const savedLe = saved ? (await lotsByCarton([saved.id])).get(saved.id) : null;
+    const lot = saved ? (savedLe?.lot ?? null) : String(lotParam ?? '').slice(0, 40) || null;
+    const exp = saved ? (savedLe?.exp ?? null) : /^\d{4}-\d{2}-\d{2}$/.test(String(expParam ?? '')) ? expParam : null;
     labels = [{ lot, exp, code: r.sscc, cartonNo: r.carton_no, total: sh?.total_cartons ?? null, poId: r.po_id, shipmentNumber: sh?.shipment_number ?? null }];
   }
   if (!labels.length) notFound();

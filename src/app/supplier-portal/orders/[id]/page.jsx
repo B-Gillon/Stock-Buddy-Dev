@@ -48,7 +48,7 @@ export default async function OrderPage({ params, searchParams }) {
     .select('id, shipment_number, ship_date, total_cartons, shipment_cartons ( id, carton_no, supplier_carton_id, sscc, tracking_number, weight, weight_unit, length, width, height, dim_unit, pallet_id, lot_number, expiration_date, received_at )')
     .eq('po_id', po.id).eq('tenant_id', s.tenantId).eq('supplier_id', s.supplierId).order('created_at', { ascending: true });
   const { data: shipLineRows } = (shipRows ?? []).length
-    ? await supabase.from('shipment_lines').select('carton_id, po_line_id, shipped_qty').in('shipment_id', shipRows.map((r) => r.id))
+    ? await supabase.from('shipment_lines').select('carton_id, po_line_id, shipped_qty, lot_number, expiration_date').in('shipment_id', shipRows.map((r) => r.id))
     : { data: [] };
   const shipped = await shippedByLine((rows ?? []).map((r) => r.id));
   const svIds = [...new Set((rows ?? []).map((r) => r.supplier_variant_id).filter(Boolean))];
