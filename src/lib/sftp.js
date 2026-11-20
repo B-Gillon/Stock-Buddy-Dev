@@ -289,11 +289,23 @@ export async function refreshSftpStatus({ poId, tenantId, settings }) {
     }
   });
 
-  // One History entry per file, so each shows as "PDF Retrieved" / "CSV Retrieved"
+  // One History entry per file, so each shows as "PDF Retrieved" / "CSV Retrieved".
+  // If the History already says this file was retrieved/deleted (e.g. the hourly job got there first),
+  // leave that entry alone and don't add another.
+  const { data: existing } = await supabase
+    .from('po_activity_log')
+    .select('comments')
+    .eq('po_id', poId)
+    .eq('tenant_id', tenantId)
+    .in('action', ['sftp_retrieved', 'sftp_deleted']);
+  const alreadyLogged = (fileName) => (existing ?? []).some((e) => (e.comments ?? '').startsWith(`${fileName} `));
+
   for (const r of retrieved) {
+    if (alreadyLogged(r.file_name)) continue;
     await logPOActivity({ poId, tenantId, userName: 'System', action: 'sftp_retrieved', comments: `${r.file_name} retrieved by supplier` });
   }
   for (const r of deleted) {
+    if (alreadyLogged(r.file_name)) continue;
     await logPOActivity({ poId, tenantId, userName: 'System', action: 'sftp_deleted', comments: `${r.file_name} retrieved and deleted by supplier` });
   }
 
