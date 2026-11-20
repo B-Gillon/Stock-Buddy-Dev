@@ -170,6 +170,20 @@ export async function verifySessionToken(token) {
 }
 
 /**
+ * The Shopify staff user id (the token's `sub` claim). Only call this on a token that
+ * verifySessionToken has already accepted.
+ * @returns {string|null}
+ */
+export function userIdFromVerifiedToken(token) {
+  try {
+    const sub = parseJwt(token).payload?.sub;
+    return sub ? String(sub) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Extract and verify the session token from an incoming API request.
  *
  * Reads the Authorization header (format: "Bearer {token}"),

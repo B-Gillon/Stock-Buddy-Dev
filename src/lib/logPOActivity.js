@@ -1,5 +1,6 @@
 // /src/lib/logPOActivity.js
 import { supabase } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { readUserCookie } from '@/lib/shopify/userCookie';
 import { userLabel } from '@/lib/userLabel';
 
@@ -18,6 +19,13 @@ import { userLabel } from '@/lib/userLabel';
 export async function logPOActivity({ poId, tenantId, action, comments, request, userName }) {
   try {
     let user = userName ? { name: userName, id: null } : (request ? readUserCookie(request) : null);
+    // Shopify staff user known only from the verified session token (no cookie available)
+    const shopifyUserId = !user && request?.headers?.get?.('x-shopify-user-id');
+    const shopDomain = request?.headers?.get?.('x-shop-domain');
+    if (shopifyUserId && shopDomain) {
+      const { data: su } = await supabaseAdmin.from('shop_users').select('name').eq('shop_domain', shopDomain).eq('user_id', shopifyUserId).maybeSingle();
+      if (su?.name) user = { name: su.name, id: shopifyUserId };
+    }
     // A website (non-Shopify) user: use their username
     const webUserId = !user && request?.headers?.get?.('x-auth-user');
     if (webUserId) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, readSessionValue } from "@/lib/auth/session";
-import { verifySessionToken } from "@/lib/shopify/sessionToken";
+import { verifySessionToken, userIdFromVerifiedToken } from "@/lib/shopify/sessionToken";
 import {
   SHOP_COOKIE,
   createShopCookieValue,
@@ -172,6 +172,7 @@ export async function proxy(request) {
   // signed cookie that we only issue after such a check.
   let shopDomain = null;
   let via = null;
+  let shopifyUserId = null;
 
   const bearer = request.headers.get("authorization");
   const jwt =
@@ -181,7 +182,7 @@ export async function proxy(request) {
 
   if (jwt) {
     shopDomain = await verifySessionToken(jwt);
-    if (shopDomain) via = "session-token";
+    if (shopDomain) { via = "session-token"; shopifyUserId = userIdFromVerifiedToken(jwt); }
   }
   if (!shopDomain) {
     shopDomain = verifyShopifyLoadUrl(request.nextUrl.searchParams);
@@ -208,6 +209,7 @@ export async function proxy(request) {
   requestHeaders.delete("x-auth-user");
   requestHeaders.delete("x-auth-role");
   requestHeaders.delete("x-auth-supplier");
+  requestHeaders.delete("x-shopify-user-id");
 
   if (!shopDomain) {
     // Not inside Shopify and not signed in: send page visits to the website login
@@ -216,6 +218,7 @@ export async function proxy(request) {
   }
 
   requestHeaders.set("x-shop-domain", shopDomain);
+  if (shopifyUserId) requestHeaders.set("x-shopify-user-id", shopifyUserId);
   if (host) requestHeaders.set("x-shopify-host", host);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });

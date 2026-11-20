@@ -14,6 +14,7 @@ import { getShopFromSessionToken } from "@/lib/shopify/sessionToken";
 import { exchangeTokenForAccess, exchangeTokenForOnlineUser } from "@/lib/shopify/tokenExchange";
 import { setUserCookie } from "@/lib/shopify/userCookie";
 import { supabase } from "@/lib/supabaseClient";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function POST(request) {
   // 1. Verify session token and extract shop domain
@@ -84,6 +85,14 @@ export async function POST(request) {
       const user = await exchangeTokenForOnlineUser(shop, sessionToken);
       if (user) {
         setUserCookie(response, user);
+        // Also keep the name on the server, so it can be found from the session token alone
+        // (the cookie is not available when the browser blocks third-party cookies).
+        if (user.id) {
+          await supabaseAdmin.from("shop_users").upsert(
+            { shop_domain: shop, user_id: user.id, name: user.name, email: user.email ?? null, updated_at: new Date().toISOString() },
+            { onConflict: "shop_domain,user_id" }
+          );
+        }
         console.log("[TokenExchange] User resolved; sb-user cookie set.");
       }
     } catch (userErr) {
