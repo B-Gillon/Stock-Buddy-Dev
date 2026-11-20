@@ -41,6 +41,10 @@ if (typeof window !== "undefined" && !window.__sbFetchPatched) {
 
   window.fetch = async (input, init) => {
     try {
+      if (window.self !== window.top && sameOrigin(input)) {
+        // App Bridge can still be starting up on the very first requests: wait for it briefly
+        for (let i = 0; i < 20 && !window.shopify?.idToken; i++) await new Promise((r) => setTimeout(r, 100));
+      }
       if (window.self !== window.top && window.shopify?.idToken && sameOrigin(input)) {
         const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         if (!headers.has("Authorization")) {
