@@ -18,6 +18,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
   const [sets, setSets] = useState(() => Object.fromEntries(lines.map((l) => [l.id, [blank()]])));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attempted, setAttempted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const digits = (v) => v === "" || /^\d+$/.test(v);
   const setField = (lineId, i, field, value) => {
@@ -49,6 +50,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
   const handleSubmit = async () => {
     setAttempted(true);
     if (incomplete || payload.length === 0) return;
+    setSubmitError("");
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/purchase-orders/${po.id}/putaway`, {
@@ -59,6 +61,7 @@ export default function ClientPutawayPage({ po, lines, slug }) {
       if (data.warning) showToast(data.warning, "error"); else showToast("Putaway submitted successfully.", "info");
       setTimeout(() => router.push(`/purchase-orders/${slug}`), data.warning ? 4000 : 1200);
     } catch (err) {
+      setSubmitError(err.message);
       showToast(err.message, "error");
       setIsSubmitting(false);
     }
@@ -145,6 +148,8 @@ export default function ClientPutawayPage({ po, lines, slug }) {
         </div>
 
         {attempted && (incomplete || payload.length === 0) && <p className="text-sm text-red-600">Each location needs both a Bin Location and a Putaway quantity.</p>}
+
+        {submitError && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{submitError}</p>}
 
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={() => router.push(`/purchase-orders/${slug}`)}>Cancel</Button>
