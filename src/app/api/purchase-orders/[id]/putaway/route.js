@@ -8,9 +8,15 @@ import { getTenantId } from "@/lib/tenants";
 import { supabase } from "@/lib/supabaseClient";
 import { logPOActivity } from "@/lib/logPOActivity";
 import { logError } from "@/lib/logError";
-import { fetchPOWithLines, resolveShopifyCredentials, getShopifyLocationId, adjustShopifyAvailable } from "@/lib/sync/po/poSyncHelpers";
+import { fetchPOWithLines, resolveShopifyCredentials, getShopifyLocationId, adjustShopifyAvailable, getShopifyInventoryLevel } from "@/lib/sync/po/poSyncHelpers";
 
 const BIN_RE = /^\d{1,20}$/;
+async function reversePushes(creds, locId, pushed) {
+  for (const p of pushed) {
+    try { await adjustShopifyAvailable(creds, p.itemId, locId, -p.delta); }
+    catch (e) { console.error("[putaway] could not reverse Shopify adjust", p.itemId, e.message); }
+  }
+}
 const bad = (error, status = 400) => NextResponse.json({ success: false, error }, { status });
 
 export async function POST(request, { params }) {
@@ -71,7 +77,53 @@ export async function POST(request, { params }) {
       }
     }
 
-    const { error: insErr } = await supabase.from("po_line_putaways").insert(rows);
+    // Putaway makes the stock sellable: add it to Shopify's available (only the part not already added).
+    // Shopify goes FIRST: if it can't be updated, nothing is recorded in Stock Buddy.
+    // TODO: make "when received stock becomes available" a setting (at receiving vs. at putaway).
+    const pushed = []; // { itemId, delta, lineId }
+    let creds = null;
+    let locId = null;
+    const { po, lines: fullLines } = await fetchPOWithLines(poId, tenantId);
+    if (po.receiving_source === "stock_buddy") {
+      const plan = [];
+      for (const [lineId, total] of Object.entries(totals)) {
+        const l = lineById.get(lineId);
+        const putAfter = (l.putaway_qty_units ?? 0) + total;
+        const delta = Math.max(0, putAfter - (l.shopify_available_pushed ?? 0));
+        if (delta === 0) continue;
+        const full = fullLines.find((x) => x.id === lineId);
+        const itemId = full?.variants?.inventory_items?.[0]?.shopify_inventory_item_id;
+        if (!itemId) return bad(`${l.sku || l.title}: no Shopify inventory item. Nothing was put away.`, 409);
+        plan.push({ lineId, l, itemId, delta });
+      }
+      if (plan.length) {
+        try {
+          creds = await resolveShopifyCredentials(tenantId);
+          locId = await getShopifyLocationId(po.ship_to_location_id, tenantId);
+        } catch (e) {
+          return bad(`Shopify could not be reached: ${e.message}. Nothing was put away.`, 502);
+        }
+        // Check every item is stocked at this location before changing anything.
+        for (const p of plan) {
+          let level;
+          try { level = await getShopifyInventoryLevel(creds, p.itemId, locId); }
+          catch (e) { return bad(`${p.l.sku || p.l.title}: could not check Shopify (${e.message}). Nothing was put away.`, 502); }
+          if (!level) return bad(`${p.l.sku || p.l.title} is not stocked at this PO's location in Shopify. Nothing was put away.`, 409);
+        }
+        for (const p of plan) {
+          try {
+            await adjustShopifyAvailable(creds, p.itemId, locId, p.delta);
+            pushed.push(p);
+          } catch (e) {
+            await reversePushes(creds, locId, pushed);
+            return bad(`${p.l.sku || p.l.title}: Shopify rejected the update (${e.message}). Nothing was put away.`, 502);
+          }
+        }
+      }
+    }
+
+    try {
+      const { error: insErr } = await supabase.from("po_line_putaways").insert(rows);
     if (insErr) throw new Error(insErr.message);
     for (const [lineId, total] of Object.entries(totals)) {
       const l = lineById.get(lineId);
@@ -86,43 +138,21 @@ export async function POST(request, { params }) {
         comments: `${r.qty} unit${r.qty === 1 ? "" : "s"} put away in Bin Location ${r.bin_location}` });
     }
 
-    // Putaway makes the stock sellable: add it to Shopify's available (only the part not already added).
-    // TODO: make "when received stock becomes available" a setting (at receiving vs. at putaway).
-    let warning;
-    try {
-      const { po, lines: fullLines } = await fetchPOWithLines(poId, tenantId);
-      if (po.receiving_source === "stock_buddy") {
-        let creds = null;
-        let locId = null;
-        const failures = [];
-        for (const [lineId, total] of Object.entries(totals)) {
-          const l = lineById.get(lineId);
-          const putAfter = (l.putaway_qty_units ?? 0) + total;
-          const delta = Math.max(0, putAfter - (l.shopify_available_pushed ?? 0));
-          if (delta === 0) continue;
-          const full = fullLines.find((x) => x.id === lineId);
-          const itemId = full?.variants?.inventory_items?.[0]?.shopify_inventory_item_id;
-          if (!itemId) { failures.push(`${l.sku || l.title}: no Shopify inventory item`); continue; }
-          try {
-            creds ??= await resolveShopifyCredentials(tenantId);
-            locId ??= await getShopifyLocationId(po.ship_to_location_id, tenantId);
-            await adjustShopifyAvailable(creds, itemId, locId, delta);
-            await supabase.from("purchase_order_lines")
-              .update({ shopify_available_pushed: (l.shopify_available_pushed ?? 0) + delta })
-              .eq("id", lineId).eq("tenant_id", tenantId);
-          } catch (e) { failures.push(`${l.sku || l.title}: ${e.message}`); }
-        }
-        if (failures.length) {
-          warning = "Putaway recorded. Shopify available could not be updated for: " + failures.join("; ");
-          await supabase.from("purchase_orders").update({ shopify_sync_error: warning }).eq("id", poId).eq("tenant_id", tenantId);
-        } else {
-          await supabase.from("purchase_orders").update({ shopify_synced_at: new Date().toISOString(), shopify_sync_error: null }).eq("id", poId).eq("tenant_id", tenantId);
-        }
-      }
-    } catch (e) {
-      warning = "Putaway recorded. Shopify available could not be updated: " + e.message;
+    for (const p of pushed) {
+      const { error } = await supabase.from("purchase_order_lines")
+        .update({ shopify_available_pushed: (p.l.shopify_available_pushed ?? 0) + p.delta })
+        .eq("id", p.lineId).eq("tenant_id", tenantId);
+      if (error) throw new Error(error.message);
     }
-    return NextResponse.json({ success: true, warning });
+    if (pushed.length) {
+      await supabase.from("purchase_orders").update({ shopify_synced_at: new Date().toISOString(), shopify_sync_error: null }).eq("id", poId).eq("tenant_id", tenantId);
+    }
+    } catch (e) {
+      // Recording failed after Shopify was updated: undo the Shopify change so the two stay in step.
+      await reversePushes(creds, locId, pushed);
+      throw e;
+    }
+    return NextResponse.json({ success: true });
   } catch (err) {
     await logError({ source: "putaway", error: err, tenantId: null });
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

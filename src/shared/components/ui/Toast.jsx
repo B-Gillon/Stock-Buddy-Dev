@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 
 /**
  * Toast
@@ -18,7 +18,7 @@ export function Toast({ message, type = "success" }) {
     type === "info"    ? "bg-blue-600"   :
                          "bg-blue-600";  // success → blue (brand color)
   return (
-    <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-lg px-4 py-3 text-sm text-white shadow-lg ${bg}`}>
+    <div className={`fixed top-4 right-4 z-50 flex max-w-md items-center gap-2 rounded-lg px-4 py-3 text-sm text-white shadow-lg ${bg}`}>
       {message}
     </div>
   );
@@ -33,10 +33,13 @@ export function Toast({ message, type = "success" }) {
  */
 export function useToast() {
   const [toast, setToast] = useState({ message: "", type: "success" });
+  const timer = useRef(null);
 
-  const showToast = useCallback((message, type = "success", duration = 3500) => {
+  const showToast = useCallback((message, type = "success", duration) => {
+    const ms = duration ?? (type === "error" || type === "warning" ? 8000 : 3500);
     setToast({ message, type });
-    setTimeout(() => setToast({ message: "", type: "success" }), duration);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setToast({ message: "", type: "success" }), duration);
   }, []);
 
   return { toast, showToast };
