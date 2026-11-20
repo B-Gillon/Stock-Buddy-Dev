@@ -2,7 +2,7 @@
 
 import axios from "axios";
 
-const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || "2026-10";
+export const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || "2026-10";
 
 export async function shopifyGraphQL(query, variables = {}, credentials = {}) {
   const domain      = credentials.shopDomain  ?? process.env.SHOPIFY_STORE_DOMAIN;
