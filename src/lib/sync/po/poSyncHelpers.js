@@ -49,7 +49,7 @@ const INVENTORY_ADJUST_MUTATION = `
   mutation InventoryAdjust($input: InventoryAdjustQuantitiesInput!) {
     inventoryAdjustQuantities(input: $input) {
       inventoryAdjustmentGroup { id }
-      userErrors { field message }
+      userErrors { code field message }
     }
   }
 `;
@@ -58,10 +58,12 @@ const INVENTORY_SET_MUTATION = `
   mutation InventorySet($input: InventorySetQuantitiesInput!) {
     inventorySetQuantities(input: $input) {
       inventoryAdjustmentGroup { id }
-      userErrors { field message }
+      userErrors { code field message }
     }
   }
 `;
+
+const isStale = (userErrors) => userErrors?.some((e) => e.code === "CHANGE_FROM_QUANTITY_STALE");
 
 /**
  * Fetch current inventory level from Shopify for a given
@@ -88,6 +90,24 @@ export async function getShopifyInventoryLevel(
 }
 
 /**
+ * Run an inventory mutation that needs the expected current quantity (changeFromQuantity, required
+ * from API 2026-04). Reads the current available, sends it as the expected value, and retries once
+ * if someone else changed the quantity in between.
+ */
+async function withExpectedQuantity(creds, itemId, locationId, label, run) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const level = await getShopifyInventoryLevel(creds, itemId, locationId);
+    if (!level) throw new Error(`Shopify ${label} failed: item is not stocked at this location`);
+    const result = await run(level.available);
+    if (!isStale(result.userErrors)) {
+      throwOnUserErrors(label, result.userErrors);
+      return result;
+    }
+  }
+  throw new Error(`Shopify ${label} failed: quantity kept changing, try again`);
+}
+
+/**
  * Adjust the Shopify available quantity by a delta.
  * Use positive delta to increase, negative to decrease.
  */
@@ -97,25 +117,27 @@ export async function adjustShopifyAvailable(
   shopifyLocationId,
   delta
 ) {
-  const data = await shopifyGraphQL(
-    INVENTORY_ADJUST_MUTATION,
-    {
-      input: {
-        reason: "received",
-        name: "available",
-        changes: [
-          {
-            delta,
-            inventoryItemId: toGid("InventoryItem", shopifyInventoryItemId),
-            locationId: toGid("Location", shopifyLocationId),
-          },
-        ],
+  return withExpectedQuantity(creds, shopifyInventoryItemId, shopifyLocationId, "adjust", async (current) => {
+    const data = await shopifyGraphQL(
+      INVENTORY_ADJUST_MUTATION,
+      {
+        input: {
+          reason: "received",
+          name: "available",
+          changes: [
+            {
+              delta,
+              changeFromQuantity: current,
+              inventoryItemId: toGid("InventoryItem", shopifyInventoryItemId),
+              locationId: toGid("Location", shopifyLocationId),
+            },
+          ],
+        },
       },
-    },
-    gqlCreds(creds)
-  );
-  throwOnUserErrors("adjust", data?.inventoryAdjustQuantities?.userErrors);
-  return data.inventoryAdjustQuantities;
+      gqlCreds(creds)
+    );
+    return data.inventoryAdjustQuantities;
+  });
 }
 
 /**
@@ -127,26 +149,27 @@ export async function setShopifyAvailable(
   shopifyLocationId,
   available
 ) {
-  const data = await shopifyGraphQL(
-    INVENTORY_SET_MUTATION,
-    {
-      input: {
-        reason: "correction",
-        name: "available",
-        ignoreCompareQuantity: true,
-        quantities: [
-          {
-            inventoryItemId: toGid("InventoryItem", shopifyInventoryItemId),
-            locationId: toGid("Location", shopifyLocationId),
-            quantity: available,
-          },
-        ],
+  return withExpectedQuantity(creds, shopifyInventoryItemId, shopifyLocationId, "set", async (current) => {
+    const data = await shopifyGraphQL(
+      INVENTORY_SET_MUTATION,
+      {
+        input: {
+          name: "available",
+          reason: "correction",
+          quantities: [
+            {
+              inventoryItemId: toGid("InventoryItem", shopifyInventoryItemId),
+              locationId: toGid("Location", shopifyLocationId),
+              quantity: available,
+              changeFromQuantity: current,
+            },
+          ],
+        },
       },
-    },
-    gqlCreds(creds)
-  );
-  throwOnUserErrors("set", data?.inventorySetQuantities?.userErrors);
-  return data.inventorySetQuantities;
+      gqlCreds(creds)
+    );
+    return data.inventorySetQuantities;
+  });
 }
 
 // ─── DB Helpers ───────────────────────────────────────────────────────────────
